@@ -59,13 +59,23 @@ test.describe('US5 Search & list', () => {
   });
 });
 
-test('items table has its own ระบบงาน column and a distinct header', async ({ page }) => {
+const headerTexts = async (page) => {
+  // wait until the table is rendered (e.g. right after a reload)
+  await page.locator('table.responsive thead th').first().waitFor({ state: 'attached' }); // thead is hidden on mobile
+  return (await page.locator('table.responsive thead th').allTextContents()).map((h) =>
+    h.replace(/[▲▼]/g, '').trim(),
+  );
+};
+
+test('items table: platform and system have their own columns, before the detail; distinct header', async ({
+  page,
+}) => {
   await open(page, '/#/items');
-  const headers = await page.locator('table.responsive thead th').allTextContents();
-  expect(headers.map((h) => h.replace(/[▲▼]/g, '').trim())).toEqual([
+  expect(await headerTexts(page)).toEqual([
     'ลำดับ',
-    'รายละเอียด',
+    'แพลตฟอร์ม',
     'ระบบงาน',
+    'รายละเอียด',
     'Taiga/MANTIS',
     'สถานะ',
     'ความเร่งด่วน',
@@ -74,4 +84,23 @@ test('items table has its own ระบบงาน column and a distinct header
     'กำหนดส่ง',
   ]);
   await expect(page.locator('table.responsive thead th').first()).toHaveCSS('font-weight', '600');
+});
+
+test('columns can be rearranged with the buttons, are remembered, and can be reset', async ({ page }) => {
+  await open(page, '/#/items');
+  await page.getByRole('button', { name: 'จัดคอลัมน์' }).click();
+  await page.getByRole('button', { name: 'ย้าย ระบบงาน ไปทางซ้าย' }).click();
+  expect((await headerTexts(page)).slice(0, 3)).toEqual(['ลำดับ', 'ระบบงาน', 'แพลตฟอร์ม']);
+  await page.reload();
+  expect((await headerTexts(page)).slice(0, 3)).toEqual(['ลำดับ', 'ระบบงาน', 'แพลตฟอร์ม']);
+  await page.getByRole('button', { name: 'จัดคอลัมน์' }).click();
+  await page.getByRole('button', { name: 'คืนค่าเริ่มต้น' }).click();
+  expect((await headerTexts(page)).slice(0, 3)).toEqual(['ลำดับ', 'แพลตฟอร์ม', 'ระบบงาน']);
+});
+
+test('dragging a header moves the column', async ({ page }) => {
+  test.skip(test.info().project.name !== 'desktop', 'drag is a desktop gesture; buttons cover touch');
+  await open(page, '/#/items');
+  await page.locator('th[data-col="due"]').dragTo(page.locator('th[data-col="platform"]'));
+  expect((await headerTexts(page)).slice(0, 3)).toEqual(['ลำดับ', 'กำหนดส่ง', 'แพลตฟอร์ม']);
 });
