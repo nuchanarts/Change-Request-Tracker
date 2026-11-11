@@ -392,9 +392,14 @@ function makeRepo(deps) {
   }
 
   /**
-   * Edit permission follows the sheet's own permission (R8). Named editors/viewers are answered from
-   * the sharing list. Anyone else (group or link sharing) is checked with Range.canEdit() (no write), or,
-   * if that is unavailable, a developer-metadata probe; the answer is cached per user for 1 hour.
+   * Edit permission follows the sheet's own permission (R8).
+   * 1. Named editors (sharing list) → yes.
+   * 2. Everyone else — including "anyone with the link can edit" and named viewers who also get edit
+   *    through the link (Google grants the higher role) — is decided by what the sheet actually allows:
+   *    Range.canEdit() when it says yes, otherwise a write probe (add + remove hidden developer metadata).
+   *    Range.canEdit() alone is not enough: it returns false for link-based editors (production 2026-11-11).
+   * The answer is cached per user. The probe only runs when the script runs AS the caller; otherwise fail
+   * closed (security review 2026-11-11).
    * @param {string} email
    */
   function canEdit(email) {
@@ -406,21 +411,12 @@ function makeRepo(deps) {
       }, e)
     )
       return true;
-    if (
-      listed(function () {
-        return ss.getViewers();
-      }, e)
-    )
-      return false;
-    // The probe runs with the script's identity. It only proves the caller's access when the script
-    // runs AS the caller (executeAs USER_ACCESSING); otherwise fail closed (security review 2026-11-11).
     var runningAs = deps.effectiveEmail ? clean(deps.effectiveEmail()).toLowerCase() : '';
     if (runningAs !== e) return false;
-    var key = C.EDIT_CACHE_PREFIX + e; // v2 key: ignores answers cached by the buggy v1 probe
+    var key = C.EDIT_CACHE_PREFIX + e;
     var cached = deps.userCache ? deps.userCache.get(key) : null;
     if (cached !== null) return cached === '1';
-    var result = rangeCanEdit();
-    if (result === null) result = metadataProbe();
+    var result = rangeCanEdit() === true || metadataProbe();
     if (deps.userCache) deps.userCache.put(key, result ? '1' : '0', C.EDIT_PROBE_CACHE_SECONDS);
     return result;
   }
