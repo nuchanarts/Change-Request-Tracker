@@ -4,8 +4,11 @@ import { open } from './helpers.js';
 test.describe('US8 Kanban board', () => {
   test('shows one column per open step plus closed this week', async ({ page }) => {
     await open(page, '/#/kanban');
-    await expect(page.locator('.kcol')).toHaveCount(10);
-    await expect(page.locator('.kcol').first()).toHaveAttribute('data-status', '0.รอแจ้งทีมพัฒนา');
+    await expect(page.locator('.kcol[data-status="0.รอแจ้งทีมพัฒนา"]')).toHaveCount(1);
+    await expect(page.locator('.kcol.closed')).toHaveCount(1);
+    await expect(page.locator('.kcol[data-status]').filter({ hasNot: page.locator('.other') })).toHaveCount(
+      11,
+    );
     await expect(page.locator('.kcol.bottleneck')).toHaveCount(1);
   });
 
@@ -34,6 +37,24 @@ test.describe('US8 Kanban board', () => {
     const row = await page.evaluate((s) => window.__mockSheet.rows.find((r) => r.seq === s), id);
     expect(row.status).toBe('0.แก้ไขเรียบร้อย');
     expect(row.doneDate).toMatch(/^\d{1,2}\/\d{1,2}\/20\d\d$/);
+  });
+
+  test('open items with a blank status get their own column and every open item is on the board', async ({
+    page,
+  }) => {
+    await open(page, '/#/kanban');
+    const other = page.locator('.kcol.other');
+    await expect(other).toHaveCount(1);
+    await expect(other.locator('.kcard')).toHaveCount(1);
+    const onBoard = await page.evaluate(() =>
+      [...document.querySelectorAll('.kcol:not(.closed) .kcount')].reduce(
+        (n, e) => n + Number(e.textContent),
+        0,
+      ),
+    );
+    await page.goto('/#/monitor');
+    // every open item (งานค้าง on Monitor) is somewhere on the board
+    await expect(page.locator('[data-metric="open"] .value')).toHaveText(onBoard.toLocaleString('th-TH'));
   });
 
   test('view-only users see no move buttons and cards are not draggable', async ({ page }) => {

@@ -46,6 +46,7 @@ export default [
         {
           varsIgnorePattern: '^(doGet|include|Api_|run|Domain|Config|makeRepo|Auth)',
           argsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
         },
       ],
     },
@@ -53,6 +54,15 @@ export default [
   {
     files: ['tests/**/*.js', 'scripts/**/*.mjs', '*.config.js', 'eslint.config.js'],
     languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: { ...globals.node } },
+  },
+  {
+    files: ['tests/integration/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      sourceType: 'script',
+      globals: { context_: 'readonly', Config: 'readonly', Domain: 'readonly', console: 'readonly' },
+    },
+    rules: { 'no-unused-vars': ['error', { varsIgnorePattern: '^(runIntegrationTests|finish_)$' }] },
   },
   {
     files: ['tests/e2e/**/*.js'],

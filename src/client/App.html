@@ -78,7 +78,7 @@
         if (k === 'due') return r.effectiveDue ? r.effectiveDue.y * 10000 + r.effectiveDue.m * 100 + r.effectiveDue.d : 99999999;
         if (k === 'seq') return r.seq === null ? 1e9 : r.seq;
         if (k === 'status') return D.statusRank(r.status);
-        if (k === 'urgency') return ['ด่วนที่สุด', 'ด่วน', 'ปกติ'].indexOf(r.urgency) + 1 || 9;
+        if (k === 'urgency') return D.urgencyRank(r.urgency);
         return r[k] || '￿';
       };
       return list.slice().sort(function (a, b) {
@@ -132,7 +132,11 @@
         document.getElementById('sheet-name').textContent = b.spreadsheetName;
         document.getElementById('nav-add').hidden = !(b.user.canEdit && b.schema.ok);
         render();
-        if (!store(KEYS.tour)) startTour();
+        // offer the tour once per page load, never again after saves/reloads (or when storage is blocked)
+        if (!state.tourOffered) {
+          state.tourOffered = true;
+          if (!store(KEYS.tour)) startTour();
+        }
       });
     }
 
@@ -213,9 +217,18 @@
       return out;
     }
 
-    function failMessage(res) {
+    /**
+     * Show a failed save once. In a form the details go next to the fields / in the banner;
+     * for quick actions (My Work, Kanban) there is no form, so one toast carries the details.
+     */
+    function failMessage(res, inForm) {
+      var fields = (res.details && res.details.fields) || {};
+      if (!inForm) {
+        var why = Object.keys(fields).map(function (k) { return fields[k]; }).filter(Boolean);
+        return UI.toast(res.message + (why.length ? ': ' + why.join(', ') : ''), 'error');
+      }
       if (res.code === 'VALIDATION') {
-        state.formErrors = (res.details && res.details.fields) || {};
+        state.formErrors = fields;
         return UI.toast(res.message, 'error');
       }
       var reload = res.code === 'CONFLICT' || res.code === 'SEQ_MISMATCH' || res.code === 'NOT_FOUND';
@@ -247,7 +260,7 @@
         btn.textContent = 'กำลังบันทึก…';
         return api('Api_createRequest', values).then(function (res) {
           if (!res.ok) {
-            failMessage(res);
+            failMessage(res, true);
             return render();
           }
           UI.toast('บันทึกรายการใหม่แล้ว ลำดับที่ ' + res.data.seq);
@@ -274,9 +287,8 @@
       }
       return api('Api_updateRequest', { rowNumber: row.rowNumber, seq: row.seq, changes: changes }).then(function (res) {
         if (!res.ok) {
-          failMessage(res);
+          failMessage(res, !!btn);
           render();
-          if (!btn) UI.toast(res.message, 'error');
           return false;
         }
         UI.toast('บันทึกการแก้ไขแล้ว (' + res.data.written.map(function (k) { return D.COLUMN_BY_KEY[k].header; }).join(', ') + ')');
@@ -441,14 +453,14 @@
       document.querySelectorAll('.kcol.drop-target').forEach(function (c) { c.classList.remove('drop-target'); });
     });
     document.addEventListener('dragover', function (ev) {
-      var col = ev.target.closest && ev.target.closest('.kcol');
+      var col = ev.target.closest && ev.target.closest('.kcol:not(.other)'); // the "other" column is not a drop target
       if (!col) return;
       ev.preventDefault();
       document.querySelectorAll('.kcol.drop-target').forEach(function (c) { if (c !== col) c.classList.remove('drop-target'); });
       col.classList.add('drop-target');
     });
     document.addEventListener('drop', function (ev) {
-      var col = ev.target.closest && ev.target.closest('.kcol');
+      var col = ev.target.closest && ev.target.closest('.kcol:not(.other)'); // the "other" column is not a drop target
       if (!col) return;
       ev.preventDefault();
       col.classList.remove('drop-target');

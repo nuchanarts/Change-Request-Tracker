@@ -64,6 +64,7 @@ var Domain = (function () {
     CANCELLED,
   ];
   var DEFAULT_STATUS = WORKFLOW[0];
+  var URGENCY = ['ด่วนที่สุด', 'ด่วน', 'ปกติ'];
   var UNASSIGNED = 'ยังไม่มอบหมาย';
   var NO_PM = 'ไม่ระบุ PM';
   var NO_STATUS_LABEL = '(ไม่ระบุสถานะ)';
@@ -344,7 +345,8 @@ var Domain = (function () {
       if (!inList(f.urgency, r.urgency)) return false;
       if (!inList(f.issueType, r.issueType)) return false;
       if (!inList(f.status, r.status)) return false;
-      if (!inList(f.ids, r.id)) return false;
+      // ids is a drill-down: an empty list means "nothing", never "no filter"
+      if (f.ids && f.ids.indexOf(r.id) === -1) return false;
       if (f.state === 'open' && !r.isOpen) return false;
       if (f.state === 'closed' && r.isOpen) return false;
       if (f.state === 'overdue' && !r.isOverdue) return false;
@@ -508,11 +510,28 @@ var Domain = (function () {
   /** @param {any[]} rows @param {string} query */
   function search(rows, query) {
     var q = clean(query).toLowerCase();
+    if (/^\d+$/.test(q)) {
+      // A number means "item or ticket number": match whole numbers only, never digits inside other numbers.
+      var whole = new RegExp('(^|\\D)' + q + '(\\D|$)');
+      return rows.filter(function (r) {
+        return (r.seq !== null && String(r.seq) === q) || whole.test(r.ticket);
+      });
+    }
     if (q.length < 2) return rows;
     return rows.filter(function (r) {
-      if (r.seq !== null && String(r.seq) === q) return true;
       return (r.detail + '\n' + r.system + '\n' + r.ticket).toLowerCase().indexOf(q) !== -1;
     });
+  }
+
+  /** Own data-contract key only (rejects inherited names like "constructor"). @param {string} key */
+  function isColumnKey(key) {
+    return Object.prototype.hasOwnProperty.call(COLUMN_BY_KEY, key);
+  }
+
+  /** 0 = ด่วนที่สุด … URGENCY.length = empty/unknown. @param {any} u */
+  function urgencyRank(u) {
+    var i = URGENCY.indexOf(clean(u));
+    return i === -1 ? URGENCY.length : i;
   }
 
   // ---------------------------------------------------------------- validation (FR-015..FR-021)
@@ -571,7 +590,7 @@ var Domain = (function () {
     if (!keys.length) errors._ = 'ไม่มีข้อมูลที่เปลี่ยนแปลง';
     keys.forEach(function (key) {
       if (key === 'seq') errors.seq = 'แก้ไขเลขลำดับไม่ได้';
-      else if (!COLUMN_BY_KEY[key]) errors[key] = 'ไม่รู้จักช่อง ' + key;
+      else if (!isColumnKey(key)) errors[key] = 'ไม่รู้จักช่อง ' + key;
       else {
         var msg = validateField(key, changes[key].to, options, warnings);
         if (msg) errors[key] = msg;
@@ -640,6 +659,11 @@ var Domain = (function () {
     validateUpdate: validateUpdate,
     diffChanges: diffChanges,
     nextSeq: nextSeq,
+    URGENCY: URGENCY,
+    urgencyRank: urgencyRank,
+    isColumnKey: isColumnKey,
+    clean: clean,
+    toInt: toInt,
   };
 })();
 

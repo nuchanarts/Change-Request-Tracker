@@ -41,6 +41,7 @@ function context_() {
       return LockService.getScriptLock();
     },
     cache: CacheService.getScriptCache(),
+    userCache: CacheService.getUserCache(),
     nowText: function () {
       return Utilities.formatDate(new Date(), Config.TZ, 'd/M/yyyy HH:mm:ss');
     },
@@ -83,7 +84,7 @@ function Api_bootstrap() {
 function Api_createRequest(input) {
   return guard_(function (ctx) {
     if (!ctx.repo.canEdit(ctx.email)) return Config.fail('FORBIDDEN');
-    var options = ctx.repo.options(ctx.repo.readAll().rows);
+    var options = ctx.repo.options();
     var v = Domain.validateCreate(input || {}, options);
     if (!v.ok) return Config.fail('VALIDATION', { fields: v.errors });
     return ctx.repo.create(input, ctx.email);
@@ -96,7 +97,7 @@ function Api_updateRequest(req) {
     if (!ctx.repo.canEdit(ctx.email)) return Config.fail('FORBIDDEN');
     var current = ctx.repo.readRow(Number(req && req.rowNumber));
     if (!current) return Config.fail('NOT_FOUND');
-    var options = ctx.repo.options(ctx.repo.readAll().rows);
+    var options = ctx.repo.options();
     var v = Domain.validateUpdate(req.changes || {}, current, options);
     if (!v.ok) return Config.fail('VALIDATION', { fields: v.errors });
     return ctx.repo.update(req, ctx.email);
@@ -106,7 +107,7 @@ function Api_updateRequest(req) {
 /** @param {string} name */
 function Api_setMyName(name) {
   return guard_(function (ctx) {
-    var options = ctx.repo.options(ctx.repo.readAll().rows);
+    var options = ctx.repo.options();
     if (options.person.indexOf(String(name)) === -1) {
       return Config.fail('VALIDATION', { fields: { name: 'กรุณาเลือกชื่อจากรายการ' } });
     }

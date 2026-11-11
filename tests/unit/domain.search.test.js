@@ -22,6 +22,16 @@ describe('search (FR-029)', () => {
     expect(ids('dispensary')).toEqual(['25']);
   });
 
+  it('a number-only query matches whole numbers only (ลำดับ or ticket), not digits inside other numbers', () => {
+    const more = rows.concat(
+      [
+        { seq: '1025', detail: 'ไม่เกี่ยว #125', system: 'x', ticket: '1025' },
+        { seq: '7', detail: 'อีกงาน', system: 'y', ticket: 'https://taiga/x/us/25' },
+      ].map((r, i) => D.enrich({ rowNumber: i + 10, status: 'กำลังพัฒนา', ...r }, today)),
+    );
+    expect(D.search(more, '25').map((r) => r.id)).toEqual(['25', '7']);
+  });
+
   it('matches ลำดับ exactly and ticket text', () => {
     expect(ids('25')).toEqual(['25']);
     expect(ids('1457')).toEqual(['1']);

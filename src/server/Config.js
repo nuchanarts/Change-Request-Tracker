@@ -61,6 +61,8 @@ var Config = (function () {
     LOCK_MS: 10000,
     CACHE_SECONDS: 300,
     CACHE_KEYS: { options: 'options:v1' },
+    EDIT_PROBE_KEY: 'bgs_app_edit_probe',
+    EDIT_PROBE_CACHE_SECONDS: 21600,
     MESSAGES: MESSAGES,
     ok: ok,
     fail: fail,

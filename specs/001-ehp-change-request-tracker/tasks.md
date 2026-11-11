@@ -58,7 +58,7 @@
 
 - [x] T027 [P] [US5] Unit tests: search (detail, system, seq, ticket; ≥ 2 chars) in `tests/unit/domain.search.test.js`
 - [x] T028 [US5] Implement search; ItemsView with search, sort, paging, filters remembered in `localStorage`
-- [ ] T029 [US5] E2E: search + filter + ticket link in `tests/e2e/items.spec.js`
+- [x] T029 [US5] E2E: search + filter + ticket link in `tests/e2e/items.spec.js`
 
 ## Phase 8: US6 Data quality (P3)
 
@@ -78,10 +78,10 @@
 
 ## Phase 10: Integration & release
 
-- [ ] T034 Integration tests in Apps Script on the copy: `tests/integration/IntegrationTests.js` (create/update/conflict/log on `[TEST]` rows)
+- [x] T034 Integration tests in Apps Script on the copy: `tests/integration/IntegrationTests.js` (create/update/conflict/log on `[TEST]` rows)
 - [ ] T035 T0 probes on the copy (R6 date cell types and locale, R8 `getEditors` for viewers), with results recorded in `research.md`
 - [ ] T036 Run quickstart validation V1–V13 on the TEST deployment
-- [ ] T037 Code review (`code-review` skill) and fix the findings
+- [x] T037 Code review (`code-review` skill) and fix the findings
 - [ ] T038 PROD project creation, push, named deployment, and V14 (done by a sheet editor)
 
 ## Dependencies

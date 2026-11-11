@@ -6,7 +6,8 @@
  * @param {{
  *   ss: any,                        // Spreadsheet
  *   getLock: () => any,             // () => Lock with tryLock(ms)/releaseLock()
- *   cache?: any,                    // Cache with get/put/remove (optional)
+ *   cache?: any,                    // script Cache with get/put/remove (optional)
+ *   userCache?: any,                // per-user Cache for the edit-permission probe (optional)
  *   nowText: () => string,          // 'd/m/yyyy HH:mm:ss' in Asia/Bangkok
  *   makeDate: (y:number, m:number, d:number) => any  // midnight Asia/Bangkok
  * }} deps
@@ -20,9 +21,16 @@ function makeRepo(deps) {
 
   // ------------------------------------------------------------------ helpers
 
-  /** @param {any} v */
-  function clean(v) {
-    return v === null || v === undefined ? '' : String(v).trim();
+  var clean = D.clean;
+  var toInt = D.toInt;
+
+  /**
+   * Strings are written with a leading apostrophe so Sheets stores them as typed text and never
+   * reinterprets them (leading zeros, "=" formulas, locale-parsed dates). The apostrophe is not displayed.
+   * @param {any} v
+   */
+  function asText(v) {
+    return typeof v === 'string' && v !== '' ? "'" + v : v;
   }
 
   function mainSheet() {
@@ -60,7 +68,10 @@ function makeRepo(deps) {
   function writeLog(entries) {
     if (!entries.length) return;
     var sh = ensureSheet(C.SHEETS.log, C.LOG_HEADERS);
-    sh.getRange(sh.getLastRow() + 1, 1, entries.length, C.LOG_HEADERS.length).setValues(entries);
+    var rows = entries.map(function (e) {
+      return e.map(asText);
+    });
+    sh.getRange(sh.getLastRow() + 1, 1, rows.length, C.LOG_HEADERS.length).setValues(rows);
   }
 
   /** Run fn while holding the script lock; never writes partially on timeout. @param {() => any} fn */
@@ -104,10 +115,10 @@ function makeRepo(deps) {
     if (col.type === 'date') {
       var useDate = currentValue instanceof Date || (clean(currentValue) === '' && columnIsDate);
       var p = D.parseDate(v).date;
-      return useDate && p ? deps.makeDate(p.y, p.m, p.d) : v;
+      return useDate && p ? deps.makeDate(p.y, p.m, p.d) : asText(v);
     }
     if (col.type === 'number' || col.type === 'int') return Number(v);
-    return v;
+    return asText(v);
   }
 
   /** @param {any[]} line @param {Object<string,number>} index @param {number} rowNumber */
@@ -124,9 +135,7 @@ function makeRepo(deps) {
 
   /** Read the whole main sheet in one call (constitution XIV). */
   function readAll() {
-    var range = mainSheet().getDataRange();
-    var display = range.getDisplayValues();
-    var values = range.getValues();
+    var display = mainSheet().getDataRange().getDisplayValues();
     var map = mapHeaders(display[0] || []);
     var hasDetail = map.index.detail !== undefined;
     var rows = [];
@@ -139,7 +148,7 @@ function makeRepo(deps) {
           });
       if (isItem) rows.push(rowObject(line, map.index, i + 1));
     }
-    return { rows: rows, missing: map.missing, dateColumns: detectDateColumns(values, map.index) };
+    return { rows: rows, missing: map.missing };
   }
 
   /** @param {number} rowNumber */
@@ -201,13 +210,14 @@ function makeRepo(deps) {
 
   /**
    * Option sets (constitution III): Data Validation → documented/distinct values → รายชื่อ.
-   * @param {any[]} rows raw rows from readAll
+   * @param {any[]} [rows] raw rows from readAll; read only on a cache miss when omitted
    */
   function options(rows) {
     if (deps.cache) {
       var hit = deps.cache.get(C.CACHE_KEYS.options);
       if (hit) return JSON.parse(hit);
     }
+    if (!rows) rows = readAll().rows;
     var sh = mainSheet();
     var width = sh.getLastColumn();
     var map = mapHeaders(sh.getRange(1, 1, 1, width).getDisplayValues()[0]);
@@ -266,12 +276,6 @@ function makeRepo(deps) {
     });
   }
 
-  /** @param {any} v */
-  function toInt(v) {
-    var s = clean(v);
-    return /^\d+(\.0+)?$/.test(s) ? parseInt(s, 10) : null;
-  }
-
   /**
    * Write only the changed cells after checking ลำดับ and conflicts (constitution V).
    * @param {{rowNumber:number, seq:number, changes:Object<string,{from:string,to:string}>}} req
@@ -295,7 +299,11 @@ function makeRepo(deps) {
       for (var i = 1; i < display.length; i++) if (toInt(display[i][map.index.seq]) === seq) dup++;
       if (dup > 1) return C.fail('SEQ_INVALID');
 
-      var keys = Object.keys(req.changes);
+      var keys = Object.keys(req.changes || {});
+      var unknown = keys.filter(function (key) {
+        return key === 'seq' || !D.isColumnKey(key) || map.index[key] === undefined;
+      });
+      if (!keys.length || unknown.length) return C.fail('VALIDATION', { fields: { _: unknown.join(', ') } });
       /** @type {Object<string, {expected:string, actual:string}>} */
       var conflicts = {};
       keys.forEach(function (key) {
@@ -307,24 +315,28 @@ function makeRepo(deps) {
 
       var dateColumns = detectDateColumns(values, map.index);
       var now = deps.nowText();
-      var log = keys.map(function (key) {
-        var colIdx = map.index[key];
-        var current = values[rowNumber - 1][colIdx];
-        sh.getRange(rowNumber, colIdx + 1).setValue(
-          toCellValue(key, req.changes[key].to, current, !!dateColumns[key]),
-        );
-        return [
-          now,
-          email,
-          'UPDATE',
-          rowNumber,
-          seq,
-          D.COLUMN_BY_KEY[key].header,
-          clean(line[colIdx]),
-          clean(req.changes[key].to),
-        ];
-      });
-      writeLog(log);
+      var log = [];
+      try {
+        keys.forEach(function (key) {
+          var colIdx = map.index[key];
+          var current = values[rowNumber - 1][colIdx];
+          sh.getRange(rowNumber, colIdx + 1).setValue(
+            toCellValue(key, req.changes[key].to, current, !!dateColumns[key]),
+          );
+          log.push([
+            now,
+            email,
+            'UPDATE',
+            rowNumber,
+            seq,
+            D.COLUMN_BY_KEY[key].header,
+            clean(line[colIdx]),
+            clean(req.changes[key].to),
+          ]);
+        });
+      } finally {
+        writeLog(log); // cells already written are always logged, even if a later write fails
+      }
       if (deps.cache && req.changes.system) deps.cache.remove(C.CACHE_KEYS.options);
       return C.ok({ rowNumber: rowNumber, seq: seq, written: keys });
     });
@@ -359,25 +371,58 @@ function makeRepo(deps) {
           break;
         }
       }
-      if (found === -1) sh.appendRow([e, name, now]);
-      else sh.getRange(found, 2, 1, 2).setValues([[name, now]]);
+      if (found === -1) sh.appendRow([e, name, now].map(asText));
+      else sh.getRange(found, 2, 1, 2).setValues([[asText(name), asText(now)]]);
       writeLog([[now, e, 'MAP_USER', '', '', C.USER_NAME_LABEL, old, name]]);
       return C.ok({ name: name });
     });
   }
 
-  /** Edit permission follows the sheet's own permission; any failure means view-only (R8). @param {string} email */
-  function canEdit(email) {
-    var e = clean(email).toLowerCase();
-    if (!e) return false;
+  /** @param {() => any[]} list @param {string} e */
+  function listed(list, e) {
     try {
-      return ss.getEditors().some(function (/** @type {any} */ u) {
+      return list().some(function (/** @type {any} */ u) {
         return clean(u.getEmail()).toLowerCase() === e;
       });
     } catch (err) {
-      console.warn('canEdit: getEditors failed, treating user as view-only', err);
+      console.warn('canEdit: could not read the sharing list', err);
       return false;
     }
+  }
+
+  /**
+   * Edit permission follows the sheet's own permission (R8). Named editors/viewers are answered from
+   * the sharing list. Anyone else (group or link sharing) is probed once by adding and removing a hidden
+   * developer-metadata key, which only editors can do; the answer is cached per user for 6 hours.
+   * @param {string} email
+   */
+  function canEdit(email) {
+    var e = clean(email).toLowerCase();
+    if (!e) return false;
+    if (
+      listed(function () {
+        return ss.getEditors();
+      }, e)
+    )
+      return true;
+    if (
+      listed(function () {
+        return ss.getViewers();
+      }, e)
+    )
+      return false;
+    var key = 'canEdit:' + e;
+    var cached = deps.userCache ? deps.userCache.get(key) : null;
+    if (cached !== null) return cached === '1';
+    var result;
+    try {
+      ss.addDeveloperMetadata(C.EDIT_PROBE_KEY).remove();
+      result = true;
+    } catch (_err) {
+      result = false; // the probe is refused without edit access
+    }
+    if (deps.userCache) deps.userCache.put(key, result ? '1' : '0', C.EDIT_PROBE_CACHE_SECONDS);
+    return result;
   }
 
   return {
