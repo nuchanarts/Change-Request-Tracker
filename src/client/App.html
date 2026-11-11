@@ -218,7 +218,9 @@
       resetForm();
       render();
       document.getElementById('main').focus({ preventScroll: true });
-      window.scrollTo(0, 0);
+      var y = pendingBack ? scrollMemo[currentHash] || 0 : 0;
+      pendingBack = false;
+      window.scrollTo(0, y);
     }
 
     function render() {
@@ -283,8 +285,11 @@
 
     // Pages visited in this session, for the in-app "← กลับ" button (the browser back button also works).
     var navStack = [];
+    var scrollMemo = {}; // where each page was scrolled to, so "back" lands on the same spot
+    var pendingBack = false;
 
     function go(hash, opts) {
+      if (hash !== currentHash) scrollMemo[currentHash] = window.scrollY;
       if (hash !== currentHash && !(opts && opts.back)) navStack.push(currentHash);
       if (gasHistory) {
         if (hash !== currentHash) gasHistory.push(null, null, hash.slice(1));
@@ -304,6 +309,7 @@
     function back() {
       var target = navStack.pop() || parentOf(route());
       if (target === '#/monitor') state.drill = null; // leaving a drill-down for its source
+      pendingBack = true;
       go(target, { back: true });
     }
 
@@ -431,7 +437,10 @@
         render();
         return focusFirstError();
       }
-      return saveChanges(row, changes, btn);
+      // after saving, go back to the page the item was opened from (user request 2026-11-11)
+      return saveChanges(row, changes, btn).then(function (ok) {
+        if (ok && route().name === 'items' && route().id === r.id) back();
+      });
     }
 
     function saveChanges(row, changes, btn) {
@@ -604,7 +613,7 @@
             }
             UI.toast('ลบรายการ #' + row.seq + ' แล้ว');
             resetForm();
-            go('#/items');
+            back(); // the page the item was opened from (or the list)
             load();
           });
         });
