@@ -40,6 +40,18 @@ if (args.has('--with-integration') && existsSync(join(root, 'tests/integration')
     if (f.endsWith('.js')) copyFileSync(join(root, 'tests/integration', f), join(dist, f));
   }
 }
+// Guard: every inline <script> in the client files must parse (a lost escape once broke the whole UI).
+for (const f of readdirSync(dist).filter((n) => n.endsWith('.html'))) {
+  const html = readFileSync(join(dist, f), 'utf8');
+  for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+    try {
+      new Function(m[1]);
+    } catch (e) {
+      console.error(`✖ syntax error in ${f}: ${e.message}`);
+      process.exit(1);
+    }
+  }
+}
 console.log('built dist/ →', readdirSync(dist).join(', '));
 
 // ---------------------------------------------------------------- preview/

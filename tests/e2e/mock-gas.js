@@ -186,6 +186,11 @@
       });
       return ok(Object.assign({}, m));
     },
+    Api_repairChips: function () {
+      if (!user.isAdmin)
+        return { ok: false, code: 'NOT_ADMIN', message: 'เฉพาะผู้ดูแลเท่านั้นที่จัดการสิทธิ์ได้' };
+      return ok({ repaired: 3, skipped: 1 });
+    },
     Api_setMyName: function (name) {
       user.name = name;
       return ok({ name: name });

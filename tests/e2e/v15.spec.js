@@ -101,3 +101,17 @@ test('user menu shows the account and logout / switch-account links', async ({ p
   await expect(page.getByRole('link', { name: 'ออกจากระบบ' })).toHaveAttribute('target', '_top');
   await expect(page.getByRole('link', { name: 'สลับบัญชี Google' })).toBeVisible();
 });
+
+test('filters use the full width (six equal columns on desktop)', async ({ page }) => {
+  test.skip(test.info().project.name !== 'desktop', 'desktop layout');
+  await open(page);
+  const form = await page.locator('#filters').boundingBox();
+  const last = await page.locator('#filters .field').last().boundingBox();
+  expect(form.x + form.width - (last.x + last.width)).toBeLessThan(40);
+});
+
+test('admins can repair dropdown chips', async ({ page }) => {
+  await open(page, '/#/access');
+  await page.getByRole('button', { name: 'ซ่อมสี dropdown' }).click();
+  await expect(page.locator('.toast')).toContainText('ซ่อมแล้ว 3 ช่อง');
+});

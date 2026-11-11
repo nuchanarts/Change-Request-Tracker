@@ -167,6 +167,13 @@ function Api_saveAccess(input) {
   });
 }
 
+/** Admin repair: rewrite dropdown cells written with a leading apostrophe so their chips show colours. */
+function Api_repairChips() {
+  return guard_(function (ctx) {
+    return ctx.repo.repairQuotedOptions(ctx.email, owner_(ctx));
+  });
+}
+
 /** @param {string} name */
 function Api_setMyName(name) {
   return guard_(function (ctx) {

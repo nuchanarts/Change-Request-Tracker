@@ -581,4 +581,12 @@
   /* hero order: text | tiles | illustration */
   .hero-text { order: 1; } .hero-stats { order: 2; } .hero-art { order: 3; }
   .hero .stat .label { white-space: nowrap; }
+
+  /* Filters fill the full width: six equal columns (head row spans all) */
+  .filters { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  @media (max-width: 1100px) { .filters { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 640px) { .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 420px) { .filters { grid-template-columns: 1fr; } }
+  .filters .date-row input { min-width: 0; }
+  .repair-panel { border-left: 5px solid #8b5cf6; }
 </style>
