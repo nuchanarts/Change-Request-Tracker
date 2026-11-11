@@ -142,6 +142,26 @@
       });
       return ok({ rowNumber: row.rowNumber, seq: Number(row.seq), written: Object.keys(req.changes) });
     },
+    Api_deleteRequest: function (req) {
+      if (!user.canEdit) return fail('FORBIDDEN');
+      var idx = rows.findIndex(function (r) {
+        return r.rowNumber === req.rowNumber;
+      });
+      if (idx === -1) return fail('NOT_FOUND');
+      var row = rows[idx];
+      if (String(row.seq) !== String(req.seq)) return fail('SEQ_MISMATCH');
+      var conflicts = {};
+      Object.keys(req.snapshot || {}).forEach(function (k) {
+        if (String(row[k] || '').trim() !== String(req.snapshot[k] || '').trim())
+          conflicts[k] = { expected: req.snapshot[k], actual: row[k] };
+      });
+      if (Object.keys(conflicts).length) return fail('CONFLICT', conflicts);
+      rows.splice(idx, 1);
+      rows.forEach(function (r) {
+        if (r.rowNumber > req.rowNumber) r.rowNumber -= 1; // rows below move up, like Sheets
+      });
+      return ok({ rowNumber: req.rowNumber, seq: Number(req.seq) });
+    },
     Api_requestAccess: function () {
       user.editReason = 'PENDING';
       return ok({ status: STATES.pending });

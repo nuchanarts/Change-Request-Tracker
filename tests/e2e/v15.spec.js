@@ -11,7 +11,7 @@ test.describe('Navigation order, Taiga link, access admin (2026-11-11)', () => {
       'ภาพรวม',
       'เพิ่มรายการ',
       'บอร์ดงาน',
-      'งานของฉัน',
+      'งานพัฒนาของฉัน',
       'มอบหมายงาน',
       'รายการทั้งหมด',
       'วิธีใช้งาน',
@@ -60,7 +60,7 @@ test.describe('My Work by week', () => {
     await expect(page.locator('.mw-tile')).toHaveCount(4);
     await expect(page.locator('#mw-urgent h2')).toContainText('ต้องตามด่วน');
     await expect(page.locator('#mw-this h2')).toContainText('ต้องทำสัปดาห์นี้');
-    await expect(page.locator('#mw-next h2')).toContainText('สัปดาห์หน้า');
+    await expect(page.locator('#mw-plan h2')).toContainText('แผนรายสัปดาห์');
   });
 });
 
@@ -135,10 +135,32 @@ test('My Work (PM): "no due date" section belongs to the PM tab, no "done" encou
 }) => {
   await page.addInitScript(() => {
     localStorage.setItem('ehp.myname.v1', JSON.stringify('พีเอ็ม สมใจ'));
-    localStorage.setItem('ehp.mytab.v1', JSON.stringify('pm'));
   });
-  await open(page, '/#/my-work');
+  await open(page, '/#/my-work/pm');
   await expect(page.locator('#mw-nodue')).toHaveCount(1);
   await expect(page.locator('#mw-done')).toHaveCount(0);
   await expect(page.locator('.mw-tile.plan')).toHaveCount(1);
+});
+
+test('งานพัฒนาของฉัน: developer menu with a week planner that moves by week; PM view is a link away', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('ehp.myname.v1', JSON.stringify('นักพัฒนา แดง')));
+  await open(page, '/#/my-work');
+  await expect(page.locator('h1')).toHaveText('งานพัฒนาของฉัน');
+  await expect(page.locator('#mw-urgent')).toHaveCount(1);
+  const plan = page.locator('#mw-plan');
+  await expect(plan).toContainText('สัปดาห์นี้');
+  await expect(plan.locator('.plan-day.today')).toHaveCount(1);
+  await expect(plan.locator('.plan-day')).toHaveCount(await plan.locator('.plan-day').count());
+  expect(await plan.locator('.plan-day').count()).toBeGreaterThanOrEqual(5);
+  await page.getByRole('button', { name: 'สัปดาห์ถัดไป' }).click();
+  await expect(plan.locator('.plan-range')).toContainText('สัปดาห์หน้า');
+  await expect(plan.locator('.plan-day.today')).toHaveCount(0);
+  await page.getByRole('button', { name: 'กลับสัปดาห์นี้' }).click();
+  await expect(plan.locator('.plan-range')).toContainText('สัปดาห์นี้');
+  await page.getByRole('link', { name: 'ดูงานที่ฉันดูแล (PM) →' }).click();
+  await expect(page).toHaveURL(/my-work\/pm$/);
+  await expect(page.locator('h1')).toHaveText('งานที่ฉันดูแล (PM)');
+  await expect(page.locator('#mw-plan')).toHaveCount(0);
 });

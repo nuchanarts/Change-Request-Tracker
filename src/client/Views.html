@@ -408,7 +408,7 @@
       html += '<div class="form-actions">';
       if (!readOnly) html += '<button type="submit" class="btn primary" id="save-btn">' + UI.withIcon('save', mode === 'new' ? 'บันทึกรายการใหม่' : 'บันทึกการแก้ไข') + '</button>';
       html += '<a class="btn" href="' + (mode === 'new' ? '#/monitor' : '#/items') + '">' + (readOnly ? 'กลับ' : 'ยกเลิก') + '</a>';
-      if (row && !readOnly && row.isOpen) html += '<span class="spacer"></span><button type="button" class="btn danger" data-action="cancel-item">ยกเลิกรายการนี้</button>';
+      if (row && !readOnly && row.seq !== null) html += '<span class="spacer"></span><button type="button" class="btn danger" data-action="delete-item">' + UI.withIcon('trash', 'ลบรายการนี้') + '</button>';
       html += '</div></form>';
       if (row) html += '<p class="muted" style="margin-top:12px;font-size:13px">แถวที่ ' + row.rowNumber + ' ในชีต ระบบจะบันทึกเฉพาะช่องที่คุณแก้ และเก็บประวัติไว้ในชีต _app_log</p>';
       return html;
@@ -463,7 +463,8 @@
       var name = state.myName();
       var people = (state.options.person || []).slice();
       if (name && people.indexOf(name) === -1) people.unshift(name);
-      var html = '<div class="page-head"><h1>งานของฉัน</h1></div>';
+      var html = '<div class="page-head"><h1>' + (state.myTab === 'pm' ? 'งานที่ฉันดูแล (PM)' : 'งานพัฒนาของฉัน') + '</h1>' +
+        (state.myTab === 'pm' ? '<a href="#/my-work" class="linklike">← งานพัฒนาของฉัน</a>' : '<a href="#/my-work/pm" class="linklike">ดูงานที่ฉันดูแล (PM) →</a>') + '</div>';
       if (!name || state.choosingName) {
         // one click: tap your own name (user request 2026-11-11)
         return html + '<section class="panel mw-who"><h2>คุณคือใคร?</h2><p class="muted">กดที่ชื่อของคุณครั้งเดียว ระบบจะจำไว้และแสดงเฉพาะงานของคุณ</p>' +
@@ -488,8 +489,8 @@
         (active ? '<button type="button" class="btn small" data-action="mw-clear">ล้างตัวกรอง</button>' : '') + '</div></div>';
       var week = D.weekRange(state.today);
       var next = { from: D.addDays(week.from, 7), to: D.addDays(week.to, 7) };
-      html += '<div class="tabs" role="tablist"><button role="tab" data-action="tab" data-tab="developer" aria-selected="' + (role === 'developer') + '">งานพัฒนาของฉัน</button>' +
-        '<button role="tab" data-action="tab" data-tab="pm" aria-selected="' + (role === 'pm') + '">งานที่ฉันดูแล (PM)</button></div>';
+      // งานพัฒนาของฉัน is the developer's own menu; the PM view is one link away in the page head (2026-11-11)
+
       if (!g.openTotal && !g.doneThisWeek.length) {
         if (active) return html + UI.emptyState('ไม่พบงานตามตัวกรอง', 'ลองเลือก "ทุกแพลตฟอร์ม" หรือ "ทุกขั้น" หรือล้างคำค้นหา', '<button type="button" class="btn" data-action="mw-clear">ล้างตัวกรอง</button>');
         return html + UI.emptyState('ยังไม่มีงานค้าง', role === 'developer' ? 'งานที่มีชื่อคุณในช่อง "นักพัฒนา" จะมาแสดงที่นี่' : 'งานที่มีชื่อคุณในช่อง "PM รับผิดชอบ" จะมาแสดงที่นี่');
@@ -501,7 +502,9 @@
       html += '<div class="mw-summary">' +
         tile('hot', 'urgent', g.urgent.length, 'ต้องตามด่วน', 'เกินกำหนดหรือด่วนที่สุด') +
         tile('warm', 'this', g.thisWeek.length, 'ต้องทำสัปดาห์นี้', D.formatThai(week.from) + ' – ' + D.formatThai(week.to)) +
-        tile('cool', 'next', g.nextWeek.length, 'สัปดาห์หน้า', D.formatThai(next.from) + ' – ' + D.formatThai(next.to)) +
+        (role === 'developer'
+          ? '<a class="mw-tile cool" href="#mw-plan" data-action="mw-week" data-week="1"><span class="mw-num num">' + g.nextWeek.length + '</span><span class="mw-label">สัปดาห์หน้า</span><span class="mw-sub">' + D.formatThai(next.from) + ' – ' + D.formatThai(next.to) + '</span></a>'
+          : tile('cool', 'next', g.nextWeek.length, 'สัปดาห์หน้า', D.formatThai(next.from) + ' – ' + D.formatThai(next.to))) +
         (role === 'developer'
           ? tile('good', 'done', g.doneThisWeek.length, 'ปิดได้สัปดาห์นี้', g.doneThisWeek.length ? 'เก่งมาก ทำต่อเลย 💪' : 'มาปิดงานแรกกัน')
           : tile('plan', 'nodue', g.noDue.length, 'ยังไม่มีวันกำหนด', g.noDue.length ? 'ใส่วันกำหนดให้ครบ' : 'ครบทุกงานแล้ว')) +
@@ -516,8 +519,12 @@
         section('urgent', '🔥 ต้องตามด่วน', 'เกินกำหนดแล้ว หรือ "ด่วนที่สุด" เรียงจากเร่งที่สุดก่อน', g.urgent, 'ไม่มีงานด่วน เยี่ยมมาก') +
         section('this', '📅 ต้องทำสัปดาห์นี้', 'กำหนดส่งภายในสัปดาห์นี้ (ยังไม่เกินกำหนด)', g.thisWeek, 'ไม่มีงานที่ครบกำหนดสัปดาห์นี้') +
         '</div>';
-      html += section('next', '🗓️ สัปดาห์หน้า', 'เตรียมไว้ล่วงหน้า', g.nextWeek, 'ยังไม่มีงานสัปดาห์หน้า');
-      if (g.later.length) html += section('later', 'ภายหลัง', '', g.later, '');
+      if (role === 'developer') {
+        html += weekPlanner(state, D.weekPlan(mine, name, state.today, state.weekOffset || 0));
+      } else {
+        html += section('next', '🗓️ สัปดาห์หน้า', 'เตรียมไว้ล่วงหน้า', g.nextWeek, 'ยังไม่มีงานสัปดาห์หน้า');
+        if (g.later.length) html += section('later', 'ภายหลัง', '', g.later, '');
+      }
       // PM tab: items without a due date (PMs set dates). Developer tab: what I finished this week (encouragement).
       if (role === 'pm') html += section('nodue', '🗂️ ยังไม่มีวันกำหนด', 'ใส่ "วันที่ต้องได้" ให้ครบ ทีมจะได้วางแผนได้', g.noDue, 'ทุกงานมีวันกำหนดแล้ว');
       if (role === 'developer' && g.doneThisWeek.length) {
@@ -527,6 +534,29 @@
           }).join('') + '</ul></section>';
       }
       return html;
+    }
+
+    var DAY_NAMES = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสฯ', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
+
+    /** Developer week planner: Mon–Fri always, Sat/Sun only when something is due. ◀ ▶ move by week. */
+    function weekPlanner(state, p) {
+      var off = state.weekOffset || 0;
+      var title = off === 0 ? 'สัปดาห์นี้' : off === 1 ? 'สัปดาห์หน้า' : off === -1 ? 'สัปดาห์ที่แล้ว' : (off > 0 ? 'อีก ' + off + ' สัปดาห์' : (-off) + ' สัปดาห์ก่อน');
+      var days = p.days.filter(function (x, i) { return i < 5 || x.items.length; });
+      return '<section class="group mw-plan" id="mw-plan" aria-labelledby="g-plan"><div class="plan-head"><h2 id="g-plan">🗓️ แผนรายสัปดาห์ <span class="count">' + p.total + ' งาน</span></h2>' +
+        '<div class="plan-nav"><button type="button" class="kjump-arrow" data-action="mw-week" data-week="' + (off - 1) + '" aria-label="สัปดาห์ก่อนหน้า">‹</button>' +
+        '<span class="plan-range"><strong>' + esc(title) + '</strong> ' + esc(D.formatThai(p.range.from) + ' – ' + D.formatThai(p.range.to)) + '</span>' +
+        '<button type="button" class="kjump-arrow" data-action="mw-week" data-week="' + (off + 1) + '" aria-label="สัปดาห์ถัดไป">›</button>' +
+        (off !== 0 ? '<button type="button" class="btn small" data-action="mw-week" data-week="0">กลับสัปดาห์นี้</button>' : '') + '</div></div>' +
+        '<p class="mw-note">งานที่ครบกำหนดแต่ละวัน (ใช้วันที่เลื่อนถ้ามี) งานที่เลยวันไปแล้วอยู่ใน 🔥 ต้องตามด่วน</p>' +
+        '<div class="plan-grid" style="--days:' + days.length + '">' + days.map(function (x) {
+          var dow = (p.days.indexOf(x));
+          return '<div class="plan-day' + (x.isToday ? ' today' : '') + (x.isPast ? ' past' : '') + '"><div class="plan-date"><span>' + DAY_NAMES[dow] + '</span><strong>' + esc(D.formatThai(x.date)) + '</strong>' + (x.isToday ? '<em>วันนี้</em>' : '') + '</div>' +
+            (x.items.length ? x.items.map(function (r) {
+              return '<a class="plan-item' + (r.isOverdue ? ' over' : '') + (D.urgencyRank(r.urgency) === 0 ? ' top' : '') + '" href="#/items/' + encodeURIComponent(r.id) + '"><span class="num">#' + esc(r.seq) + '</span> ' + esc(r.detail) +
+                '<span class="plan-meta">' + esc(r.platform) + ' · ' + esc(D.statusLabel(r.status)) + '</span></a>';
+            }).join('') : '<span class="plan-free">ว่าง</span>') + '</div>';
+        }).join('') + '</div></section>';
     }
 
     function workCard(state, r) {
@@ -700,7 +730,7 @@
         '<li>แถบ "งานค้างแต่ละขั้นตอน" เรียงตามลำดับงานจริง ขั้นที่ไฮไลต์คือขั้นที่มีงานรอมากที่สุด</li>' +
         '<li>กดที่ตัวเลขใดก็ได้ เพื่อดูรายการที่อยู่เบื้องหลังตัวเลขนั้น</li><li>ใช้ตัวกรองแพลตฟอร์ม PM นักพัฒนา ความเร่งด่วน และช่วงกำหนดส่ง ตัวเลขทุกตัวจะคำนวณใหม่ทันที</li>' +
         '<li>กด "โหลดข้อมูลใหม่" เพื่อดึงข้อมูลล่าสุดจากชีต</li></ol></section>' +
-        '<section><h2>ดูงานของฉัน</h2><ol><li>เปิดเมนู "งานของฉัน" ครั้งแรกให้เลือกชื่อของคุณจากรายชื่อ</li><li>แท็บ "งานพัฒนาของฉัน" แสดงงานที่คุณเป็นนักพัฒนา แท็บ "งานที่ฉันดูแล (PM)" แสดงงานที่คุณเป็น PM</li>' +
+        '<section><h2>ดูงานของฉัน</h2><ol><li>เปิดเมนู "งานพัฒนาของฉัน" ครั้งแรกให้กดที่ชื่อของคุณ</li><li>ด้านบนคือ 🔥 ต้องตามด่วน (เกินกำหนด/ด่วนที่สุด) และ 📅 ต้องทำสัปดาห์นี้ ด้านล่างคือ "แผนรายสัปดาห์" ดูทีละวัน กด ‹ › เพื่อดูสัปดาห์อื่น</li><li>กรองด้วยแพลตฟอร์ม ขั้นงาน หรือค้นหา ถ้าเป็น PM กด "ดูงานที่ฉันดูแล (PM)"</li><li>หัวหน้า dev ใช้เมนู "มอบหมายงาน" ใส่ชื่อนักพัฒนาให้งานที่ยังไม่มีคนทำ</li>' +
         '<li>กดปุ่ม "เปลี่ยนเป็น …" เพื่อเลื่อนงานไปขั้นถัดไปได้ทันที</li></ol></section>' +
         '<section><h2>ใช้บอร์ดงาน (Kanban)</h2><ol><li>เปิดเมนู "บอร์ดงาน" แต่ละคอลัมน์คือขั้นตอนงานเรียงตามลำดับ คอลัมน์ที่ไฮไลต์มีงานมากที่สุด</li>' +
         '<li>ลากการ์ดไปวางในคอลัมน์ใหม่ หรือกดปุ่ม ◀ (ถอยกลับ) ▶ (ขั้นถัดไป) บนการ์ด เพื่อเปลี่ยนสถานะ</li>' +
@@ -708,8 +738,8 @@
         '<li>ใช้ตัวกรองนักพัฒนาเพื่อดูบอร์ดของแต่ละคน การ์ดขอบแดงคืองานเกินกำหนด</li></ol></section>' +
         '<section><h2>เพิ่มรายการใหม่</h2><ol><li>กด "เพิ่มรายการ" ที่เมนูด้านบน</li><li>เลือกค่าจากรายการในทุกช่อง ช่องที่มี * ต้องกรอก</li><li>ระบบงานเลือกจากรายการหรือพิมพ์ชื่อใหม่ได้</li>' +
         '<li>กด "บันทึกรายการใหม่" ระบบจะต่อท้ายชีตและให้เลขลำดับอัตโนมัติ</li></ol></section>' +
-        '<section><h2>แก้ไขหรืออัปเดตสถานะ</h2><ol><li>เปิดรายการจาก "รายการทั้งหมด" หรือ "งานของฉัน"</li><li>แก้เฉพาะช่องที่ต้องการแล้วกด "บันทึกการแก้ไข" ระบบเขียนเฉพาะช่องที่เปลี่ยน</li>' +
-        '<li>ถ้าเปลี่ยนเป็น "0.แก้ไขเรียบร้อย" ต้องใส่วันที่เสร็จ</li><li>ถ้าจะยกเลิกงาน ให้กด "ยกเลิกรายการนี้" ระบบจะเปลี่ยนสถานะเป็น 0.ยกเลิก โดยไม่ลบแถว</li></ol></section>' +
+        '<section><h2>แก้ไขหรืออัปเดตสถานะ</h2><ol><li>เปิดรายการจาก "รายการทั้งหมด" หรือ "งานพัฒนาของฉัน"</li><li>แก้เฉพาะช่องที่ต้องการแล้วกด "บันทึกการแก้ไข" ระบบเขียนเฉพาะช่องที่เปลี่ยน</li>' +
+        '<li>ถ้าเปลี่ยนเป็น "0.แก้ไขเรียบร้อย" ต้องใส่วันที่เสร็จ</li><li>ถ้างานถูกยกเลิก ให้เปลี่ยนสถานะเป็น "ยกเลิก" ถ้าบันทึกผิดหรือซ้ำ กด "ลบรายการนี้" ระบบจะลบแถวออกจากชีต และเก็บสำเนาไว้ใน _app_log</li></ol></section>' +
         '<section><h2>ความหมายของคำในแอป</h2><dl>' +
         '<dt>งานค้าง</dt><dd>ทุกรายการที่สถานะไม่ใช่ 0.แก้ไขเรียบร้อย, 0.ใช้งานได้อยู่แล้ว หรือ 0.ยกเลิก รวมถึงสถานะว่าง (0.รอแจ้งทีมพัฒนา และ 0.จัดทำไฟล์แก้ไข ยังนับเป็นงานค้าง)</dd>' +
         '<dt>วันกำหนด</dt><dd>ใช้ "วันที่เลื่อน" ถ้ามี ถ้าไม่มีจึงใช้ "วันที่ต้องได้"</dd>' +
@@ -728,7 +758,7 @@
     var TOUR = [
       ['ยินดีต้อนรับ', 'แอปนี้อ่านและบันทึกข้อมูลที่ชีต "สรุปขอแก้ไขโปรแกรม EHP และ แพลตฟอร์มกลาง" โดยตรง คนที่ยังกรอกในชีตก็ใช้งานต่อได้ตามปกติ'],
       ['ภาพรวม', 'ดูงานค้าง งานเกินกำหนด และขั้นตอนที่งานกองอยู่มากที่สุด กดที่ตัวเลขใดก็ได้เพื่อดูรายการเบื้องหลัง'],
-      ['งานของฉัน', 'เลือกชื่อของคุณครั้งเดียว แล้วจะเห็นเฉพาะงานของคุณ เรียงตามวันกำหนด และเลื่อนสถานะได้ในคลิกเดียว'],
+      ['งานพัฒนาของฉัน', 'กดชื่อของคุณครั้งเดียว แล้วจะเห็นงานเกินกำหนด งานสัปดาห์นี้ และแผนรายสัปดาห์ของคุณ เลื่อนสถานะได้ในคลิกเดียว'],
       ['เพิ่มและแก้ไข', 'ทุกช่องเป็นตัวเลือกตามค่าในชีต จึงไม่มีค่าไปอยู่ผิดช่อง ทุกการแก้ไขถูกบันทึกประวัติไว้ ดูวิธีใช้ละเอียดได้ที่เมนู "วิธีใช้งาน"'],
     ];
 

@@ -350,6 +350,51 @@ function makeRepo(deps) {
     });
   }
 
+  /**
+   * Delete one item row for real (user decision 2026-11-11, constitution v4). Same guards as update:
+   * lock, ลำดับ at that row, unique ลำดับ, and every column must still match what the user saw.
+   * The whole row is logged as JSON {header: value} in _app_log so it can be restored by hand.
+   * @param {{rowNumber:number, seq:number, snapshot:Object<string,string>}} req @param {string} email
+   */
+  function remove(req, email) {
+    return withLock(function () {
+      var sh = mainSheet();
+      var rowNumber = Number(req.rowNumber);
+      if (!(rowNumber >= 2 && rowNumber <= sh.getLastRow())) return C.fail('NOT_FOUND');
+      if (!req.snapshot || typeof req.snapshot !== 'object')
+        return C.fail('VALIDATION', { fields: { _: 'snapshot' } });
+      var display = sh.getDataRange().getDisplayValues();
+      var map = mapHeaders(display[0]);
+      if (map.missing.length) return C.fail('SCHEMA', { missing: map.missing }, map.missing.join(', '));
+      var line = display[rowNumber - 1];
+      var seq = toInt(line[map.index.seq]);
+      if (seq === null) return C.fail('SEQ_INVALID');
+      if (seq !== Number(req.seq)) return C.fail('SEQ_MISMATCH', { expected: req.seq, actual: seq });
+      var dup = 0;
+      for (var i = 1; i < display.length; i++) if (toInt(display[i][map.index.seq]) === seq) dup++;
+      if (dup > 1) return C.fail('SEQ_INVALID');
+      /** @type {Object<string, {expected:string, actual:string}>} */
+      var conflicts = {};
+      Object.keys(req.snapshot).forEach(function (key) {
+        if (!D.isColumnKey(key) || map.index[key] === undefined) return;
+        var actual = clean(line[map.index[key]]);
+        if (actual !== clean(req.snapshot[key]))
+          conflicts[key] = { expected: clean(req.snapshot[key]), actual: actual };
+      });
+      if (Object.keys(conflicts).length) return C.fail('CONFLICT', conflicts);
+
+      /** @type {Object<string,string>} */
+      var saved = {};
+      display[0].forEach(function (/** @type {string} */ h, /** @type {number} */ c) {
+        if (clean(h)) saved[clean(h)] = line[c];
+      });
+      sh.deleteRow(rowNumber); // throws on failure → nothing is logged as deleted
+      writeLog([[deps.nowText(), email, 'DELETE', rowNumber, seq, '(ทั้งแถว)', JSON.stringify(saved), '']]);
+      if (deps.cache) deps.cache.remove(C.CACHE_KEYS.options);
+      return C.ok({ rowNumber: rowNumber, seq: seq });
+    });
+  }
+
   // ------------------------------------------------------------------ users & permissions
 
   /** @param {string} email */
@@ -739,6 +784,7 @@ function makeRepo(deps) {
     options: options,
     create: create,
     update: update,
+    remove: remove,
     getUserName: getUserName,
     setUserName: setUserName,
     canEdit: canEdit,
