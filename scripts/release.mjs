@@ -17,7 +17,9 @@ const git = (...args) => execFileSync('git', args).toString().trim();
 const run = (cmd, args) => {
   console.log(`→ ${cmd} ${args.join(' ')}`);
   if (dry) return;
-  execFileSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32' });
+  // only npm/npx need a shell on Windows (.cmd); git must not get one, or "-m" text with spaces splits apart
+  const needsShell = process.platform === 'win32' && (cmd === 'npm' || cmd === 'npx');
+  execFileSync(cmd, args, { stdio: 'inherit', shell: needsShell });
 };
 
 if (!/^\d+\.\d+\.\d+$/.test(version)) die(`version ใน package.json ไม่ถูกต้อง: ${version}`);
