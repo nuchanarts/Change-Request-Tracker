@@ -142,9 +142,27 @@
 
     // ------------------------------------------------------------------ router & render
 
+    /*
+     * Routing. In Apps Script the app runs inside a sandboxed iframe: the visible URL belongs to the outer
+     * page, so the iframe's own location/hashchange cannot drive navigation. The current route lives in
+     * `currentHash`; links are intercepted, and the outer URL is kept in sync with google.script.history
+     * (back/forward via setChangeHandler, deep links via google.script.url). Outside Apps Script (local
+     * preview, tests) the browser hash is used instead.
+     */
+    var gasHistory = window.google && google.script && google.script.history;
+    var currentHash = gasHistory ? '#/monitor' : location.hash || '#/monitor';
+
     function route() {
-      var h = (location.hash || '#/monitor').slice(2).split('/');
+      var h = (currentHash || '#/monitor').slice(2).split('/');
       return { name: h[0] || 'monitor', id: h[1] ? decodeURIComponent(h[1]) : null };
+    }
+
+    function showRoute(hash) {
+      currentHash = hash || '#/monitor';
+      resetForm();
+      render();
+      document.getElementById('main').focus({ preventScroll: true });
+      window.scrollTo(0, 0);
     }
 
     function render() {
@@ -173,19 +191,39 @@
     }
 
     function go(hash) {
+      if (gasHistory) {
+        if (hash !== currentHash) gasHistory.push(null, null, hash.slice(1));
+        return showRoute(hash);
+      }
       if (location.hash === hash) render();
-      else location.hash = hash;
+      else location.hash = hash; // hashchange → showRoute
     }
 
     function resetForm() {
       state.formErrors = state.formWarnings = state.formDraft = state.formAlert = null;
     }
 
-    window.addEventListener('hashchange', function () {
-      resetForm();
-      render();
-      document.getElementById('main').focus({ preventScroll: true });
-      window.scrollTo(0, 0);
+    if (gasHistory) {
+      gasHistory.setChangeHandler(function (e) {
+        showRoute('#' + ((e && e.location && e.location.hash) || '/monitor'));
+      });
+      if (google.script.url) {
+        google.script.url.getLocation(function (loc) {
+          if (loc && loc.hash) showRoute('#' + loc.hash); // deep link like …/exec#/kanban
+        });
+      }
+    } else {
+      window.addEventListener('hashchange', function () {
+        showRoute(location.hash);
+      });
+    }
+
+    // In-app links ("#/…") never leave the iframe: route them through go().
+    document.addEventListener('click', function (ev) {
+      var a = ev.target.closest && ev.target.closest('a[href^="#/"]');
+      if (!a || ev.defaultPrevented || ev.ctrlKey || ev.metaKey || ev.shiftKey) return;
+      ev.preventDefault();
+      go(a.getAttribute('href'));
     });
 
     // ------------------------------------------------------------------ form helpers

@@ -157,4 +157,38 @@
   }
 
   window.google = { script: { run: runner(null, null) } };
+
+  // ?gas=1 simulates the real Apps Script sandbox: the app lives in an iframe, the visible URL belongs to
+  // the outer page, and navigation must go through google.script.history / google.script.url.
+  if (params.get('gas') === '1') {
+    var changeHandler = null;
+    window.__gasHistory = [];
+    window.google.script.history = {
+      push: function (state, query, hash) {
+        window.__gasHistory.push(hash);
+      },
+      replace: function (state, query, hash) {
+        window.__gasHistory.push(hash);
+      },
+      setChangeHandler: function (fn) {
+        changeHandler = fn;
+      },
+    };
+    window.google.script.url = {
+      getLocation: function (cb) {
+        setTimeout(function () {
+          cb({ hash: params.get('hash') || '', parameter: {}, parameters: {} });
+        }, 0);
+      },
+    };
+    window.__gasBack = function (hash) {
+      if (changeHandler)
+        changeHandler({ state: null, location: { hash: hash, parameter: {}, parameters: {} } });
+    };
+    // In the sandbox, a link to "#/…" with <base target="_top"> would leave the iframe: treat that as a failure.
+    window.__leftIframe = false;
+    window.addEventListener('beforeunload', function () {
+      window.__leftIframe = true;
+    });
+  }
 })();
