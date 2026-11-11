@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain. 1 marker remains (FR-028: how logged-in users are matched to names in the `รายชื่อ` sheet).
+- [x] No [NEEDS CLARIFICATION] markers remain. FR-028 resolved with option B: the user picks their name once, and the mapping is stored in `_app_users`.
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -32,4 +32,4 @@
 ## Notes
 
 - The spec references the Google Sheet, its columns, and its sheets because they are the data contract defined by the constitution (Principles I–III), not an implementation choice. Specific APIs (such as LockService and getDisplayValues) were left out of the spec on purpose; they belong in the plan.
-- Remaining item: resolve FR-028 with the user, then re-validate.
+- All items pass. The spec is ready for `/speckit-clarify` or `/speckit-plan`.
