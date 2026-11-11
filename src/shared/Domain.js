@@ -771,6 +771,33 @@ var Domain = (function () {
     return g;
   }
 
+  /**
+   * One week (Mon–Sun) of a developer's open work, by due day (วันที่เลื่อน wins over วันที่ต้องได้).
+   * @param {any[]} rows enriched rows @param {string} name developer @param {SheetDate} today
+   * @param {number} offset weeks from this week (0 = this week, 1 = next, -1 = last)
+   */
+  function weekPlan(rows, name, today, offset) {
+    var base = weekRange(today);
+    var range = { from: addDays(base.from, 7 * (offset || 0)), to: addDays(base.to, 7 * (offset || 0)) };
+    var todayN = dayNumber(today);
+    var days = [0, 1, 2, 3, 4, 5, 6].map(function (i) {
+      var date = addDays(range.from, i);
+      var n = dayNumber(date);
+      return { date: date, isToday: n === todayN, isPast: n < todayN, items: /** @type {any[]} */ ([]) };
+    });
+    var total = 0;
+    rows.forEach(function (r) {
+      if (!name || !r.isOpen || r.developer !== name || !r.effectiveDue || !inRange(r.effectiveDue, range))
+        return;
+      days[dayNumber(r.effectiveDue) - dayNumber(range.from)].items.push(r);
+      total++;
+    });
+    days.forEach(function (x) {
+      x.items.sort(pressing);
+    });
+    return { range: range, days: days, total: total, isThisWeek: !offset };
+  }
+
   var OVERDUE_BUCKETS = [
     { label: '1–7 วัน', max: 7 },
     { label: '8–14 วัน', max: 14 },
@@ -1089,6 +1116,7 @@ var Domain = (function () {
     computeMetrics: computeMetrics,
     pmBreakdown: pmBreakdown,
     unassignedQueue: unassignedQueue,
+    weekPlan: weekPlan,
     stageOf: stageOf,
     STAGE_LABELS: STAGE_LABELS,
     filterMyWork: filterMyWork,

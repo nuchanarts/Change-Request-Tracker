@@ -238,7 +238,10 @@
         html = row ? Views.form(state, 'edit', row) : UI.emptyState('ไม่พบรายการนี้', 'รายการอาจถูกเปลี่ยนเลขลำดับในชีต ลองโหลดข้อมูลใหม่', '<a class="btn" href="#/items">กลับไปที่รายการทั้งหมด</a>');
       } else if (r.name === 'items') html = Views.items(state);
       else if (r.name === 'new') html = Views.form(state, 'new', null);
-      else if (r.name === 'my-work') html = Views.myWork(state);
+      else if (r.name === 'my-work') {
+        state.myTab = r.id === 'pm' ? 'pm' : 'developer';
+        html = Views.myWork(state);
+      }
       else if (r.name === 'kanban') html = Views.kanban(state);
       else if (r.name === 'assign') html = Views.assign(state);
       else if (r.name === 'access') {
@@ -731,6 +734,15 @@
         a.click();
         setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
         rememberReportBaseline();
+      },
+      'mw-week': function (el, ev) {
+        if (ev) ev.preventDefault();
+        state.weekOffset = Number(el.getAttribute('data-week')) || 0;
+        render();
+        var t = document.getElementById('mw-plan');
+        if (t && el.classList.contains('mw-tile')) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        var again = document.querySelector('[data-action="mw-week"][aria-label="' + (el.getAttribute('aria-label') || '') + '"]');
+        if (again) again.focus();
       },
       'mw-jump': function (el, ev) {
         ev.preventDefault();

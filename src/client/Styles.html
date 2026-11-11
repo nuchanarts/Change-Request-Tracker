@@ -712,4 +712,27 @@
   .mw-chip[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   .mw-bar-q { display: flex; gap: 8px; align-items: center; }
   .mw-bar-q input { flex: 1; min-width: 0; min-height: 38px; border: 1px solid #cfe0fa; border-radius: 10px; padding: 6px 12px; font: inherit; background: #fff; }
+
+  /* งานพัฒนาของฉัน: view switch + week planner */
+  .mw-switch { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 4px 0 12px; }
+  .mw-view { margin: 0; font-size: 20px; }
+  .mw-plan { margin-top: 18px; }
+  .plan-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .plan-head h2 { margin: 0; }
+  .plan-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .plan-range { font-size: 14px; }
+  .plan-grid { display: grid; grid-template-columns: repeat(var(--days), minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+  @media (max-width: 900px) { .plan-grid { grid-template-columns: 1fr; } }
+  .plan-day { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px; display: flex; flex-direction: column; gap: 6px; min-height: 120px; }
+  .plan-day.today { border: 2px solid var(--accent); background: linear-gradient(180deg, var(--accent-soft), var(--surface) 60px); }
+  .plan-day.past { background: var(--surface-2); }
+  .plan-date { display: flex; gap: 6px; align-items: baseline; font-size: 13px; color: var(--muted); }
+  .plan-date strong { color: var(--ink); font-size: 14px; }
+  .plan-date em { margin-left: auto; font-style: normal; background: var(--accent); color: #fff; border-radius: 999px; padding: 0 8px; font-size: 12px; }
+  .plan-item { display: block; font-size: 13.5px; line-height: 1.4; color: var(--ink); text-decoration: none; background: #f5f9ff; border: 1px solid #cfe0fa; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 6px 8px; }
+  .plan-item:hover, .plan-item:focus-visible { border-color: var(--accent); }
+  .plan-item.top { border-left-color: #f59e0b; }
+  .plan-item.over { border-left-color: #dc2626; background: #fff6f5; border-color: #f3c9c4; }
+  .plan-meta { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .plan-free { color: var(--muted); font-size: 13px; margin: auto 0; text-align: center; }
 </style>
