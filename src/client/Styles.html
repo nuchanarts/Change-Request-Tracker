@@ -614,7 +614,7 @@
   .kjump-arrow { flex: none; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-size: 22px; line-height: 1; cursor: pointer; color: var(--ink); }
   .kjump-arrow:hover { background: var(--surface-2); }
   .kjump-all { flex: none; }
-  @media (max-width: 640px) { .kjump { top: 120px; } .kjump-all { display: none; } }
+  @media (max-width: 640px) { .kjump { top: 120px; flex-wrap: wrap; } .kjump-chips { flex: 1 1 100%; order: -1; } }
 
   .g-prep.kjump-chip { background: var(--g-prep-soft); } .g-prep .kjump-step { background: var(--g-prep); }
   .g-dev.kjump-chip { background: var(--g-dev-soft); } .g-dev .kjump-step { background: var(--g-dev); }
