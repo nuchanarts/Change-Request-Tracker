@@ -9,7 +9,7 @@ test.describe('US2 Add request', () => {
     await page.selectOption('#f-urgency', 'ด่วน');
     await page.fill('#f-system', 'เวชระเบียน');
     await page.fill('#f-detail', 'ทดสอบเพิ่มรายการผ่านแอป');
-    await page.selectOption('#f-pm', { index: 1 });
+    await page.locator('input[name="pm-pick"]').first().check();
     await page.fill('#f-dueDate', '30/12/2026');
     await page.getByRole('button', { name: 'บันทึกรายการใหม่' }).click();
     await expect(page.locator('.toast')).toContainText('บันทึกรายการใหม่แล้ว ลำดับที่ 721');
@@ -28,10 +28,10 @@ test.describe('US2 Add request', () => {
   test('status dropdown is in workflow order with numbered steps', async ({ page }) => {
     await open(page, '/#/new');
     const labels = await page.locator('#f-status option').allTextContents();
-    expect(labels[0]).toBe('1) 0.จัดทำไฟล์แก้ไข');
+    expect(labels[0]).toBe('1) จัดทำไฟล์แก้ไข');
     expect(labels[4]).toBe('5) dev ขอ Sourecode อจ.');
     expect(labels[10]).toBe('11) รอ Complie ต้องแจ้งอจ.');
-    expect(labels.slice(11)).toEqual(['0.ยกเลิก', '0.ใช้งานได้อยู่แล้ว', '0.แก้ไขเรียบร้อย']);
+    expect(labels.slice(11)).toEqual(['ยกเลิก', 'ใช้งานได้อยู่แล้ว', 'แก้ไขเรียบร้อย']);
     await expect(page.locator('#f-status')).toHaveValue('0.รอแจ้งทีมพัฒนา');
   });
 
@@ -141,10 +141,29 @@ test.describe('Free-text developer and fixed PM list (2026-11-11)', () => {
     await page.selectOption('#f-urgency', 'ปกติ');
     await page.fill('#f-system', 'เวชระเบียน');
     await page.fill('#f-detail', 'ทดสอบนักพัฒนาชื่อใหม่');
-    await page.selectOption('#f-pm', { index: 1 });
+    await page.locator('input[name="pm-pick"]').first().check();
     await page.fill('#f-dueDate', '30/12/2026');
     await page.fill('#f-developer', 'นักพัฒนาใหม่ ทดสอบ');
     await page.getByRole('button', { name: 'บันทึกรายการใหม่' }).click();
     await expect(page.locator('.toast')).toContainText('บันทึกรายการใหม่แล้ว');
   });
+});
+
+test('PM: several can be picked and are saved as "A, B" in one cell (2026-11-11)', async ({ page }) => {
+  await open(page, '/#/new');
+  await page.selectOption('#f-platform', 'NHIP');
+  await page.selectOption('#f-issueType', 'Requement');
+  await page.selectOption('#f-urgency', 'ด่วน');
+  await page.fill('#f-system', 'เวชระเบียน');
+  await page.fill('#f-detail', 'ทดสอบ PM หลายคน');
+  await page.fill('#f-dueDate', '30/12/2026');
+  const picks = page.locator('input[name="pm-pick"]');
+  await picks.nth(1).check();
+  await picks.nth(0).check();
+  const names = await picks.evaluateAll((els) => els.slice(0, 2).map((e) => e.value));
+  await expect(page.locator('input[name="pm"]')).toHaveValue(names.join(', ')); // list order, not click order
+  await page.getByRole('button', { name: 'บันทึกรายการใหม่' }).click();
+  await expect(page.locator('.toast')).toContainText('บันทึกรายการใหม่แล้ว');
+  const row = await page.evaluate(() => window.__mockSheet.rows.find((r) => r.detail === 'ทดสอบ PM หลายคน'));
+  expect(row.pm).toBe(names.join(', '));
 });

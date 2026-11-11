@@ -25,7 +25,7 @@
 
     function statusBadge(status) {
       var s = String(status || '').trim();
-      return '<span class="badge ' + statusClass(s) + '">' + esc(s || '(ไม่ระบุสถานะ)') + '</span>';
+      return '<span class="badge ' + statusClass(s) + '">' + esc(s ? D.statusLabel(s) : '(ไม่ระบุสถานะ)') + '</span>';
     }
 
     function urgency(u) {
@@ -157,13 +157,29 @@
       return fieldWrap(o, html, extra ? 'ค่าเดิมไม่อยู่ในรายการตัวเลือก กรุณาเลือกค่าที่ถูกต้อง' : '');
     }
 
+    /**
+     * Pick several names (PM). Checkbox chips; the joined "A, B" value lives in a hidden input named o.name,
+     * so the form reads it like any other field. Unknown existing names stay visible and checked.
+     */
+    function multiPick(o) {
+      var cur = D.splitPm(o.value);
+      var list = (o.options || []).concat(cur.filter(function (n) { return (o.options || []).indexOf(n) === -1; }));
+      var html = '<input type="hidden" id="f-' + esc(o.name) + '-value" name="' + esc(o.name) + '" value="' + esc(o.value || '') + '">' +
+        '<div class="pick" role="group" aria-label="' + esc(o.label) + '"' + (o.error ? ' aria-invalid="true"' : '') + '>' +
+        list.map(function (n, i) {
+          return '<label class="pick-chip"><input type="checkbox" name="' + esc(o.name) + '-pick" value="' + esc(n) + '"' + (i === 0 ? ' id="f-' + esc(o.name) + '"' : '') +
+            (cur.indexOf(n) !== -1 ? ' checked' : '') + (o.disabled ? ' disabled' : '') + ' aria-describedby="h-' + esc(o.name) + '"><span>' + esc(n) + '</span></label>';
+        }).join('') + '</div>';
+      return fieldWrap(Object.assign({}, o, { hint: o.hint || 'เลือกได้มากกว่า 1 คน' }), html, '');
+    }
+
     /** Status options in workflow order: numbered open steps, then the closing statuses. */
     function statusGroups() {
       var open = D.WORKFLOW.filter(function (s) { return D.isOpen(s); });
       var closed = D.WORKFLOW.filter(function (s) { return !D.isOpen(s); });
       return [
-        { label: 'ขั้นตอนงาน (เรียงตามลำดับ)', options: open.map(function (s, i) { return { value: s, label: (i + 1) + ') ' + s }; }) },
-        { label: 'ปิดงาน', options: closed.map(function (s) { return { value: s, label: s }; }) },
+        { label: 'ขั้นตอนงาน (เรียงตามลำดับ)', options: open.map(function (s, i) { return { value: s, label: (i + 1) + ') ' + D.statusLabel(s) }; }) },
+        { label: 'ปิดงาน', options: closed.map(function (s) { return { value: s, label: D.statusLabel(s) }; }) },
       ];
     }
 
@@ -284,7 +300,7 @@
     return {
       esc: esc, statusBadge: statusBadge, statusClass: statusClass, urgency: urgency, due: due, ticket: ticket,
       helpTip: helpTip, withIcon: withIcon, backButton: backButton, calendar: calendar, ticketLink: ticketLink, taigaButton: taigaButton, TAIGA_URL: TAIGA_URL, illustration: illustration, icon: icon, emptyState: emptyState, loading: loading, errorState: errorState,
-      select: select, statusGroups: statusGroups, input: input, textarea: textarea, combobox: combobox, dateField: dateField,
+      select: select, multiPick: multiPick, statusGroups: statusGroups, input: input, textarea: textarea, combobox: combobox, dateField: dateField,
       toast: toast, confirm: confirm,
     };
   })();
