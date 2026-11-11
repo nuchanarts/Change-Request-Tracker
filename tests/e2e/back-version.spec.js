@@ -4,13 +4,16 @@ import { open } from './helpers.js';
 for (const mode of ['', '?gas=1']) {
   test.describe(`In-app back button ${mode ? '(Apps Script sandbox)' : '(browser)'}`, () => {
     test('item page → กลับ returns to the list it came from', async ({ page }) => {
-      await open(page, `/${mode}#/items`);
+      await open(page, mode ? '/?gas=1&hash=/items' : '/#/items');
       await page.getByRole('button', { name: 'เกินกำหนด', exact: true }).click();
       await page.locator('tbody tr').first().locator('.detail-cell a').click();
       await expect(page.locator('#item-form')).toBeVisible();
       await page.getByRole('button', { name: 'กลับ' }).click();
       await expect(page.getByRole('heading', { name: 'รายการทั้งหมด', level: 1 })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'เกินกำหนด', exact: true })).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByRole('button', { name: 'เกินกำหนด', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
     });
 
     test('drill-down → กลับ returns to Monitor', async ({ page }) => {

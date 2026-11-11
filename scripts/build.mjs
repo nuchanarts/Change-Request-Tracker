@@ -16,6 +16,9 @@ import { generateRows, PEOPLE_PM, PEOPLE_DEV } from '../tests/fixtures/generate.
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = new Set(process.argv.slice(2));
 const read = (p) => readFileSync(join(root, p), 'utf8');
+// Single source of the app version: package.json → shown on screen via __APP_VERSION__.
+const version = JSON.parse(read('package.json')).version;
+const stamp = (text) => text.split('__APP_VERSION__').join(version);
 
 // ---------------------------------------------------------------- dist/
 const dist = join(root, 'dist');
@@ -30,7 +33,7 @@ for (const f of readdirSync(join(root, 'src/server'))) {
   if (f.endsWith('.js')) copyFileSync(join(root, 'src/server', f), join(dist, f));
 }
 for (const f of readdirSync(join(root, 'src/client'))) {
-  if (f.endsWith('.html')) copyFileSync(join(root, 'src/client', f), join(dist, f));
+  if (f.endsWith('.html')) writeFileSync(join(dist, f), stamp(read(`src/client/${f}`)));
 }
 if (args.has('--with-integration') && existsSync(join(root, 'tests/integration'))) {
   for (const f of readdirSync(join(root, 'tests/integration'))) {
@@ -47,13 +50,14 @@ if (args.has('--preview')) {
 
   const files = { DomainClient: `<script>\n${domain}\n</script>` };
   for (const f of readdirSync(join(root, 'src/client')))
-    files[f.replace(/\.html$/, '')] = read(`src/client/${f}`);
+    files[f.replace(/\.html$/, '')] = stamp(read(`src/client/${f}`));
   const mock = '<script src="fixture.js"></script>\n<script src="mock-gas.js"></script>\n';
   const html = files.Index.replace(/<\?!=\s*include\('([^']+)'\);?\s*\?>/g, (_, name) => {
     if (!(name in files)) throw new Error(`include('${name}') not found`);
     return (name === 'App' ? mock : '') + files[name];
   });
   writeFileSync(join(preview, 'index.html'), html);
+  writeFileSync(join(preview, 'version.txt'), version);
   copyFileSync(join(root, 'tests/e2e/mock-gas.js'), join(preview, 'mock-gas.js'));
 
   // Synthetic fixture (no real data), "today" = the real date in Asia/Bangkok so the preview looks live.

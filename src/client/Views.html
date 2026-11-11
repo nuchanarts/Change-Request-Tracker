@@ -189,7 +189,7 @@
       var html = schemaBanner(state) + '<div class="page-head"><h1>รายการทั้งหมด</h1><span class="muted">' + total.toLocaleString('th-TH') + ' รายการ</span>' +
         '<span class="spacer"></span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button></div>';
       if (state.drill) {
-        html += '<div class="drill" role="status"><span>กำลังดู: <strong>' + esc(state.drill.title) + '</strong> (' + state.drill.ids.length + ' รายการ)</span><button class="btn small" data-action="clear-drill">ดูรายการทั้งหมด</button></div>';
+        html += '<div class="drill" role="status">' + UI.backButton() + '<span>กำลังดู: <strong>' + esc(state.drill.title) + '</strong> (' + state.drill.ids.length + ' รายการ)</span><button class="btn small" data-action="clear-drill">ดูรายการทั้งหมด</button></div>';
       } else {
         html += filterBar(state);
       }
@@ -262,7 +262,7 @@
       var values = state.formDraft || (row ? row.raw : defaults(state));
       var title = mode === 'new' ? 'เพิ่มรายการขอแก้ไขใหม่' : 'รายการ #' + (row.seq === null ? '–' : row.seq);
       var html = schemaBanner(state) + readOnlyBanner(state);
-      html += '<div class="page-head"><h1>' + esc(title) + '</h1>' + (row ? UI.statusBadge(row.status) + '<span class="muted">' + UI.due(row, state.today) + '</span>' : '<span class="muted">ช่องที่มี * ต้องกรอก</span>') + '</div>';
+      html += '<div class="page-head">' + UI.backButton() + '<h1>' + esc(title) + '</h1>' + (row ? UI.statusBadge(row.status) + '<span class="muted">' + UI.due(row, state.today) + '</span>' : '<span class="muted">ช่องที่มี * ต้องกรอก</span>') + '</div>';
       if (state.formAlert) html += '<div class="banner danger" role="alert">' + esc(state.formAlert.message) + (state.formAlert.reload ? ' <button class="btn small" data-action="reload-item">โหลดข้อมูลใหม่</button>' : '') + '</div>';
       if (row && row.issues.length) {
         html += '<div class="banner warn"><strong>ข้อมูลที่ควรแก้:</strong><ul style="margin:4px 0 0;padding-left:1.2em">' + row.issues.map(function (i) { return '<li>' + esc(i.message) + '</li>'; }).join('') + '</ul></div>';

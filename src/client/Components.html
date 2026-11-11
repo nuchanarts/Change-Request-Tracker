@@ -55,6 +55,11 @@
       return '<span class="tip" tabindex="0" role="note" aria-label="' + esc(text) + '">i<span class="tip-body" aria-hidden="true">' + esc(text) + '</span></span>';
     }
 
+    /** In-app back button: returns to the page the user came from (see App back()). */
+    function backButton() {
+      return '<button type="button" class="btn small back" data-action="back" aria-label="กลับ"><span aria-hidden="true">←</span> กลับ</button>';
+    }
+
     function emptyState(title, text, actionHtml) {
       return '<div class="empty"><h2>' + esc(title) + '</h2><p>' + esc(text) + '</p>' + (actionHtml || '') + '</div>';
     }
@@ -188,7 +193,7 @@
 
     return {
       esc: esc, statusBadge: statusBadge, statusClass: statusClass, urgency: urgency, due: due, ticket: ticket,
-      helpTip: helpTip, emptyState: emptyState, loading: loading, errorState: errorState,
+      helpTip: helpTip, backButton: backButton, emptyState: emptyState, loading: loading, errorState: errorState,
       select: select, statusGroups: statusGroups, input: input, textarea: textarea, combobox: combobox, dateField: dateField,
       toast: toast, confirm: confirm,
     };
