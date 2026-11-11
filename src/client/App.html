@@ -188,6 +188,33 @@
       else html = Views.monitor(state);
       if (state.tourStep !== null) html += Views.tour(state.tourStep);
       main.innerHTML = html;
+      if (r.name === 'monitor' && !state.introPlayed) playIntro(main);
+    }
+
+    /**
+     * The one orchestrated entrance (first Monitor view of a page load): hero rises, pipeline grows,
+     * headline numbers count up. Skipped for reduced motion and for automated browsers (tests read numbers).
+     */
+    function playIntro(main) {
+      state.introPlayed = true;
+      var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced || navigator.webdriver) return;
+      main.classList.add('intro');
+      setTimeout(function () { main.classList.remove('intro'); }, 2200);
+      var els = main.querySelectorAll('.hero .stat .value');
+      var targets = Array.prototype.map.call(els, function (el) { return Number(el.textContent.replace(/[^\d]/g, '')) || 0; });
+      var start = null;
+      var DURATION = 1100;
+      function frame(t) {
+        if (start === null) start = t;
+        var p = Math.min(1, (t - start) / DURATION);
+        var eased = 1 - Math.pow(1 - p, 3);
+        els.forEach(function (el, i) {
+          if (el.isConnected) el.textContent = Math.round(targets[i] * eased).toLocaleString('th-TH');
+        });
+        if (p < 1) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
     }
 
     // Pages visited in this session, for the in-app "← กลับ" button (the browser back button also works).

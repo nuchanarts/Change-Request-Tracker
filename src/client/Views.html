@@ -57,21 +57,14 @@
       var rows = state.filteredRows();
       var m = D.computeMetrics(rows, state.today);
       var html = schemaBanner(state) + readOnlyBanner(state);
-      html += '<div class="page-head"><h1>ภาพรวมงานขอแก้ไขโปรแกรม</h1><span class="muted">' + esc(filterSummary(state)) +
-        '</span><span class="spacer muted">ข้อมูล ณ ' + esc(state.loadedAt) + '</span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button></div>';
+
+      // Hero: the welcome moment. Q1 + Q5 live here as the four headline numbers.
+      html += hero(state, m, rows.length);
       html += filterBar(state);
 
       if (!rows.length) {
         return html + UI.emptyState('ไม่มีรายการตามตัวกรองนี้', 'ลองล้างตัวกรอง หรือเลือกช่วงวันที่ให้กว้างขึ้น', '<button class="btn" data-action="clear-filters">ล้างตัวกรอง</button>');
       }
-
-      // Q1 + Q5: summary line
-      html += '<div class="summary">' +
-        stat(state, 'lead', 'open', m.openCount, 'งานค้าง', m.openIds, 'งานที่สถานะยังไม่ใช่ แก้ไขเรียบร้อย / ใช้งานได้อยู่แล้ว / ยกเลิก (รวมสถานะว่าง)') +
-        stat(state, 'danger', 'overdue', m.overdueCount, 'เกินกำหนด', m.overdueIds, 'งานค้างที่วันกำหนดผ่านไปแล้ว โดยใช้วันที่เลื่อนก่อน ถ้าไม่มีจึงใช้วันที่ต้องได้') +
-        stat(state, 'ok', 'closed-week', m.closedThisWeek.count, 'ปิดงานสัปดาห์นี้', m.closedThisWeek.ids, 'นับจากวันที่เสร็จ วันจันทร์ถึงวันอาทิตย์นี้') +
-        stat(state, '', 'closed-month', m.closedThisMonth.count, 'ปิดงานเดือนนี้', m.closedThisMonth.ids, 'นับจากวันที่เสร็จ ภายในเดือนนี้') +
-        '</div>';
 
       // Q2: pipeline (the signature element)
       html += pipeline(state, m);
@@ -79,6 +72,57 @@
       // Q6 (left) + Q3/Q4 (right)
       html += '<div class="grid-2"><div>' + overduePanel(state, m) + '</div><div>' + developerPanel(state, m) + pmPanel(state, m) + qualityPanel(state) + '</div></div>';
       return html;
+    }
+
+    var CHEVRONS = '<svg class="hero-deco" viewBox="0 0 240 120" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M20 15l45 45-45 45"/><path d="M95 15l45 45-45 45"/><path d="M170 15l45 45-45 45"/></g></svg>';
+
+    function greetingName(state) {
+      var name = state.myName();
+      if (name) return name;
+      var email = (state.user && state.user.email) || '';
+      return email ? email.split('@')[0] : '';
+    }
+
+    /** One plain sentence that says what matters today. */
+    function todaySentence(m) {
+      if (!m.openCount) return 'ไม่มีงานค้างเลย เยี่ยมมาก';
+      var top = m.byStatus.filter(function (s) { return D.WORKFLOW.indexOf(s.value) !== -1; })
+        .sort(function (a, b) { return b.count - a.count; })[0];
+      var parts = [];
+      parts.push(m.overdueCount ? 'มีงานเกินกำหนด ' + m.overdueCount.toLocaleString('th-TH') + ' งานที่ควรตามก่อน' : 'ยังไม่มีงานเกินกำหนด');
+      if (top) parts.push('งานกองอยู่ที่ "' + top.value + '" มากที่สุด');
+      return parts.join(' และ');
+    }
+
+    function myWorkChip(state) {
+      var name = state.myName();
+      if (!name) return '<a class="hero-chip" href="#/my-work">เลือกชื่อของคุณ เพื่อดูงานของตัวเอง</a>';
+      var dev = D.groupMyWork(state.rows, name, 'developer', state.today);
+      var pm = D.groupMyWork(state.rows, name, 'pm', state.today);
+      var g = dev.total || !pm.total ? dev : pm;
+      if (!g.total) return '<a class="hero-chip" href="#/my-work">ยังไม่มีงานค้างของคุณ</a>';
+      return '<a class="hero-chip" href="#/my-work">งานของคุณ <strong>' + g.total + '</strong> งาน' +
+        (g.overdue.length ? ', เกินกำหนด <strong class="hot">' + g.overdue.length + '</strong>' : '') +
+        (g.today.length ? ', ครบกำหนดวันนี้ <strong>' + g.today.length + '</strong>' : '') + '</a>';
+    }
+
+    function hero(state, m, count) {
+      var name = greetingName(state);
+      return '<section class="hero" aria-labelledby="hero-h">' + CHEVRONS +
+        '<div class="hero-text"><p class="hero-hello">' + (name ? 'สวัสดี คุณ' + esc(name) : 'สวัสดี') + '<span class="hero-date">' + esc(D.formatThaiLong(state.today)) + '</span></p>' +
+        '<h1 id="hero-h">ภาพรวมงานขอแก้ไขโปรแกรม</h1>' +
+        (count ? '<p class="hero-sub">' + esc(todaySentence(m)) + '</p>' : '') +
+        '<div class="hero-actions">' + myWorkChip(state) +
+        '<button class="btn small on-dark" data-action="reload">โหลดข้อมูลใหม่</button>' +
+        '<span class="hero-meta">' + esc(filterSummary(state)) + ', ข้อมูล ณ ' + esc(state.loadedAt) + '</span></div></div>' +
+        (count ? '<div class="hero-stats">' +
+          stat(state, 'lead', 'open', m.openCount, 'งานค้าง', m.openIds, 'งานที่สถานะยังไม่ใช่ แก้ไขเรียบร้อย / ใช้งานได้อยู่แล้ว / ยกเลิก (รวมสถานะว่าง)') +
+          stat(state, 'danger', 'overdue', m.overdueCount, 'เกินกำหนด', m.overdueIds, 'งานค้างที่วันกำหนดผ่านไปแล้ว โดยใช้วันที่เลื่อนก่อน ถ้าไม่มีจึงใช้วันที่ต้องได้') +
+          stat(state, 'ok', 'closed-week', m.closedThisWeek.count, 'ปิดสัปดาห์นี้', m.closedThisWeek.ids, 'นับจากวันที่เสร็จ วันจันทร์ถึงวันอาทิตย์นี้') +
+          stat(state, '', 'closed-month', m.closedThisMonth.count, 'ปิดเดือนนี้', m.closedThisMonth.ids, 'นับจากวันที่เสร็จ ภายในเดือนนี้') +
+          '</div>' : '') +
+        '</section>';
     }
 
     function stat(state, cls, metric, value, label, ids, tip) {
@@ -97,13 +141,13 @@
         var c = counts[s] ? counts[s].count : 0;
         if (c > max) { max = c; maxStatus = s; }
       });
-      var stages = open.map(function (s) {
+      var stages = open.map(function (s, idx) {
         var c = counts[s] ? counts[s].count : 0;
         var h = max ? Math.round((c / max) * 100) : 0;
         var cls = 'stage' + (s === maxStatus && c > 0 ? ' bottleneck' : '') + (c === 0 ? ' zero' : '');
         var key = state.registerDrill('สถานะ ' + s, counts[s] ? counts[s].ids : []);
         return '<button type="button" class="' + cls + '" data-action="drill" data-drill="' + key + '" aria-label="' + esc(s + ' ' + c + ' รายการ') + '">' +
-          '<span class="fill" style="height:' + h + '%"></span><span class="count num">' + c + '</span><span class="name">' + esc(s) + '</span></button>';
+          '<span class="fill" style="height:' + h + '%;--i:' + idx + '"></span><span class="count num">' + c + '</span><span class="name">' + esc(s) + '</span></button>';
       }).join('');
       var others = m.byStatus.filter(function (s) { return open.indexOf(s.value) === -1; });
       var extra = others.length
