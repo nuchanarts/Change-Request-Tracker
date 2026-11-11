@@ -25,6 +25,7 @@ npm run lint         # eslint + prettier + tsc --checkJs
 npm run preview      # local preview with mock backend
 npm run test:e2e     # Playwright (desktop + 375px + axe)
 npm run push:test    # push to the TEST COPY only
+npm run release      # PROD: push + redeploy (same URL) + tag; main only; run by the user
 ```
 
 ## Non-negotiables (see the constitution)
@@ -43,3 +44,4 @@ npm run push:test    # push to the TEST COPY only
 - Develop and test only against the spreadsheet **copy**, through the TEST project.
 - Work test-first. Commit after every green cycle using Conventional Commits.
 - Do not use the React, Next.js, or Vercel skills on this project.
+- LINE notifications: the app only queues messages in `_app_notify`; แมวส้ม sends them with `integrations/line-bot/sendAppNotifications.gs`, which the user pastes into the bot project. Never put a LINE token in this repo.
