@@ -18,7 +18,10 @@
     "test:e2e": "node scripts/build.mjs --preview && playwright test",
     "clasp:create-test": "clasp create --type standalone --title \"[TEST] EHP Change Request Tracker\" --rootDir dist && node -e \"require('fs').renameSync('.clasp.json','.clasp.test.json')\"",
     "push:test": "node scripts/build.mjs --with-integration && node scripts/check-clasp-target.mjs .clasp.test.json && clasp -P .clasp.test.json push --force",
-    "push:prod": "node scripts/build.mjs && node scripts/check-clasp-target.mjs .clasp.prod.json --prod && clasp -P .clasp.prod.json push --force"
+    "push:prod": "node scripts/build.mjs && node scripts/check-clasp-target.mjs .clasp.prod.json --prod && clasp -P .clasp.prod.json push --force",
+    "clasp:create-prod": "node scripts/build.mjs && clasp create --type standalone --title \"EHP Change Request Tracker\" --rootDir dist && node -e \"require('fs').renameSync('.clasp.json','.clasp.prod.json')\"",
+    "deploy:prod": "clasp -P .clasp.prod.json create-deployment",
+    "deployments:prod": "clasp -P .clasp.prod.json list-deployments"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
