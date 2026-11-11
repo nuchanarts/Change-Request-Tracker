@@ -45,10 +45,25 @@
       return esc(label) + ' <span class="muted">(อีก ' + diff + ' วัน)</span>' + moved;
     }
 
+    var TAIGA_URL = 'https://taiga.hosxp.net/login';
+    var EXT = '<svg class="ext" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
+
     function ticket(r) {
       if (!r.ticket) return '';
-      if (r.ticketUrl) return '<a href="' + esc(r.ticketUrl) + '" target="_blank" rel="noopener">Taiga/MANTIS</a>';
+      if (r.ticketUrl) return ticketLink(r);
       return '<span>#' + esc(r.ticket) + '</span>';
+    }
+
+    /** Clickable link to the Taiga/MANTIS item (opens a new tab). */
+    function ticketLink(r) {
+      var label = /taiga/i.test(r.ticketUrl) ? 'Taiga' : /mantis/i.test(r.ticketUrl) ? 'MANTIS' : 'ลิงก์';
+      var ref = D.itemRef(r);
+      return '<a class="ticket-link" href="' + esc(r.ticketUrl) + '" target="_blank" rel="noopener noreferrer" aria-label="เปิด ' + label + ' ' + esc(ref) + ' ในแท็บใหม่">' + label + (/^\d+$/.test(ref) ? ' ' + esc(ref) : '') + ' ' + EXT + '</a>';
+    }
+
+    /** Link to the Taiga login page for testers (documents and status there). */
+    function taigaButton(text) {
+      return '<a class="btn small taiga-btn" href="' + TAIGA_URL + '" target="_blank" rel="noopener noreferrer">' + esc(text || 'เปิด Taiga') + ' ' + EXT + '</a>';
     }
 
     function helpTip(text) {
@@ -67,7 +82,32 @@
       overdue: '<circle cx="12" cy="13" r="7"/><path d="M12 9v4l3 2M5 4L3 6M19 4l2 2"/>',
       week: '<circle cx="12" cy="12" r="8"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
       month: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 14h2M13 14h2M9 17h2"/>',
+      // navigation
+      monitor: '<path d="M4 19h16"/><rect x="6" y="11" width="3" height="6" rx="1"/><rect x="11" y="7" width="3" height="10" rx="1"/><rect x="16" y="13" width="3" height="4" rx="1"/>',
+      add: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+      kanban: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/>',
+      me: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
+      list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
+      help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.5v.01"/>',
+      shield: '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+      // filters
+      platform: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+      pm: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5.5 6.5-5.5s5.5 2 6.5 5.5"/><path d="M17 4.5a3.5 3.5 0 0 1 0 7M18.5 14.7c1.6.9 2.6 2.7 3 5.3"/>',
+      dev: '<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>',
+      urgency: '<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.2 1-3.6 2.2-4.8C10 10 11.5 9 12 3z"/>',
+      calendar: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>',
+      // buttons
+      reload: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
+      report: '<path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+      clear: '<path d="M6 6l12 12M18 6L6 18"/>',
+      save: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+      copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
+      download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
     };
+    /** Icon + text for buttons (icon is decorative; the text carries the meaning). */
+    function withIcon(name, text) {
+      return '<span class="bi">' + icon(name) + '</span>' + esc(text);
+    }
     function icon(name) {
       return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + (ICONS[name] || '') + '</svg>';
     }
@@ -129,7 +169,7 @@
 
     function fieldWrap(o, control, autoWarn) {
       return (
-        '<div class="field' + (o.wide ? ' wide' : '') + '"><label for="f-' + esc(o.name) + '">' + esc(o.label) +
+        '<div class="field' + (o.wide ? ' wide' : '') + '"><label for="f-' + esc(o.name) + '">' + (o.icon ? '<span class="li">' + icon(o.icon) + '</span>' : '') + esc(o.label) +
         (o.required ? ' <span class="req" aria-hidden="true">*</span>' : '') + (o.tip ? ' ' + helpTip(o.tip) : '') + '</label>' +
         control +
         '<div id="h-' + esc(o.name) + '">' +
@@ -178,8 +218,41 @@
         value: cell.date && !cell.issue ? cell.raw.trim() : '', warn: o.warn || warn,
       }));
       if (o.readonly || o.disabled) return html;
-      var btn = '<button type="button" class="btn small" data-action="date-today" data-target="f-' + esc(o.name) + '" aria-label="ใส่วันนี้ในช่อง ' + esc(o.label) + '">วันนี้</button>';
-      return html.replace(/(<input[^>]*\/>)/, '<div style="display:flex;gap:6px">$1' + btn + '</div>');
+      var btn = '<button type="button" class="btn small cal-btn" data-action="cal-open" data-target="f-' + esc(o.name) + '" aria-haspopup="dialog" aria-label="เลือกวันที่จากปฏิทิน: ' + esc(o.label) + '" title="เลือกจากปฏิทิน">' +
+        '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></button>';
+      return html.replace(/(<input[^>]*\/>)/, '<div class="date-row">$1' + btn + '</div>');
+    }
+
+    var WEEKDAYS = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา']; // Monday first, like weekRange()
+
+    /**
+     * Month calendar popover for a date field. Values are always written in the sheet format d/m/yyyy (C.E.);
+     * the heading also shows the Buddhist year for orientation.
+     * @param {string} targetId input id @param {number} y @param {number} m 1-12
+     * @param {{y:number,m:number,d:number}|null} selected @param {{y:number,m:number,d:number}} today
+     */
+    function calendar(targetId, y, m, selected, today) {
+      var first = { y: y, m: m, d: 1 };
+      var days = D.monthRange(first).to.d;
+      var offset = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
+      var monthName = D.THAI_MONTHS_LONG[m - 1];
+      var cells = '';
+      for (var i = 0; i < offset; i++) cells += '<span class="cal-pad" aria-hidden="true"></span>';
+      for (var d = 1; d <= days; d++) {
+        var cur = { y: y, m: m, d: d };
+        var isSel = !!(selected && D.compareDate(selected, cur) === 0);
+        var isToday = D.compareDate(today, cur) === 0;
+        cells += '<button type="button" class="cal-day' + (isToday ? ' today' : '') + '" data-action="cal-pick" data-date="' + D.formatDate(cur) + '"' +
+          ' aria-pressed="' + isSel + '" aria-label="' + d + ' ' + monthName + ' ' + y + (isToday ? ' (วันนี้)' : '') + '">' + d + '</button>';
+      }
+      return '<div class="cal" role="dialog" aria-label="เลือกวันที่" data-target="' + esc(targetId) + '">' +
+        '<div class="cal-head"><button type="button" class="cal-nav" data-action="cal-nav" data-dir="-1" aria-label="เดือนก่อน">‹</button>' +
+        '<div class="cal-title"><strong>' + esc(monthName + ' ' + y) + '</strong><span>พ.ศ. ' + (y + 543) + '</span></div>' +
+        '<button type="button" class="cal-nav" data-action="cal-nav" data-dir="1" aria-label="เดือนถัดไป">›</button></div>' +
+        '<div class="cal-grid">' + WEEKDAYS.map(function (w) { return '<span class="cal-wd" aria-hidden="true">' + w + '</span>'; }).join('') + cells + '</div>' +
+        '<div class="cal-foot"><button type="button" class="btn small" data-action="cal-pick" data-date="' + D.formatDate(today) + '">วันนี้</button>' +
+        '<button type="button" class="btn small" data-action="cal-pick" data-date="">ล้างวันที่</button>' +
+        '<button type="button" class="btn small" data-action="cal-close">ปิด</button></div></div>';
     }
 
     function toast(message, type) {
@@ -210,7 +283,7 @@
 
     return {
       esc: esc, statusBadge: statusBadge, statusClass: statusClass, urgency: urgency, due: due, ticket: ticket,
-      helpTip: helpTip, backButton: backButton, illustration: illustration, icon: icon, emptyState: emptyState, loading: loading, errorState: errorState,
+      helpTip: helpTip, withIcon: withIcon, backButton: backButton, calendar: calendar, ticketLink: ticketLink, taigaButton: taigaButton, TAIGA_URL: TAIGA_URL, illustration: illustration, icon: icon, emptyState: emptyState, loading: loading, errorState: errorState,
       select: select, statusGroups: statusGroups, input: input, textarea: textarea, combobox: combobox, dateField: dateField,
       toast: toast, confirm: confirm,
     };

@@ -35,10 +35,40 @@ test.describe('US2 Add request', () => {
     await expect(page.locator('#f-status')).toHaveValue('0.รอแจ้งทีมพัฒนา');
   });
 
-  test('"วันนี้" fills the date in d/m/yyyy', async ({ page }) => {
+  test('calendar picker fills dates in the sheet format d/m/yyyy (C.E.)', async ({ page }) => {
     await open(page, '/#/new');
-    await page.getByRole('button', { name: 'ใส่วันนี้ในช่อง วันที่ต้องได้' }).click();
+    await page.getByRole('button', { name: 'เลือกวันที่จากปฏิทิน: วันที่ต้องได้' }).click();
+    const cal = page.getByRole('dialog', { name: 'เลือกวันที่' });
+    await expect(cal).toBeVisible();
+    await cal.getByRole('button', { name: 'วันนี้', exact: true }).click();
+    await expect(cal).toBeHidden();
     await expect(page.locator('#f-dueDate')).toHaveValue(/^\d{1,2}\/\d{1,2}\/20\d\d$/);
+  });
+
+  test('calendar opens on the typed month, navigates, and picks a day', async ({ page }) => {
+    await open(page, '/#/new');
+    await page.fill('#f-postponedDate', '16/4/2026');
+    await page.getByRole('button', { name: 'เลือกวันที่จากปฏิทิน: วันที่เลื่อน' }).click();
+    const cal = page.getByRole('dialog', { name: 'เลือกวันที่' });
+    await expect(cal).toContainText('เมษายน 2026');
+    await expect(cal).toContainText('พ.ศ. 2569');
+    await expect(cal.getByRole('button', { name: '16 เมษายน 2026', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await cal.getByRole('button', { name: 'เดือนถัดไป' }).click();
+    await expect(cal).toContainText('พฤษภาคม 2026');
+    await cal.getByRole('button', { name: '5 พฤษภาคม 2026', exact: true }).click();
+    await expect(page.locator('#f-postponedDate')).toHaveValue('5/5/2026');
+  });
+
+  test('Escape closes the calendar without changing the date', async ({ page }) => {
+    await open(page, '/#/new');
+    await page.fill('#f-dueDate', '1/12/2026');
+    await page.getByRole('button', { name: 'เลือกวันที่จากปฏิทิน: วันที่ต้องได้' }).click();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'เลือกวันที่' })).toBeHidden();
+    await expect(page.locator('#f-dueDate')).toHaveValue('1/12/2026');
   });
 });
 
@@ -55,11 +85,9 @@ test.describe('US3 Safe edit', () => {
     await open(page);
     const seq = await firstOpenSeq(page);
     await page.goto(`/#/items/${seq}`);
+    // developer is a pick-or-type field (datalist): type a different name
     const current = await page.locator('#f-developer').inputValue();
-    const other = (await page.locator('#f-developer option').allTextContents()).find(
-      (t) => t && t !== current && !t.startsWith('—'),
-    );
-    await page.selectOption('#f-developer', other);
+    await page.fill('#f-developer', current === 'นักพัฒนา แดง' ? 'นักพัฒนา ดำ' : 'นักพัฒนา แดง');
     await page.getByRole('button', { name: 'บันทึกการแก้ไข' }).click();
     await expect(page.locator('.toast')).toContainText('บันทึกการแก้ไขแล้ว (นักพัฒนา)');
   });
@@ -70,7 +98,7 @@ test.describe('US3 Safe edit', () => {
     await page.goto(`/#/items/${seq}`);
     await page.evaluate((s) => window.__mockSheet.edit(s, 'developer', 'นักพัฒนา ฟ้า (แก้ในชีต)'), seq);
     await page.fill('#f-detail', 'แก้รายละเอียดจากแอป');
-    await page.selectOption('#f-developer', { index: 1 });
+    await page.fill('#f-developer', 'นักพัฒนา แดง');
     await page.getByRole('button', { name: 'บันทึกการแก้ไข' }).click();
     await expect(page.getByRole('alert')).toContainText('มีคนแก้ไขรายการนี้ไปก่อนหน้าคุณ');
   });
@@ -102,5 +130,21 @@ test.describe('US4 My Work', () => {
     await page.getByRole('button', { name: 'ใช้ชื่อนี้' }).click();
     await expect(page.locator('.page-head')).toContainText('นักพัฒนา แดง');
     await expect(page.locator('.work').first()).toBeVisible();
+  });
+});
+
+test.describe('Free-text developer and fixed PM list (2026-11-11)', () => {
+  test('a new developer name can be typed and saved with a warning', async ({ page }) => {
+    await open(page, '/#/new');
+    await page.selectOption('#f-platform', 'EHP');
+    await page.selectOption('#f-issueType', 'defect');
+    await page.selectOption('#f-urgency', 'ปกติ');
+    await page.fill('#f-system', 'เวชระเบียน');
+    await page.fill('#f-detail', 'ทดสอบนักพัฒนาชื่อใหม่');
+    await page.selectOption('#f-pm', { index: 1 });
+    await page.fill('#f-dueDate', '30/12/2026');
+    await page.fill('#f-developer', 'นักพัฒนาใหม่ ทดสอบ');
+    await page.getByRole('button', { name: 'บันทึกรายการใหม่' }).click();
+    await expect(page.locator('.toast')).toContainText('บันทึกรายการใหม่แล้ว');
   });
 });

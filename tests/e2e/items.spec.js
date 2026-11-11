@@ -39,14 +39,15 @@ test.describe('US5 Search & list', () => {
   test('ticket URLs render as links that open in a new tab', async ({ page }) => {
     await open(page, '/#/items');
     await page.getByRole('button', { name: 'ทั้งหมด', exact: true }).click();
-    const link = page.getByRole('link', { name: 'Taiga/MANTIS' }).first();
+    // own column (2026-11-11)
+    const link = page.locator('td.ticket-cell .ticket-link').first();
     await expect(link).toHaveAttribute('href', /^https:\/\/taiga\.example\//);
     await expect(link).toHaveAttribute('target', '_blank');
   });
 
   test('clicking a row opens the item form', async ({ page }) => {
     await open(page, '/#/items');
-    await page.locator('tbody tr').first().locator('td').nth(2).click();
+    await page.locator('tbody tr').first().locator('td:has(.badge)').first().click(); // status cell: visible on all sizes
     await expect(page).toHaveURL(/#\/items\/[^/]+$/);
     await expect(page.locator('#item-form')).toBeVisible();
   });
@@ -56,4 +57,21 @@ test.describe('US5 Search & list', () => {
     await page.fill('#q', 'ไม่มีคำนี้แน่นอน');
     await expect(page.locator('.empty')).toContainText('ไม่พบรายการ');
   });
+});
+
+test('items table has its own ระบบงาน column and a distinct header', async ({ page }) => {
+  await open(page, '/#/items');
+  const headers = await page.locator('table.responsive thead th').allTextContents();
+  expect(headers.map((h) => h.replace(/[▲▼]/g, '').trim())).toEqual([
+    'ลำดับ',
+    'รายละเอียด',
+    'ระบบงาน',
+    'Taiga/MANTIS',
+    'สถานะ',
+    'ความเร่งด่วน',
+    'นักพัฒนา',
+    'PM',
+    'กำหนดส่ง',
+  ]);
+  await expect(page.locator('table.responsive thead th').first()).toHaveCSS('font-weight', '600');
 });

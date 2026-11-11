@@ -48,8 +48,14 @@ describe('validateCreate (FR-015..FR-017)', () => {
     expect(res.warnings.system).toMatch(/ใหม่/);
   });
 
-  it('rejects unknown optional developer', () => {
-    expect(D.validateCreate({ ...valid, developer: 'คนนอก' }, options).errors.developer).toBeDefined();
+  it('accepts a typed-in developer name with a warning', () => {
+    const res = D.validateCreate({ ...valid, developer: 'นักพัฒนาใหม่' }, options);
+    expect(res.ok).toBe(true);
+    expect(res.warnings.developer).toMatch(/ใหม่/);
+  });
+
+  it('still requires PM from the list', () => {
+    expect(D.validateCreate({ ...valid, pm: 'คนนอก' }, options).errors.pm).toBeDefined();
   });
 
   it('rejects unparseable dates', () => {

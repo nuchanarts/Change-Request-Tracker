@@ -55,22 +55,26 @@ function context_() {
   return { ok: true, ss: ss, repo: repo, email: Session.getActiveUser().getEmail() };
 }
 
-/** Sheet edit right + team allowlist (_app_allowed). @param {any} ctx */
-function editAccess_(ctx) {
-  var owner = '';
+/** Sheet owner's email ('' when unavailable). @param {any} ctx */
+function owner_(ctx) {
   try {
-    owner = ctx.ss.getOwner().getEmail();
+    return ctx.ss.getOwner().getEmail();
   } catch (err) {
     console.warn('getOwner failed (shared drive or no access)', err);
+    return '';
   }
-  return ctx.repo.editAccess(ctx.email, owner);
+}
+
+/** Sheet edit right + team allowlist (_app_allowed). @param {any} ctx */
+function editAccess_(ctx) {
+  return ctx.repo.editAccess(ctx.email, owner_(ctx));
 }
 
 /** Result to return when the caller may not write, or null when they may. @param {any} ctx */
 function denied_(ctx) {
   var access = editAccess_(ctx);
   if (access.canEdit) return null;
-  return Config.fail(access.reason === 'NOT_ALLOWED' ? 'NOT_ALLOWED' : 'FORBIDDEN');
+  return Config.fail(access.reason === 'SHEET_VIEW_ONLY' ? 'FORBIDDEN' : 'NOT_ALLOWED');
 }
 
 /** Run fn with a context; any unexpected error is logged and returned as a Thai message. @param {(ctx:any)=>any} fn */
@@ -99,6 +103,7 @@ function Api_bootstrap() {
           name: ctx.repo.getUserName(ctx.email),
           canEdit: access.canEdit,
           editReason: access.reason,
+          isAdmin: ctx.repo.isAdmin(ctx.email, owner_(ctx)),
         };
       })(),
       schema: { ok: data.missing.length === 0, missing: data.missing },
@@ -132,6 +137,33 @@ function Api_updateRequest(req) {
     var v = Domain.validateUpdate(req.changes || {}, current, options);
     if (!v.ok) return Config.fail('VALIDATION', { fields: v.errors });
     return ctx.repo.update(req, ctx.email);
+  });
+}
+
+/** A signed-in person asks for edit access (pending until an admin allows it). @param {{name?:string, note?:string}} input */
+function Api_requestAccess(input) {
+  return guard_(function (ctx) {
+    return ctx.repo.requestAccess(ctx.email, (input && input.name) || '', (input && input.note) || '');
+  });
+}
+
+/** Team list for the admin screen (admins only). */
+function Api_listAccess() {
+  return guard_(function (ctx) {
+    if (!ctx.repo.isAdmin(ctx.email, owner_(ctx))) return Config.fail('NOT_ADMIN');
+    return Config.ok({
+      members: ctx.repo.listAccess(),
+      owner: owner_(ctx),
+      roles: [Config.ROLE.admin, Config.ROLE.editor],
+      states: Config.ACCESS,
+    });
+  });
+}
+
+/** Add a person or change their role/status (admins only; enforced in Repo). @param {any} input */
+function Api_saveAccess(input) {
+  return guard_(function (ctx) {
+    return ctx.repo.saveAccess(ctx.email, owner_(ctx), input || {});
   });
 }
 

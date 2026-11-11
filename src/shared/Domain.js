@@ -25,7 +25,7 @@ var Domain = (function () {
     { key: 'pm', header: 'PM รับผิดชอบ', type: 'person', required: true },
     { key: 'ticket', header: 'ข้อมูลลิงค์ Taiga หรือ MANTIS', type: 'text' },
     { key: 'dueDate', header: 'วันที่ต้องได้', type: 'date', required: true },
-    { key: 'developer', header: 'นักพัฒนา', type: 'person' },
+    { key: 'developer', header: 'นักพัฒนา', type: 'freePerson' }, // pick or type a new name (2026-11-11)
     { key: 'postponedDate', header: 'วันที่เลื่อน', type: 'date' },
     { key: 'doneDate', header: 'วันที่เสร็จ', type: 'date' },
     { key: 'deployDate', header: 'วันที่ Deploy', type: 'date' },
@@ -320,7 +320,7 @@ var Domain = (function () {
    */
   function detectIssues(r, options, seqCounts) {
     var out = [];
-    OPTION_KEYS.concat(PERSON_KEYS).forEach(function (key) {
+    OPTION_KEYS.concat(['pm']).forEach(function (key) {
       var list = optionList(options, key);
       if (r[key] !== '' && list.length && list.indexOf(r[key]) === -1) {
         out.push(
@@ -538,6 +538,215 @@ var Domain = (function () {
     return g;
   }
 
+  /** Most pressing first: longest overdue, then earliest due, then top urgency, then ลำดับ. */
+  function pressing(/** @type {any} */ a, /** @type {any} */ b) {
+    if (b.overdueDays !== a.overdueDays) return b.overdueDays - a.overdueDays;
+    var da = a.effectiveDue ? dayNumber(a.effectiveDue) : Infinity;
+    var db = b.effectiveDue ? dayNumber(b.effectiveDue) : Infinity;
+    if (da !== db) return da < db ? -1 : 1;
+    if (urgencyRank(a.urgency) !== urgencyRank(b.urgency))
+      return urgencyRank(a.urgency) - urgencyRank(b.urgency);
+    return (a.seq || 0) - (b.seq || 0);
+  }
+
+  /**
+   * My Work by calendar week (user request 2026-11-11): overdue, this week (Mon–Sun containing today),
+   * next week, later, no due date; plus "urgent" (overdue or ด่วนที่สุด) and what I closed this week.
+   * @param {any[]} rows @param {string} name @param {'developer'|'pm'} role @param {SheetDate} today
+   */
+  function groupMyWeek(rows, name, role, today) {
+    var mine = rows.filter(function (r) {
+      return name && r[role] === name;
+    });
+    var open = mine.filter(function (r) {
+      return r.isOpen;
+    });
+    var week = weekRange(today);
+    var next = { from: addDays(week.from, 7), to: addDays(week.to, 7) };
+    var g = {
+      overdue: [],
+      thisWeek: [],
+      nextWeek: [],
+      later: [],
+      noDue: [],
+      urgent: [],
+      doneThisWeek: [],
+      openTotal: open.length,
+    };
+    open.forEach(function (r) {
+      if (!r.effectiveDue) g.noDue.push(r);
+      else if (r.isOverdue) g.overdue.push(r);
+      else if (inRange(r.effectiveDue, week)) g.thisWeek.push(r);
+      else if (inRange(r.effectiveDue, next)) g.nextWeek.push(r);
+      else g.later.push(r);
+      if (r.isOverdue || r.urgency === URGENCY[0]) g.urgent.push(r);
+    });
+    g.doneThisWeek = mine.filter(function (r) {
+      return !r.isOpen && r.doneDate.date && inRange(r.doneDate.date, week);
+    });
+    ['overdue', 'thisWeek', 'nextWeek', 'later', 'noDue', 'urgent'].forEach(function (k) {
+      /** @type {any} */ (g)[k].sort(pressing);
+    });
+    return g;
+  }
+
+  var OVERDUE_BUCKETS = [
+    { label: '1–7 วัน', max: 7 },
+    { label: '8–14 วัน', max: 14 },
+    { label: '15–30 วัน', max: 30 },
+    { label: 'เกิน 30 วัน', max: Infinity },
+  ];
+
+  /** Overdue items grouped by days late (for the overdue chart). @param {any[]} rows */
+  function overdueBuckets(rows) {
+    var out = OVERDUE_BUCKETS.map(function (b) {
+      return { label: b.label, max: b.max, ids: /** @type {string[]} */ ([]) };
+    });
+    rows.forEach(function (r) {
+      if (!r.isOverdue) return;
+      for (var i = 0; i < out.length; i++) {
+        if (r.overdueDays <= out[i].max) {
+          out[i].ids.push(r.id);
+          break;
+        }
+      }
+    });
+    return out;
+  }
+
+  // ---------------------------------------------------------------- text report export (2026-11-11)
+
+  /** Short reference used in reports: the ticket number when there is one, otherwise ลำดับ. @param {any} r */
+  function itemRef(r) {
+    var t = clean(r.ticket);
+    var us = /\/us\/(\d+)/.exec(t);
+    if (us) return us[1];
+    var num = /^#?(\d+)$/.exec(t);
+    if (num) return num[1];
+    return 'ลำดับ ' + (r.seq === null ? '-' : r.seq);
+  }
+
+  /** "9–15 พ.ย. 2569" for a range inside one month, else two Thai dates. */
+  function thaiRange(/** @type {{from:SheetDate,to:SheetDate}} */ rg) {
+    if (rg.from.m === rg.to.m && rg.from.y === rg.to.y) {
+      return rg.from.d + '–' + rg.to.d + ' ' + THAI_MONTHS[rg.to.m - 1] + ' ' + (rg.to.y + 543);
+    }
+    return formatThai(rg.from) + ' – ' + formatThai(rg.to);
+  }
+
+  /**
+   * Plain-text monthly summary in the team's report format (sections 1–6).
+   * @param {any[]} rows enriched rows (already filtered by the caller, e.g. by PM)
+   * @param {SheetDate} today
+   * @param {{sinceSeq?: number|null, pm?: string}} opts sinceSeq = last ลำดับ in the previous report
+   */
+  function buildReport(rows, today, opts) {
+    opts = opts || {};
+    var m = computeMetrics(rows, today);
+    var lines = [];
+    var month = THAI_MONTHS_LONG[today.m - 1] + ' ' + (today.y + 543);
+    lines.push('สรุปรายการขอแก้ไขโปรแกรม ประจำเดือน' + month);
+    if (opts.pm) lines.push('PM ผู้รับผิดชอบ: ' + opts.pm);
+    lines.push('ข้อมูล ณ วันที่ ' + today.d + ' ' + THAI_MONTHS[today.m - 1] + ' ' + (today.y + 543));
+    lines.push('');
+
+    var since = typeof opts.sinceSeq === 'number' && isFinite(opts.sinceSeq) ? opts.sinceSeq : null;
+    var fresh =
+      since === null
+        ? []
+        : rows
+            .filter(function (r) {
+              return r.seq !== null && r.seq > since;
+            })
+            .sort(function (a, b) {
+              return a.seq - b.seq;
+            });
+    var closed = rows.filter(function (r) {
+      return !r.isOpen;
+    });
+    var byKind = function (s) {
+      return closed.filter(function (r) {
+        return r.status === s;
+      }).length;
+    };
+    lines.push('1. ภาพรวมการดำเนินงาน');
+    lines.push(
+      '- รายการขอแก้ไขทั้งหมด ' +
+        rows.length +
+        ' ข้อ' +
+        (since === null ? '' : ' (เพิ่มมาใหม่ ' + fresh.length + ' ข้อ)'),
+    );
+    lines.push(
+      '- ดำเนินการแล้ว (ปิดงาน) ' +
+        closed.length +
+        ' ข้อ: แก้ไขเรียบร้อย ' +
+        byKind(DONE) +
+        ', ใช้งานได้อยู่แล้ว ' +
+        byKind('0.ใช้งานได้อยู่แล้ว') +
+        ', ยกเลิก ' +
+        byKind(CANCELLED),
+    );
+    lines.push('- คงเหลือรอแก้ไข ' + m.openCount + ' ข้อ (เกินกำหนด ' + m.overdueCount + ' ข้อ)');
+    lines.push('- ปิดงานในเดือนนี้ ' + m.closedThisMonth.count + ' ข้อ');
+    lines.push('');
+
+    var week = weekRange(today);
+    var queue = rows
+      .filter(function (r) {
+        return r.isOpen && !r.isOverdue && inRange(r.effectiveDue, week);
+      })
+      .sort(pressing);
+    lines.push('2. รายการในคิวแก้ไขสัปดาห์นี้ (' + thaiRange(week) + ')');
+    lines.push(
+      'จำนวน ' + queue.length + ' ข้อ' + (queue.length ? ' ได้แก่ ' + queue.map(itemRef).join(', ') : ''),
+    );
+    lines.push('');
+
+    lines.push('3. รายการเกินกำหนดระยะเวลา');
+    lines.push(
+      'จำนวน ' +
+        m.overdueList.length +
+        ' ข้อ' +
+        (m.overdueList.length ? ' ได้แก่ ' + m.overdueList.map(itemRef).join(', ') : ''),
+    );
+    m.overdueList.forEach(function (r) {
+      lines.push(
+        '- ' +
+          itemRef(r) +
+          ' เกิน ' +
+          r.overdueDays +
+          ' วัน: ' +
+          r.detail +
+          ' (' +
+          (r.developer || UNASSIGNED) +
+          ')',
+      );
+    });
+    lines.push('');
+
+    if (since === null) {
+      lines.push('4. รายการขอแก้ไขใหม่');
+      lines.push('(ระบุลำดับสุดท้ายของรายงานครั้งก่อน เพื่อแสดงรายการใหม่)');
+    } else {
+      lines.push('4. รายการขอแก้ไขใหม่ จำนวน ' + fresh.length + ' ข้อ (ตั้งแต่ลำดับ ' + (since + 1) + ')');
+      fresh.forEach(function (r) {
+        lines.push(r.platform + ' - ' + r.detail);
+      });
+    }
+    lines.push('');
+
+    lines.push('5. งานค้างแยกตามสถานะ');
+    m.byStatus.forEach(function (s) {
+      lines.push('- ' + s.status + ': ' + s.count);
+    });
+    lines.push('');
+    lines.push('6. งานค้างแยกตามนักพัฒนา');
+    m.byDeveloper.forEach(function (p) {
+      lines.push('- ' + p.name + ': ' + p.open + (p.overdue ? ' (เกินกำหนด ' + p.overdue + ')' : ''));
+    });
+    return lines.join('\n');
+  }
+
   /** @param {any[]} rows @param {string} query */
   function search(rows, query) {
     var q = clean(query).toLowerCase();
@@ -580,8 +789,13 @@ var Domain = (function () {
       if (list.indexOf(v) === -1) return 'กรุณาเลือก "' + col.header + '" จากรายการ';
     } else if (col.type === 'status') {
       if (WORKFLOW.indexOf(v) === -1) return 'กรุณาเลือกสถานะจากรายการ';
-    } else if (col.type === 'freeOption') {
-      if (optionList(options, key).indexOf(v) === -1) warnings[key] = 'เป็นระบบงานใหม่ที่ยังไม่มีในรายการ';
+    } else if (col.type === 'freeOption' || col.type === 'freePerson') {
+      if (optionList(options, key).indexOf(v) === -1) {
+        warnings[key] =
+          col.type === 'freePerson'
+            ? 'เป็นชื่อนักพัฒนาใหม่ที่ยังไม่มีในรายการ'
+            : 'เป็นระบบงานใหม่ที่ยังไม่มีในรายการ';
+      }
     } else if (col.type === 'date') {
       var p = parseDate(v);
       if (!p.date || p.issue)
@@ -668,6 +882,7 @@ var Domain = (function () {
     formatDate: formatDate,
     formatThai: formatThai,
     formatThaiLong: formatThaiLong,
+    THAI_MONTHS_LONG: THAI_MONTHS_LONG,
     fromIso: fromIso,
     toIso: toIso,
     daysBetween: daysBetween,
@@ -686,6 +901,10 @@ var Domain = (function () {
     applyFilters: applyFilters,
     computeMetrics: computeMetrics,
     groupMyWork: groupMyWork,
+    groupMyWeek: groupMyWeek,
+    overdueBuckets: overdueBuckets,
+    itemRef: itemRef,
+    buildReport: buildReport,
     search: search,
     validateCreate: validateCreate,
     validateUpdate: validateUpdate,

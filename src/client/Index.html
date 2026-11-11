@@ -24,13 +24,25 @@
           </span>
         </a>
         <nav class="nav" aria-label="เมนูหลัก">
-          <a href="#/monitor" data-route="monitor">ภาพรวม</a>
-          <a href="#/kanban" data-route="kanban">บอร์ดงาน</a>
-          <a href="#/my-work" data-route="my-work">งานของฉัน</a>
-          <a href="#/items" data-route="items">รายการทั้งหมด</a>
-          <a href="#/new" data-route="new" class="nav-add" id="nav-add" hidden>เพิ่มรายการ</a>
-          <a href="#/help" data-route="help">วิธีใช้งาน</a>
+          <a href="#/monitor" data-route="monitor" data-icon="monitor">ภาพรวม</a>
+          <a href="#/new" data-route="new" data-icon="add" class="nav-add" id="nav-add" hidden>เพิ่มรายการ</a>
+          <a href="#/kanban" data-route="kanban" data-icon="kanban">บอร์ดงาน</a>
+          <a href="#/my-work" data-route="my-work" data-icon="me">งานของฉัน</a>
+          <a href="#/items" data-route="items" data-icon="list">รายการทั้งหมด</a>
+          <a href="#/help" data-route="help" data-icon="help">วิธีใช้งาน</a>
+          <a href="#/access" data-route="access" data-icon="shield" id="nav-access" hidden>จัดการสิทธิ์</a>
+          <a href="https://taiga.hosxp.net/login" class="nav-ext" target="_blank" rel="noopener noreferrer" aria-label="Taiga (เปิดในแท็บใหม่)">Taiga ↗</a>
         </nav>
+        <details class="user-menu" id="user-menu" hidden>
+          <summary aria-label="บัญชีผู้ใช้"><span class="avatar" id="user-avatar" aria-hidden="true">?</span></summary>
+          <div class="user-pop">
+            <p class="user-email" id="user-email"></p>
+            <p class="user-role" id="user-role"></p>
+            <a class="btn small" target="_top" href="https://accounts.google.com/AccountChooser?continue=https%3A%2F%2Fnuchanarts.github.io%2FChange-Request-Tracker%2F">สลับบัญชี Google</a>
+            <a class="btn small danger" target="_top" id="logout-link" href="https://accounts.google.com/Logout?continue=https%3A%2F%2Fnuchanarts.github.io%2FChange-Request-Tracker%2F%3Fstay%3D1">ออกจากระบบ</a>
+            <p class="user-note">ออกจากระบบ = ออกจากบัญชี Google ในเบราว์เซอร์นี้ (รวม Gmail) เหมาะกับเครื่องที่ใช้ร่วมกัน</p>
+          </div>
+        </details>
       </div>
     </header>
     <main id="main" tabindex="-1" aria-live="polite">

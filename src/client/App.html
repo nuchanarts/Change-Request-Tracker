@@ -131,6 +131,13 @@
         state.phase = 'ready';
         document.getElementById('sheet-name').textContent = b.spreadsheetName;
         document.getElementById('nav-add').hidden = !(b.user.canEdit && b.schema.ok);
+        document.getElementById('nav-access').hidden = !b.user.isAdmin;
+        var menu = document.getElementById('user-menu');
+        menu.hidden = !b.user.email;
+        document.getElementById('user-email').textContent = b.user.email || '';
+        document.getElementById('user-avatar').textContent = (b.user.email || '?').charAt(0).toUpperCase();
+        document.getElementById('user-role').textContent = b.user.isAdmin ? 'ผู้ดูแล' : b.user.canEdit ? 'ผู้แก้ไข' : 'ดูอย่างเดียว';
+        state.access = null;
         render();
         // offer the tour once per page load, never again after saves/reloads (or when storage is blocked)
         if (!state.tourOffered) {
@@ -184,6 +191,10 @@
       else if (r.name === 'new') html = Views.form(state, 'new', null);
       else if (r.name === 'my-work') html = Views.myWork(state);
       else if (r.name === 'kanban') html = Views.kanban(state);
+      else if (r.name === 'access') {
+        if (state.user.isAdmin && !state.access && !state.accessLoading) loadAccess();
+        html = Views.access(state);
+      }
       else if (r.name === 'help') html = Views.help(state);
       else html = Views.monitor(state);
       if (state.tourStep !== null) html += Views.tour(state.tourStep);
@@ -395,6 +406,87 @@
       return saveChanges(row, changes, null);
     }
 
+    // ------------------------------------------------------------------ calendar popover (date fields)
+
+    var cal = null; // { target, y, m, opener }
+
+    function drawCalendar() {
+      document.querySelectorAll('.cal').forEach(function (c) { c.remove(); });
+      var input = document.getElementById(cal.target);
+      if (!input) return (cal = null);
+      var typed = D.parseDate(input.value);
+      var host = input.closest('.field');
+      host.insertAdjacentHTML('beforeend', UI.calendar(cal.target, cal.y, cal.m, typed.issue ? null : typed.date, state.today));
+      var pick = host.querySelector('.cal [aria-pressed="true"]') || host.querySelector('.cal .today') || host.querySelector('.cal .cal-day');
+      if (pick) pick.focus();
+    }
+
+    function closeCalendar() {
+      document.querySelectorAll('.cal').forEach(function (c) { c.remove(); });
+      if (cal && cal.opener && document.body.contains(cal.opener)) cal.opener.focus();
+      cal = null;
+    }
+
+    document.addEventListener('click', function (ev) {
+      if (cal && !ev.target.closest('.cal') && !ev.target.closest('[data-action="cal-open"]')) closeCalendar();
+    }, true);
+
+    // ------------------------------------------------------------------ access management (admins)
+
+    function loadAccess() {
+      state.accessLoading = true;
+      api('Api_listAccess').then(function (res) {
+        state.accessLoading = false;
+        state.access = res.ok ? res.data : { error: res.message };
+        if (route().name === 'access') render();
+      });
+    }
+
+    function saveAccess(input) {
+      api('Api_saveAccess', input).then(function (res) {
+        if (!res.ok) {
+          var fields = (res.details && res.details.fields) || {};
+          var why = Object.keys(fields).map(function (k) { return fields[k]; });
+          UI.toast(res.message + (why.length ? ': ' + why.join(', ') : ''), 'error');
+        } else {
+          UI.toast('บันทึกสิทธิ์ของ ' + res.data.email + ' แล้ว (' + res.data.role + ', ' + res.data.status + ')');
+        }
+        state.access = null;
+        render();
+      });
+    }
+
+    // ------------------------------------------------------------------ text report export
+
+    var REPORT_KEY = 'ehp.report.since.v1';
+    var exportOpts = null;
+
+    function reportRows() {
+      return D.applyFilters(state.rows, { pm: exportOpts.pm ? [exportOpts.pm] : [] });
+    }
+    function reportText() {
+      return D.buildReport(reportRows(), state.today, { sinceSeq: exportOpts.since, pm: exportOpts.pm });
+    }
+    function openExport() {
+      var saved = store(REPORT_KEY);
+      exportOpts = { pm: state.filters.pm || '', since: typeof saved === 'number' ? saved : null };
+      var dlg = document.getElementById('dialog');
+      dlg.className = 'export-dialog';
+      dlg.innerHTML = '<form id="export-form" method="dialog">' + Views.exportDialog(state, exportOpts, reportText()) + '</form>';
+      dlg.showModal();
+    }
+    function refreshExport() {
+      var form = document.getElementById('export-form');
+      var sinceRaw = form.elements['rep-since'].value.trim();
+      exportOpts.pm = form.elements['rep-pm'].value;
+      exportOpts.since = /^\d+$/.test(sinceRaw) ? Number(sinceRaw) : null;
+      document.getElementById('rep-text').value = reportText();
+    }
+    /** Next report's "new items" start after the highest ลำดับ in this one. */
+    function rememberReportBaseline() {
+      store(REPORT_KEY, D.nextSeq(state.rows) - 1);
+    }
+
     function focusFirstError() {
       var el = document.querySelector('[aria-invalid="true"]');
       if (el) el.focus();
@@ -457,12 +549,78 @@
         el.disabled = true;
         moveStatus(el.getAttribute('data-id'), el.getAttribute('data-to'));
       },
-      'date-today': function (el) {
-        var input = document.getElementById(el.getAttribute('data-target'));
-        input.value = todaySheet();
+      'cal-open': function (el) {
+        var id = el.getAttribute('data-target');
+        if (cal && cal.target === id) return closeCalendar();
+        var typed = D.parseDate(document.getElementById(id).value);
+        var base = typed.date && !typed.issue ? typed.date : state.today;
+        cal = { target: id, y: base.y, m: base.m, opener: el };
+        drawCalendar();
+      },
+      'cal-nav': function (el) {
+        var n = cal.m + Number(el.getAttribute('data-dir'));
+        cal.y += n < 1 ? -1 : n > 12 ? 1 : 0;
+        cal.m = ((n + 11) % 12) + 1;
+        drawCalendar();
+      },
+      'cal-pick': function (el) {
+        var input = document.getElementById(cal.target);
+        input.value = el.getAttribute('data-date');
         input.dispatchEvent(new Event('change', { bubbles: true }));
+        closeCalendar();
+        input.focus();
+      },
+      'cal-close': function () {
+        closeCalendar();
       },
       back: back,
+      'request-access': function (el) {
+        el.disabled = true;
+        api('Api_requestAccess', { name: state.myName() }).then(function (res) {
+          if (!res.ok) return UI.toast(res.message, 'error');
+          state.user.editReason = res.data.status === 'อนุญาต' ? 'OK' : 'PENDING';
+          UI.toast(res.data.status === 'อนุญาต' ? 'คุณมีสิทธิ์อยู่แล้ว กดโหลดข้อมูลใหม่' : 'ส่งคำขอแล้ว รอผู้ดูแลอนุมัติ');
+          render();
+        });
+      },
+      'reload-access': function () { state.access = null; render(); },
+      'access-set': function (el) {
+        var input = { email: el.getAttribute('data-email') };
+        input[el.getAttribute('data-field')] = el.getAttribute('data-value');
+        el.disabled = true;
+        saveAccess(input);
+      },
+      'export-open': openExport,
+      'export-close': function () { document.getElementById('dialog').close(); },
+      'export-copy': function () {
+        var ta = document.getElementById('rep-text');
+        ta.focus();
+        ta.select();
+        var done = function () { rememberReportBaseline(); UI.toast('คัดลอกข้อความแล้ว วางใน LINE หรืออีเมลได้เลย'); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(ta.value).then(done, function () {
+            UI.toast('คัดลอกอัตโนมัติไม่ได้ ข้อความถูกเลือกไว้แล้ว กด Ctrl+C (มือถือ: กดค้างแล้วเลือกคัดลอก)', 'error');
+          });
+        } else {
+          UI.toast('ข้อความถูกเลือกไว้แล้ว กด Ctrl+C เพื่อคัดลอก');
+        }
+      },
+      'export-download': function () {
+        var text = document.getElementById('rep-text').value;
+        var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'สรุปรายการขอแก้ไข-' + D.formatDate(state.today).split('/').join('-') + '.txt';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        rememberReportBaseline();
+      },
+      'mw-jump': function (el, ev) {
+        ev.preventDefault();
+        var t = document.getElementById(el.getAttribute('data-target'));
+        if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      },
       'tour-start': startTour,
       'tour-next': function () {
         if (state.tourStep >= Views.TOUR_STEPS - 1) return endTour();
@@ -481,6 +639,12 @@
 
     document.addEventListener('change', function (ev) {
       var form = ev.target.form;
+      if (ev.target.classList && ev.target.classList.contains('access-select')) {
+        var input = { email: ev.target.getAttribute('data-email') };
+        input[ev.target.getAttribute('data-field')] = ev.target.value;
+        return saveAccess(input);
+      }
+      if (form && form.id === 'export-form') return refreshExport();
       if (form && form.id === 'filters') {
         ['platform', 'pm', 'developer', 'urgency', 'from', 'to'].forEach(function (k) { state.filters[k] = form.elements[k].value; });
         store(KEYS.filters, state.filters);
@@ -515,6 +679,13 @@
       if (form.id === 'item-form') {
         ev.preventDefault();
         submitForm(form);
+      } else if (form.id === 'access-add') {
+        ev.preventDefault();
+        var email = form.elements['acc-email'].value.trim();
+        if (!email) return UI.toast('กรุณากรอกอีเมล', 'error');
+        saveAccess({ email: email, name: form.elements['acc-name'].value, role: form.elements['acc-role'].value, status: state.access.states.allowed });
+      } else if (form.id === 'export-form') {
+        ev.preventDefault();
       } else if (form.id === 'name-form') {
         ev.preventDefault();
         var name = form.elements.myname.value;
@@ -557,11 +728,20 @@
     });
 
     document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && cal) {
+        ev.preventDefault();
+        return closeCalendar();
+      }
       if (ev.key === 'Escape' && state.tourStep !== null) endTour();
       if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('tr[data-action]')) {
         ev.preventDefault();
         actions['open-item'](ev.target, ev);
       }
+    });
+
+    // menu icons (decorative; link text stays the accessible name)
+    document.querySelectorAll('.nav a[data-icon]').forEach(function (el) {
+      el.insertAdjacentHTML('afterbegin', '<span class="bi">' + UI.icon(el.getAttribute('data-icon')) + '</span>');
     });
 
     load();

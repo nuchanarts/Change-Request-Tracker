@@ -11,15 +11,18 @@
       var f = state.filters;
       var o = state.options;
       var devs = [D.UNASSIGNED].concat(o.developer || []);
+      var active = ['platform', 'pm', 'developer', 'urgency', 'from', 'to'].filter(function (k) { return f[k]; }).length;
       return (
-        '<form class="filters" id="filters" aria-label="ตัวกรอง">' +
-        UI.select({ name: 'platform', label: 'แพลตฟอร์ม', options: o.platform, value: f.platform, emptyLabel: 'ทั้งหมด' }) +
-        UI.select({ name: 'pm', label: 'PM', options: o.pm, value: f.pm, emptyLabel: 'ทั้งหมด' }) +
-        UI.select({ name: 'developer', label: 'นักพัฒนา', options: devs, value: f.developer, emptyLabel: 'ทั้งหมด' }) +
-        UI.select({ name: 'urgency', label: 'ความเร่งด่วน', options: o.urgency, value: f.urgency, emptyLabel: 'ทั้งหมด' }) +
-        UI.input({ name: 'from', label: 'กำหนดส่งตั้งแต่', value: f.from, placeholder: 'วว/ดด/ปปปป', inputmode: 'numeric' }) +
-        UI.input({ name: 'to', label: 'ถึง', value: f.to, placeholder: 'วว/ดด/ปปปป', inputmode: 'numeric' }) +
-        '<div class="actions"><button type="button" class="btn small" data-action="clear-filters">ล้างตัวกรอง</button></div>' +
+        '<form class="filters' + (active ? ' is-active' : '') + '" id="filters" aria-label="ตัวกรอง">' +
+        '<div class="filters-head"><span class="filters-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 8v5l-4 2v-7z"/></svg></span>' +
+        '<strong>ตัวกรอง</strong><span class="filters-count">' + (active ? 'ใช้อยู่ ' + active + ' ตัว' : 'แสดงทุกรายการ') + '</span>' +
+        (active ? '<button type="button" class="btn small filters-clear" data-action="clear-filters">' + UI.withIcon('clear', 'ล้างตัวกรอง') + '</button>' : '') + '</div>' +
+        UI.select({ name: 'platform', label: 'แพลตฟอร์ม', icon: 'platform', options: o.platform, value: f.platform, emptyLabel: 'ทั้งหมด' }) +
+        UI.select({ name: 'pm', label: 'PM', icon: 'pm', options: o.pm, value: f.pm, emptyLabel: 'ทั้งหมด' }) +
+        UI.select({ name: 'developer', label: 'นักพัฒนา', icon: 'dev', options: devs, value: f.developer, emptyLabel: 'ทั้งหมด' }) +
+        UI.select({ name: 'urgency', label: 'ความเร่งด่วน', icon: 'urgency', options: o.urgency, value: f.urgency, emptyLabel: 'ทั้งหมด' }) +
+        UI.dateField({ name: 'from', label: 'กำหนดส่งตั้งแต่', icon: 'calendar', value: f.from }) +
+        UI.dateField({ name: 'to', label: 'ถึง', icon: 'calendar', value: f.to }) +
         '</form>'
       );
     }
@@ -44,8 +47,12 @@
     function readOnlyBanner(state) {
       if (state.user.canEdit) return '';
       var who = 'บัญชี ' + esc(state.user.email || '');
+      if (state.user.editReason === 'PENDING') {
+        return '<div class="banner info">' + who + ' ส่งคำขอสิทธิ์แก้ไขแล้ว กำลังรอผู้ดูแลอนุมัติ เมื่ออนุมัติแล้วกด "โหลดข้อมูลใหม่"</div>';
+      }
       if (state.user.editReason === 'NOT_ALLOWED') {
-        return '<div class="banner warn">' + who + ' ยังไม่อยู่ในรายชื่อทีมที่แก้ไขได้ จึงดูข้อมูลได้อย่างเดียว ให้ PM เพิ่มอีเมลนี้ในชีต <strong>_app_allowed</strong> แล้วกดโหลดข้อมูลใหม่</div>';
+        return '<div class="banner warn banner-row"><span>' + who + ' ยังไม่อยู่ในรายชื่อทีมที่แก้ไขได้ จึงดูข้อมูลได้อย่างเดียว</span>' +
+          '<button class="btn small primary" data-action="request-access">ขอสิทธิ์แก้ไข</button></div>';
       }
       return '<div class="banner warn">' + who + ' มีสิทธิ์ดูอย่างเดียวในชีต จึงดูข้อมูลได้แต่เพิ่มหรือแก้ไขไม่ได้</div>';
     }
@@ -114,8 +121,13 @@
         '<div class="hero-text"><p class="hero-hello">' + (name ? 'สวัสดี คุณ<strong>' + esc(name) + '</strong>' : 'สวัสดี') + '<span class="hero-date">' + esc(D.formatThaiLong(state.today)) + '</span></p>' +
         '<h1 id="hero-h">ภาพรวมงานขอแก้ไขโปรแกรม</h1>' +
         (count ? '<p class="hero-sub">' + esc(todaySentence(m)) + '</p>' : '') +
-        '<div class="hero-actions">' + myWorkChip(state) +
-        '<button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button>' +
+        '<div class="hero-actions">' +
+        (state.user.canEdit && state.schema.ok
+          ? '<a class="hero-add" href="#/new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>เพิ่มรายการขอแก้ไข</a>'
+          : '') +
+        myWorkChip(state) +
+        '<button class="btn small export-btn" data-action="export-open">' + UI.withIcon('report', 'สรุปรายงาน (Export)') + '</button>' +
+        '<button class="btn small" data-action="reload">' + UI.withIcon('reload', 'โหลดข้อมูลใหม่') + '</button>' +
         '<span class="hero-meta">' + esc(filterSummary(state)) + ', ข้อมูล ณ ' + esc(state.loadedAt) + '</span></div></div>' +
         '<div class="hero-art">' + UI.illustration() + '</div>' +
         (count ? '<div class="hero-stats">' +
@@ -166,21 +178,48 @@
         '</h2><span class="muted">' + head + '</span></div><div class="stages">' + stages + '</div>' + extra + '</section>';
     }
 
+    /** Ring showing the share of open work that is still on time. */
+    function onTimeRing(open, overdue) {
+      var pct = open ? Math.round(((open - overdue) / open) * 100) : 100;
+      var r = 34;
+      var c = 2 * Math.PI * r;
+      return '<svg class="ring" viewBox="0 0 84 84" role="img" aria-label="งานค้างที่ยังไม่เกินกำหนด ' + pct + '%">' +
+        '<circle cx="42" cy="42" r="' + r + '" fill="none" stroke="#fde8e6" stroke-width="10"/>' +
+        '<circle cx="42" cy="42" r="' + r + '" fill="none" stroke="var(--ok)" stroke-width="10" stroke-linecap="round" stroke-dasharray="' + ((c * pct) / 100).toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 42 42)"/>' +
+        '<text x="42" y="40" text-anchor="middle" class="ring-num">' + pct + '%</text><text x="42" y="55" text-anchor="middle" class="ring-sub">ทันกำหนด</text></svg>';
+    }
+
+    function severity(days) {
+      return days > 30 ? 'sev-4' : days > 14 ? 'sev-3' : days > 7 ? 'sev-2' : 'sev-1';
+    }
+
     function overduePanel(state, m) {
       var list = m.overdueList;
-      var body;
+      var head = '<div class="panel-head"><h2 id="od-h">งานเกินกำหนด</h2><span class="muted">เรียงจากเกินนานที่สุด</span></div>';
       if (!list.length) {
-        body = '<p class="muted">ไม่มีงานเกินกำหนด</p>';
-      } else {
-        body = '<ol class="od-list">' + list.slice(0, 12).map(function (r) {
-          return '<li><div class="od-days num">' + r.overdueDays + '<small>วัน</small></div><div>' +
-            '<a href="#/items/' + encodeURIComponent(r.id) + '">' + esc(r.detail) + '</a>' +
-            '<div class="meta"><span>#' + esc(r.seq === null ? '-' : r.seq) + '</span><span>' + esc(r.platform) + '</span><span>' + esc(r.system) + '</span><span>' + esc(r.developer || D.UNASSIGNED) + '</span>' +
-            UI.statusBadge(r.status) + '</div></div></li>';
-        }).join('') + '</ol>';
-        if (list.length > 12) body += '<p style="margin-top:8px">' + drillButton(state, 'งานเกินกำหนดทั้งหมด', m.overdueIds, 'ดูงานเกินกำหนดทั้งหมด ' + list.length + ' งาน') + '</p>';
+        return '<section class="panel od-panel" aria-labelledby="od-h">' + head +
+          '<div class="od-clear"><span aria-hidden="true">🎉</span><div><strong>ไม่มีงานเกินกำหนด</strong><p class="muted">ทีมทำได้ยอดเยี่ยม รักษามาตรฐานนี้ไว้</p></div></div></section>';
       }
-      return '<section class="panel" aria-labelledby="od-h"><div class="panel-head"><h2 id="od-h">งานเกินกำหนด</h2><span class="muted">เรียงจากเกินนานที่สุด</span></div>' + body + '</section>';
+      var buckets = D.overdueBuckets(list);
+      var maxB = buckets.reduce(function (a, b) { return Math.max(a, b.ids.length); }, 0) || 1;
+      var chart = '<div class="od-buckets">' + buckets.map(function (b, i) {
+        var pct = Math.round((b.ids.length / maxB) * 100);
+        return '<div class="od-bucket"><span class="od-blabel">' + esc(b.label) + '</span>' +
+          '<span class="od-btrack"><span class="od-bfill sev-' + (i + 1) + '" style="width:' + pct + '%"></span></span>' +
+          (b.ids.length ? drillButton(state, 'เกินกำหนด ' + b.label, b.ids, '<strong class="num">' + b.ids.length + '</strong>') : '<span class="muted num">0</span>') + '</div>';
+      }).join('') + '</div>';
+      var week = m.closedThisWeek.count;
+      var cheer = '<div class="od-cheer">' + onTimeRing(m.openCount, m.overdueCount) +
+        '<div><strong>ช่วยกันเคลียร์ให้เหลือศูนย์!</strong><p>เกินกำหนด <b class="hot num">' + list.length + '</b> งาน' +
+        (week ? ' · สัปดาห์นี้ปิดไปแล้ว <b class="good num">' + week + '</b> งาน 💪' : ' · เริ่มปิดงานแรกของสัปดาห์กันเลย') + '</p>' + chart + '</div></div>';
+      var body = '<ol class="od-list">' + list.slice(0, 12).map(function (r) {
+        return '<li class="' + severity(r.overdueDays) + '"><div class="od-days num">' + r.overdueDays + '<small>วัน</small></div><div>' +
+          '<a href="#/items/' + encodeURIComponent(r.id) + '">' + esc(r.detail) + '</a>' +
+          '<div class="meta"><span>#' + esc(r.seq === null ? '-' : r.seq) + '</span><span>' + esc(r.platform) + '</span><span>' + esc(r.system) + '</span><span>' + esc(r.developer || D.UNASSIGNED) + '</span>' +
+          UI.statusBadge(r.status) + (r.ticketUrl ? UI.ticketLink(r) : '') + '</div></div></li>';
+      }).join('') + '</ol>';
+      if (list.length > 12) body += '<p style="margin-top:8px">' + drillButton(state, 'งานเกินกำหนดทั้งหมด', m.overdueIds, 'ดูงานเกินกำหนดทั้งหมด ' + list.length + ' งาน') + '</p>';
+      return '<section class="panel od-panel" aria-labelledby="od-h">' + head + cheer + body + '</section>';
     }
 
     function peopleTable(state, rows, label, withOverdue) {
@@ -255,13 +294,17 @@
         var cur = state.sort.key === key;
         return '<th class="' + (cls || '') + '" aria-sort="' + (cur ? (state.sort.dir > 0 ? 'ascending' : 'descending') : 'none') + '"><button data-action="sort" data-key="' + key + '">' + label + (cur ? (state.sort.dir > 0 ? ' ▲' : ' ▼') : '') + '</button></th>';
       };
-      html += '<div class="table-wrap"><table class="responsive"><thead><tr>' + th('seq', 'ลำดับ') + '<th>รายละเอียด</th>' + th('status', 'สถานะ') + th('urgency', 'ความเร่งด่วน') +
+      // Taiga/MANTIS has its own column (user request 2026-11-11) so testers find it without reading the detail
+      html += '<div class="table-wrap"><table class="responsive"><thead><tr>' + th('seq', 'ลำดับ') + '<th>รายละเอียด</th>' + th('system', 'ระบบงาน') + '<th>Taiga/MANTIS</th>' + th('status', 'สถานะ') + th('urgency', 'ความเร่งด่วน') +
         th('developer', 'นักพัฒนา') + th('pm', 'PM') + th('due', 'กำหนดส่ง') + '</tr></thead><tbody>' +
         slice.map(function (r) {
+          var ticketCell = r.ticketUrl ? UI.ticketLink(r) : r.ticket ? '<span class="num">#' + esc(r.ticket) + '</span>' : '<span class="muted">–</span>';
           return '<tr class="clickable" data-action="open-item" data-id="' + esc(r.id) + '"><td class="num" data-hide-mobile>' + esc(r.seq === null ? '–' : r.seq) + '</td>' +
             '<td class="detail-cell"><a href="#/items/' + encodeURIComponent(r.id) + '">' + esc(r.detail) + '</a><div class="sub">' +
-            '<span class="mobile-only">#' + esc(r.seq === null ? '–' : r.seq) + ' </span>' + esc(r.platform) + ' / ' + esc(r.system) + (r.ticket ? ' / ' + UI.ticket(r) : '') +
+            '<span class="mobile-only">#' + esc(r.seq === null ? '–' : r.seq) + ' </span>' + esc(r.platform) + '<span class="mobile-only"> / ' + esc(r.system) + '</span>' +
             (r.issues.length ? ' <span class="flag">ข้อมูลไม่ครบ/ผิดช่อง</span>' : '') + '</div></td>' +
+            '<td class="system-cell" data-hide-mobile>' + esc(r.system || '–') + '</td>' +
+            '<td class="ticket-cell">' + ticketCell + '</td>' +
             '<td>' + UI.statusBadge(r.status) + '</td><td data-hide-mobile>' + UI.urgency(r.urgency) + '</td><td>' + esc(r.developer || '–') + '</td><td data-hide-mobile>' + esc(r.pm) + '</td><td>' + UI.due(r, state.today) + '</td></tr>';
         }).join('') + '</tbody></table></div>';
       if (pages > 1) {
@@ -296,10 +339,19 @@
       }
       if (col.type === 'person') return UI.select(Object.assign(o, { options: key === 'pm' ? opts.pm : opts.developer, emptyLabel: key === 'developer' ? '— ยังไม่มอบหมาย —' : undefined }));
       if (col.type === 'freeOption') return UI.combobox(Object.assign(o, { options: opts.system }));
+      if (col.type === 'freePerson') {
+        return UI.combobox(Object.assign(o, { options: opts.developer, placeholder: 'เลือกจากรายการ หรือพิมพ์ชื่อใหม่', hint: 'ถ้าไม่มีชื่อในรายการ พิมพ์ชื่อใหม่ได้เลย' }));
+      }
       if (col.type === 'date') return UI.dateField(o);
       if (col.type === 'number') return UI.input(Object.assign(o, { inputmode: 'decimal' }));
       if (key === 'detail') return UI.textarea(Object.assign(o, { wide: true, hint: 'อธิบายสิ่งที่ต้องการให้แก้ไข ให้คนอื่นอ่านแล้วเข้าใจ' }));
-      return UI.input(Object.assign(o, { wide: key === 'ticket' }));
+      if (key === 'ticket') {
+        var url = D.ticketUrl(value);
+        var html = UI.input(Object.assign(o, { wide: true, placeholder: 'วางลิงก์ Taiga/MANTIS หรือใส่เลข ticket' }));
+        var links = '<div class="ticket-actions">' + (url ? UI.ticketLink({ ticket: value, ticketUrl: url }) : '') + UI.taigaButton(url ? 'เข้า Taiga' : 'เข้า Taiga เพื่อเพิ่มเอกสาร/ปรับสถานะ') + '</div>';
+        return html.replace(/<\/div><\/div>$/, '</div>' + links + '</div>');
+      }
+      return UI.input(o);
     }
 
     function form(state, mode, row) {
@@ -321,7 +373,7 @@
         }).join('') + '</div></fieldset>';
       });
       html += '<div class="form-actions">';
-      if (!readOnly) html += '<button type="submit" class="btn primary" id="save-btn">' + (mode === 'new' ? 'บันทึกรายการใหม่' : 'บันทึกการแก้ไข') + '</button>';
+      if (!readOnly) html += '<button type="submit" class="btn primary" id="save-btn">' + UI.withIcon('save', mode === 'new' ? 'บันทึกรายการใหม่' : 'บันทึกการแก้ไข') + '</button>';
       html += '<a class="btn" href="' + (mode === 'new' ? '#/monitor' : '#/items') + '">' + (readOnly ? 'กลับ' : 'ยกเลิก') + '</a>';
       if (row && !readOnly && row.isOpen) html += '<span class="spacer"></span><button type="button" class="btn danger" data-action="cancel-item">ยกเลิกรายการนี้</button>';
       html += '</div></form>';
@@ -339,7 +391,6 @@
 
     // ------------------------------------------------------------------ My Work (US4)
 
-    var GROUP_LABELS = [['overdue', 'เกินกำหนด'], ['today', 'ครบกำหนดวันนี้'], ['within7', 'ภายใน 7 วัน'], ['later', 'ภายหลัง'], ['noDue', 'ไม่มีวันกำหนด']];
 
     function myWork(state) {
       var name = state.myName();
@@ -350,18 +401,40 @@
           '<div class="actions" style="display:flex;align-items:flex-end"><button class="btn primary" type="submit">ใช้ชื่อนี้</button></div></form></section>';
       }
       var role = state.myTab;
-      var g = D.groupMyWork(state.rows, name, role, state.today);
+      var g = D.groupMyWeek(state.rows, name, role, state.today);
+      var week = D.weekRange(state.today);
+      var next = { from: D.addDays(week.from, 7), to: D.addDays(week.to, 7) };
       html += '<div class="tabs" role="tablist"><button role="tab" data-action="tab" data-tab="developer" aria-selected="' + (role === 'developer') + '">งานพัฒนาของฉัน</button>' +
         '<button role="tab" data-action="tab" data-tab="pm" aria-selected="' + (role === 'pm') + '">งานที่ฉันดูแล (PM)</button></div>';
-      if (!g.total) {
+      if (!g.openTotal && !g.doneThisWeek.length) {
         return html + UI.emptyState('ยังไม่มีงานค้าง', role === 'developer' ? 'งานที่มีชื่อคุณในช่อง "นักพัฒนา" จะมาแสดงที่นี่' : 'งานที่มีชื่อคุณในช่อง "PM รับผิดชอบ" จะมาแสดงที่นี่');
       }
-      GROUP_LABELS.forEach(function (gl) {
-        var list = g[gl[0]];
-        if (!list.length) return;
-        html += '<section class="group" aria-labelledby="g-' + gl[0] + '"><h2 id="g-' + gl[0] + '">' + gl[1] + ' <span class="count">' + list.length + ' งาน</span></h2>' +
-          list.map(function (r) { return workCard(state, r); }).join('') + '</section>';
-      });
+      // Summary strip: what needs attention this week, at a glance
+      var tile = function (cls, key, value, label, sub) {
+        return '<a class="mw-tile ' + cls + '" href="#mw-' + key + '" data-action="mw-jump" data-target="mw-' + key + '"><span class="mw-num num">' + value + '</span><span class="mw-label">' + label + '</span>' + (sub ? '<span class="mw-sub">' + sub + '</span>' : '') + '</a>';
+      };
+      html += '<div class="mw-summary">' +
+        tile('hot', 'urgent', g.urgent.length, 'ต้องตามด่วน', 'เกินกำหนดหรือด่วนที่สุด') +
+        tile('warm', 'this', g.thisWeek.length, 'ต้องทำสัปดาห์นี้', D.formatThai(week.from) + ' – ' + D.formatThai(week.to)) +
+        tile('cool', 'next', g.nextWeek.length, 'สัปดาห์หน้า', D.formatThai(next.from) + ' – ' + D.formatThai(next.to)) +
+        tile('good', 'done', g.doneThisWeek.length, 'ปิดได้สัปดาห์นี้', g.doneThisWeek.length ? 'เก่งมาก ทำต่อเลย 💪' : 'มาปิดงานแรกกัน') +
+        '</div>';
+      var section = function (key, title, note, list, empty) {
+        return '<section class="group mw-group mw-' + key + '" id="mw-' + key + '" aria-labelledby="g-' + key + '"><h2 id="g-' + key + '">' + title + ' <span class="count">' + list.length + ' งาน</span></h2>' +
+          (note ? '<p class="mw-note">' + note + '</p>' : '') +
+          (list.length ? list.map(function (r) { return workCard(state, r); }).join('') : '<p class="muted mw-empty">' + empty + '</p>') + '</section>';
+      };
+      html += section('urgent', '🔥 ต้องตามด่วน', 'งานที่เกินกำหนดแล้ว หรือถูกตั้งเป็น "ด่วนที่สุด" เรียงจากเร่งที่สุดก่อน', g.urgent, 'ไม่มีงานด่วน เยี่ยมมาก');
+      html += section('this', '📅 ต้องทำสัปดาห์นี้', 'กำหนดส่งภายในสัปดาห์นี้ (ยังไม่เกินกำหนด)', g.thisWeek, 'ไม่มีงานที่ครบกำหนดสัปดาห์นี้');
+      html += section('next', '🗓️ สัปดาห์หน้า', 'เตรียมไว้ล่วงหน้า', g.nextWeek, 'ยังไม่มีงานสัปดาห์หน้า');
+      if (g.later.length) html += section('later', 'ภายหลัง', '', g.later, '');
+      if (g.noDue.length) html += section('nodue', 'ยังไม่มีวันกำหนด', 'ควรขอให้ PM ใส่วันที่ต้องได้', g.noDue, '');
+      if (g.doneThisWeek.length) {
+        html += '<section class="group mw-group mw-done" id="mw-done"><h2>✅ ปิดได้สัปดาห์นี้ <span class="count">' + g.doneThisWeek.length + ' งาน</span></h2>' +
+          '<ul class="mw-donelist">' + g.doneThisWeek.map(function (r) {
+            return '<li><a href="#/items/' + encodeURIComponent(r.id) + '">' + esc(r.detail) + '</a> <span class="muted">' + esc(r.doneDate.raw) + '</span></li>';
+          }).join('') + '</ul></section>';
+      }
       return html;
     }
 
@@ -374,8 +447,60 @@
       }
       return '<article class="work' + (r.isOverdue ? ' over' : '') + '"><div><a href="#/items/' + encodeURIComponent(r.id) + '" style="color:inherit">' + esc(r.detail) + '</a>' +
         '<div class="meta"><span>#' + esc(r.seq === null ? '–' : r.seq) + '</span><span>' + esc(r.platform) + ' / ' + esc(r.system) + '</span>' +
-        (r.devQueue !== null ? '<span>คิวที่ ' + r.devQueue + '</span>' : '') + '<span>' + UI.urgency(r.urgency) + '</span>' + UI.statusBadge(r.status) + '<span>' + UI.due(r, state.today) + '</span></div></div>' +
+        (r.devQueue !== null ? '<span>คิวที่ ' + r.devQueue + '</span>' : '') + '<span>' + UI.urgency(r.urgency) + '</span>' + UI.statusBadge(r.status) + '<span>' + UI.due(r, state.today) + '</span>' + (r.ticketUrl ? UI.ticketLink(r) : '') + '</div></div>' +
         '<div class="actions">' + actions + '</div></article>';
+    }
+
+    // ------------------------------------------------------------------ Access management (admins)
+
+    function access(state) {
+      var html = '<div class="page-head"><h1>จัดการสิทธิ์</h1><span class="muted">ใครเพิ่มหรือแก้ไขรายการได้ (บันทึกลงชีต _app_allowed และเก็บประวัติใน _app_log)</span></div>';
+      if (!state.user.isAdmin) return html + UI.emptyState('เฉพาะผู้ดูแลเท่านั้น', 'หน้านี้ใช้จัดการสิทธิ์ของทีม ถ้าต้องการสิทธิ์ผู้ดูแล ให้ติดต่อ PM');
+      var a = state.access;
+      if (!a) return html + UI.loading('กำลังโหลดรายชื่อทีม…');
+      if (a.error) return html + UI.errorState(a.error, 'reload-access');
+      var pending = a.members.filter(function (m) { return m.status === a.states.pending; });
+      if (pending.length) {
+        html += '<section class="panel access-pending" aria-labelledby="ap-h"><div class="panel-head"><h2 id="ap-h">คำขอรออนุมัติ <span class="count">' + pending.length + '</span></h2></div>' +
+          pending.map(function (m) {
+            return '<div class="access-req"><div><strong>' + esc(m.email) + '</strong>' + (m.name ? ' <span class="muted">' + esc(m.name) + '</span>' : '') + (m.note ? '<div class="muted">' + esc(m.note) + '</div>' : '') + '</div>' +
+              '<div class="access-actions"><button class="btn small primary" data-action="access-set" data-email="' + esc(m.email) + '" data-field="status" data-value="' + esc(a.states.allowed) + '">อนุญาต</button>' +
+              '<button class="btn small danger" data-action="access-set" data-email="' + esc(m.email) + '" data-field="status" data-value="' + esc(a.states.suspended) + '">ปฏิเสธ</button></div></div>';
+          }).join('') + '</section>';
+      }
+      html += '<section class="panel" aria-labelledby="aa-h"><div class="panel-head"><h2 id="aa-h">เพิ่มคนเข้าทีม</h2></div>' +
+        '<form id="access-add" class="access-add">' +
+        UI.input({ name: 'acc-email', label: 'อีเมล Gmail', type: 'email', required: true, placeholder: 'name@gmail.com' }) +
+        UI.input({ name: 'acc-name', label: 'ชื่อ (ไม่บังคับ)' }) +
+        UI.select({ name: 'acc-role', label: 'บทบาท', options: a.roles, value: a.roles[1] || a.roles[0], allowEmpty: false }) +
+        '<div class="actions"><button class="btn primary" type="submit">เพิ่มเข้าทีม</button></div></form></section>';
+      html += '<section class="panel" aria-labelledby="am-h"><div class="panel-head"><h2 id="am-h">สมาชิกทั้งหมด <span class="count">' + a.members.length + '</span></h2>' +
+        '<span class="muted">ผู้ดูแลจัดการสิทธิ์ได้ ผู้แก้ไขเพิ่ม/แก้รายการได้ เจ้าของชีตเป็นผู้ดูแลเสมอ</span></div>' +
+        '<div class="table-wrap"><table class="access-table"><thead><tr><th>อีเมล</th><th>ชื่อ</th><th>บทบาท</th><th>สถานะ</th></tr></thead><tbody>' +
+        a.members.map(function (m) {
+          var sel = function (field, list, value) {
+            return '<select class="access-select" data-email="' + esc(m.email) + '" data-field="' + field + '" aria-label="' + (field === 'role' ? 'บทบาทของ ' : 'สถานะของ ') + esc(m.email) + '">' +
+              list.map(function (v) { return '<option' + (v === value ? ' selected' : '') + '>' + esc(v) + '</option>'; }).join('') + '</select>';
+          };
+          return '<tr class="st-' + (m.status === a.states.allowed ? 'ok' : m.status === a.states.pending ? 'wait' : 'off') + '"><td>' + esc(m.email) + (m.email === a.owner ? ' <span class="badge s-done">เจ้าของชีต</span>' : '') + '</td><td>' + esc(m.name) + '</td>' +
+            '<td>' + sel('role', a.roles, m.role) + '</td><td>' + sel('status', [a.states.allowed, a.states.pending, a.states.suspended], m.status) + '</td></tr>';
+        }).join('') + '</tbody></table></div></section>';
+      return html;
+    }
+
+    // ------------------------------------------------------------------ Text report export
+
+    function exportDialog(state, opts, text) {
+      return '<h2>สรุปรายงาน (Export)</h2>' +
+        '<p class="muted" style="margin:4px 0 12px">สร้างข้อความสรุปพร้อมส่งใน LINE หรืออีเมล เลือก PM เพื่อแยกรายงานตามผู้รับผิดชอบ</p>' +
+        '<div class="export-opts">' +
+        UI.select({ name: 'rep-pm', label: 'PM ผู้รับผิดชอบ', options: state.options.pm, value: opts.pm, emptyLabel: 'ทุกคน' }) +
+        UI.input({ name: 'rep-since', label: 'ลำดับสุดท้ายของรายงานครั้งก่อน', value: opts.since === null || opts.since === undefined ? '' : String(opts.since), inputmode: 'numeric', tip: 'รายการที่มีลำดับมากกว่าเลขนี้นับเป็น "รายการขอแก้ไขใหม่" ระบบจำเลขล่าสุดให้ทุกครั้งที่คัดลอกหรือดาวน์โหลด' }) +
+        '</div>' +
+        '<label class="sr-only" for="rep-text">ข้อความรายงาน</label><textarea id="rep-text" class="export-text" readonly>' + esc(text) + '</textarea>' +
+        '<div class="dialog-actions"><button class="btn" value="close" data-action="export-close">ปิด</button>' +
+        '<button class="btn" data-action="export-download">' + UI.withIcon('download', 'ดาวน์โหลด .txt') + '</button>' +
+        '<button class="btn primary" data-action="export-copy">' + UI.withIcon('copy', 'คัดลอกข้อความ') + '</button></div>';
     }
 
     // ------------------------------------------------------------------ Kanban (US8)
@@ -436,7 +561,7 @@
       return '<article class="kcard' + (r.isOverdue ? ' over' : '') + '"' + (canMove ? ' draggable="true"' : '') + ' data-id="' + esc(r.id) + '">' +
         '<a href="#/items/' + encodeURIComponent(r.id) + '" class="ktitle">' + esc(r.detail) + '</a>' +
         '<div class="meta"><span>#' + esc(r.seq === null ? '–' : r.seq) + '</span><span>' + esc(r.platform) + '</span>' + (r.urgency !== 'ปกติ' ? '<span>' + UI.urgency(r.urgency) + '</span>' : '') + '</div>' +
-        '<div class="meta"><span>' + esc(r.developer || D.UNASSIGNED) + '</span><span>' + UI.due(r, state.today) + '</span></div>' + btns + '</article>';
+        '<div class="meta"><span>' + esc(r.developer || D.UNASSIGNED) + '</span><span>' + UI.due(r, state.today) + '</span>' + (r.ticketUrl ? UI.ticketLink(r) : '') + '</div>' + btns + '</article>';
     }
 
     // ------------------------------------------------------------------ Help (US7)
@@ -486,6 +611,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>

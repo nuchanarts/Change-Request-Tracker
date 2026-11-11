@@ -17,7 +17,21 @@
       : params.get('notallowed') === '1'
         ? 'NOT_ALLOWED'
         : 'OK';
-  var user = { email: 'tester@example.com', name: null, canEdit: reason === 'OK', editReason: reason };
+  var user = {
+    email: 'tester@example.com',
+    name: null,
+    canEdit: reason === 'OK',
+    editReason: reason,
+    isAdmin: reason === 'OK',
+  };
+  var ROLES = ['ผู้ดูแล', 'ผู้แก้ไข'];
+  var STATES = { allowed: 'อนุญาต', pending: 'รออนุมัติ', suspended: 'ระงับ' };
+  var members = [
+    { email: 'tester@example.com', name: 'ผู้ทดสอบ', note: '', role: 'ผู้ดูแล', status: 'อนุญาต' },
+    { email: 'dev1@example.com', name: 'นักพัฒนา แดง', note: '', role: 'ผู้แก้ไข', status: 'อนุญาต' },
+    { email: 'newbie@example.com', name: 'คนใหม่', note: 'ทีมทดสอบ', role: 'ผู้แก้ไข', status: 'รออนุมัติ' },
+  ];
+  window.__mockAccess = members;
   var latency = Number(params.get('latency') || 250);
   var MSG = {
     FORBIDDEN: 'บัญชีของคุณมีสิทธิ์ดูอย่างเดียว จึงเพิ่มหรือแก้ไขรายการไม่ได้',
@@ -127,6 +141,50 @@
         row[k] = req.changes[k].to;
       });
       return ok({ rowNumber: row.rowNumber, seq: Number(row.seq), written: Object.keys(req.changes) });
+    },
+    Api_requestAccess: function () {
+      user.editReason = 'PENDING';
+      return ok({ status: STATES.pending });
+    },
+    Api_listAccess: function () {
+      if (!user.isAdmin)
+        return { ok: false, code: 'NOT_ADMIN', message: 'เฉพาะผู้ดูแลเท่านั้นที่จัดการสิทธิ์ได้' };
+      return ok({
+        members: members.map(function (m) {
+          return Object.assign({}, m);
+        }),
+        owner: 'owner@example.com',
+        roles: ROLES,
+        states: STATES,
+      });
+    },
+    Api_saveAccess: function (input) {
+      if (!user.isAdmin)
+        return { ok: false, code: 'NOT_ADMIN', message: 'เฉพาะผู้ดูแลเท่านั้นที่จัดการสิทธิ์ได้' };
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email || ''))
+        return {
+          ok: false,
+          code: 'VALIDATION',
+          message: 'กรุณาตรวจสอบข้อมูลที่กรอกอีกครั้ง',
+          details: { fields: { email: 'อีเมลไม่ถูกต้อง' } },
+        };
+      var m = members.filter(function (x) {
+        return x.email === input.email.toLowerCase();
+      })[0];
+      if (!m) {
+        m = {
+          email: input.email.toLowerCase(),
+          name: '',
+          note: '',
+          role: 'ผู้แก้ไข',
+          status: STATES.allowed,
+        };
+        members.push(m);
+      }
+      ['name', 'note', 'role', 'status'].forEach(function (k) {
+        if (input[k] !== undefined) m[k] = input[k];
+      });
+      return ok(Object.assign({}, m));
     },
     Api_setMyName: function (name) {
       user.name = name;
