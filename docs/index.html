@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ติดตามรายการขอแก้ไขโปรแกรม</title>
+    <meta name="description" content="ทางเข้าแอปติดตามรายการขอแก้ไขโปรแกรม EHP / NHIP / INV (ทำงานบน Google Apps Script)" />
+    <meta name="robots" content="noindex" />
+    <!--
+      Entry page only (GitHub Pages). It holds no data and no app logic: the app and all data stay on
+      Google Apps Script / Google Sheets (constitution VIII). Update APP_URL if the deployment changes.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230f766e'/%3E%3Cpath d='M8 10l5 6-5 6M14.5 10l5 6-5 6M21 10l5 6-5 6' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+    <style>
+      :root {
+        --bg: #0e3b38;
+        --ink: #ecf7f5;
+        --muted: #a8d1cb;
+        --accent: #3fb8aa;
+        --focus: #ffd166;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0; background: var(--bg); color: var(--ink);
+        font: 400 16px/1.6 'IBM Plex Sans Thai', 'Sarabun', 'Noto Sans Thai', system-ui, sans-serif;
+        display: grid; place-items: center; padding: 24px 16px; overflow-x: hidden; position: relative; isolation: isolate;
+      }
+      .deco { position: fixed; right: -80px; top: -60px; width: min(620px, 90vw); color: #fff; opacity: 0.06; z-index: -1; }
+      main { max-width: 520px; width: 100%; text-align: center; }
+      .logo { width: 72px; height: 72px; color: var(--accent); display: block; margin: 0 auto 20px; }
+      h1 { font-size: clamp(26px, 6vw, 36px); line-height: 1.25; margin: 0 0 8px; font-weight: 600; }
+      p { margin: 0; color: var(--muted); }
+      .go {
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: 28px;
+        background: var(--ink); color: var(--bg); text-decoration: none; font-weight: 600; font-size: 17px;
+        padding: 12px 28px; border-radius: 999px; min-height: 48px;
+      }
+      .go:hover { background: #fff; }
+      :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+      .status { margin-top: 18px; font-size: 14px; min-height: 1.6em; }
+      .bar { height: 3px; width: 160px; margin: 14px auto 0; background: rgba(255, 255, 255, 0.15); border-radius: 3px; overflow: hidden; }
+      .bar span { display: block; height: 100%; width: 0; background: var(--accent); animation: fill 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+      .note { margin-top: 36px; font-size: 13px; line-height: 1.7; }
+      .note a { color: var(--ink); }
+      .rise { animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+      @keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+      @keyframes fill { to { width: 100%; } }
+      @media (prefers-reduced-motion: reduce) { .rise, .bar span { animation: none; } .bar span { width: 100%; } }
+    </style>
+  </head>
+  <body>
+    <svg class="deco" viewBox="0 0 240 120" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 15l45 45-45 45" /><path d="M95 15l45 45-45 45" /><path d="M170 15l45 45-45 45" />
+      </g>
+    </svg>
+    <main class="rise">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <rect width="32" height="32" rx="9" fill="currentColor" />
+        <path d="M8 10l5 6-5 6M14.5 10l5 6-5 6M21 10l5 6-5 6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <h1>ติดตามรายการขอแก้ไขโปรแกรม</h1>
+      <p>EHP / NHIP / INV สำหรับทีม BGS</p>
+      <a class="go" id="go" href="https://script.google.com/macros/s/AKfycbz_ElEdO0SWkeYFwl92D4yKOFupRmlFjKNuFvUIoUje7Y02yjL3wdSKMvdi0Vk8lA8V/exec">เปิดแอป</a>
+      <p class="status" id="status" role="status" aria-live="polite">กำลังพาเข้าแอป…</p>
+      <div class="bar" aria-hidden="true"><span></span></div>
+      <p class="note">
+        ต้องล็อกอินด้วยบัญชี Google ที่มีสิทธิ์ในชีตข้อมูล<br />
+        ครั้งแรกถ้าเห็น "Google ยังไม่ได้ยืนยันแอปนี้" ให้กด <strong>ขั้นสูง</strong> แล้ว <strong>ไปที่ EHP Change Request Tracker</strong> และกด <strong>อนุญาต</strong>
+      </p>
+    </main>
+    <script>
+      (function () {
+        'use strict';
+        // The real app (Google Apps Script web app). Keep in sync with the production deployment.
+        var APP_URL = 'https://script.google.com/macros/s/AKfycbz_ElEdO0SWkeYFwl92D4yKOFupRmlFjKNuFvUIoUje7Y02yjL3wdSKMvdi0Vk8lA8V/exec';
+        // Carry a deep link through, e.g. …github.io/Change-Request-Tracker/#/kanban → app #/kanban
+        var target = APP_URL + (location.hash && location.hash.indexOf('#/') === 0 ? location.hash : '');
+        document.getElementById('go').href = target;
+        var stay = /[?&]stay=1/.test(location.search); // ?stay=1 shows this page without redirecting
+        if (stay) {
+          document.getElementById('status').textContent = 'กดปุ่มเพื่อเข้าใช้งาน';
+          return;
+        }
+        var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        setTimeout(function () {
+          location.replace(target);
+        }, reduced ? 0 : 1400);
+      })();
+    </script>
+    <noscript><p style="text-align: center">เปิดแอปได้ที่ปุ่มด้านบน</p></noscript>
+  </body>
+</html>
