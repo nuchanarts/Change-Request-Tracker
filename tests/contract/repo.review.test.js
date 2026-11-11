@@ -125,11 +125,28 @@ describe('canEdit covers group and link sharing (R8)', () => {
     expect(ss.probes).toBe(0);
   });
 
-  it('link/group viewers get false from Range.canEdit()', () => {
+  it('link viewers: Range.canEdit() false and the write probe is refused → view-only', () => {
     build({ probeAllowed: false });
     main.rangeCanEdit = false;
     effective = 'linkviewer@x.com';
     expect(repo.canEdit('linkviewer@x.com')).toBe(false);
+  });
+
+  it('"anyone with the link can edit": Range.canEdit() says false but the write probe succeeds → can edit', () => {
+    // Regression (production 2026-11-11, v1.1.1): the real sheet is shared "anyone with link → editor";
+    // Range.canEdit() returned false for those users, so they were shown as view-only.
+    build({ probeAllowed: true });
+    main.rangeCanEdit = false;
+    effective = 'nuchanart.soon@gmail.com';
+    expect(repo.canEdit('nuchanart.soon@gmail.com')).toBe(true);
+    expect(ss.metadata).toEqual([]);
+  });
+
+  it('a named viewer who also has link edit access can edit (Google grants the higher role)', () => {
+    build({ probeAllowed: true });
+    main.rangeCanEdit = false;
+    effective = 'viewer@x.com';
+    expect(repo.canEdit('viewer@x.com')).toBe(true);
   });
 
   it('falls back to the metadata probe (real API shape) and leaves no metadata behind', () => {
@@ -149,7 +166,8 @@ describe('canEdit covers group and link sharing (R8)', () => {
     build({ probeAllowed: true });
     main.rangeCanEdit = true;
     effective = 'groupmember@x.com';
-    userCache.put('canEdit:groupmember@x.com', '0');
+    userCache.put('canEdit:groupmember@x.com', '0'); // v1.1.0
+    userCache.put('canEdit:v2:groupmember@x.com', '0'); // v1.1.1 (wrong for link editors)
     expect(repo.canEdit('groupmember@x.com')).toBe(true);
   });
 
