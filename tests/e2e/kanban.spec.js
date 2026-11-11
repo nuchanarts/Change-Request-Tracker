@@ -96,3 +96,24 @@ test('columns waiting on อจ. sit after "ปิดงานสัปดาห
   const chips = await page.locator('.kjump-chip .kjump-name').allTextContents();
   expect(chips.slice(-2)).toEqual(['dev ขอ Sourecode อจ.', 'รอ Complie ต้องแจ้งอจ.']);
 });
+
+test('empty columns are hidden; "แสดงคอลัมน์ว่าง" brings them back and is remembered (2026-11-11)', async ({
+  page,
+}) => {
+  // make one workflow step empty: move every card out of "รอ compile"
+  await page.addInitScript(() => {
+    window.__beforeMock = (rows) =>
+      rows.forEach((r) => r.status === 'รอ compile' && (r.status = 'กำลังทดสอบ'));
+  });
+  await open(page, '/#/kanban');
+  await expect(page.locator('.kcol[data-status="รอ compile"]')).toHaveCount(0);
+  await expect(page.locator('.kjump-chip', { hasText: 'รอ compile' })).toHaveCount(0);
+  await expect(page.locator('.kcol .kempty')).toHaveCount(0); // no empty column on the board
+  const show = page.getByRole('button', { name: /แสดงคอลัมน์ว่าง \(\d+\)/ });
+  await show.click();
+  await expect(page.locator('.kcol[data-status="รอ compile"]')).toHaveCount(1);
+  await page.reload();
+  await expect(page.locator('.kcol[data-status="รอ compile"]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'ซ่อนคอลัมน์ว่าง' }).click();
+  await expect(page.locator('.kcol[data-status="รอ compile"]')).toHaveCount(0);
+});

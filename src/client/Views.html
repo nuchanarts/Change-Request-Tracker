@@ -718,6 +718,10 @@
         (state.user.canEdit ? 'ลากการ์ดไปคอลัมน์อื่น หรือกดปุ่ม ◀ ▶ เพื่อเปลี่ยนสถานะ' : 'ดูอย่างเดียว') +
         '</span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button></div>' + filterBar(state);
       var collapsed = state.kanbanCollapsed || {};
+      // empty columns are hidden unless "แสดงคอลัมน์ว่าง" is on (user request 2026-11-11)
+      var emptyCount = cols.filter(function (c) { return !c.rows.length; }).length;
+      if (!state.kanbanShowEmpty) cols = cols.filter(function (c) { return c.rows.length; });
+      var nCollapsed = cols.filter(function (c) { return collapsed[c.status]; }).length;
       // Jump bar ON TOP (user request): chips per column + ◀ ▶ to scroll the board without the bottom scrollbar
       html += '<div class="kjump" role="toolbar" aria-label="เลื่อนไปยังคอลัมน์">' +
         '<button type="button" class="kjump-arrow" data-action="kscroll" data-dir="-1" aria-label="เลื่อนบอร์ดไปทางซ้าย">‹</button>' +
@@ -726,7 +730,9 @@
             (c.step ? '<span class="kjump-step">' + c.step + '</span>' : '') + '<span class="kjump-name">' + esc(c.title) + '</span><span class="kjump-count num">' + c.rows.length + '</span></button>';
         }).join('') + '</div>' +
         '<button type="button" class="kjump-arrow" data-action="kscroll" data-dir="1" aria-label="เลื่อนบอร์ดไปทางขวา">›</button>' +
-        '<button type="button" class="btn small kjump-all" data-action="kcollapse-all">' + (Object.keys(collapsed).length ? 'ขยายทุกคอลัมน์' : 'ยุบคอลัมน์ว่าง') + '</button></div>';
+        (nCollapsed ? '<button type="button" class="btn small kjump-all" data-action="kcollapse-all">ขยายทุกคอลัมน์</button>' : '') +
+        (emptyCount ? '<button type="button" class="btn small kjump-all" data-action="kshow-empty" aria-pressed="' + !!state.kanbanShowEmpty + '">' +
+          (state.kanbanShowEmpty ? 'ซ่อนคอลัมน์ว่าง' : 'แสดงคอลัมน์ว่าง (' + emptyCount + ')') + '</button>' : '') + '</div>';
       html += '<div class="board" role="list" aria-label="บอร์ดงานตามสถานะ">' + cols.map(function (c) {
         var sorted = c.rows.slice().sort(function (a, b) {
           return (b.isOverdue - a.isOverdue) || (D.urgencyRank(a.urgency) - D.urgencyRank(b.urgency)) ||

@@ -36,6 +36,7 @@
       myTab: store(KEYS.tab) || 'developer',
       mwFilter: store('ehp.mwfilter.v1') || {},
       kanbanCollapsed: store('ehp.kcollapsed.v1') || {},
+      kanbanShowEmpty: store('ehp.kshowempty.v1') === true,
       choosingName: false,
       formErrors: null,
       formWarnings: null,
@@ -707,13 +708,13 @@
         render();
       },
       'kcollapse-all': function () {
-        if (Object.keys(state.kanbanCollapsed).length) state.kanbanCollapsed = {};
-        else {
-          document.querySelectorAll('.kcol').forEach(function (c) {
-            if (c.querySelector('.kempty')) state.kanbanCollapsed[c.getAttribute('data-status')] = true;
-          });
-        }
+        state.kanbanCollapsed = {};
         store('ehp.kcollapsed.v1', state.kanbanCollapsed);
+        render();
+      },
+      'kshow-empty': function () {
+        state.kanbanShowEmpty = !state.kanbanShowEmpty;
+        store('ehp.kshowempty.v1', state.kanbanShowEmpty);
         render();
       },
       'request-access': function (el) {

@@ -10,6 +10,7 @@
   var rows = fx.rows.map(function (r) {
     return Object.assign({}, r);
   });
+  if (typeof window.__beforeMock === 'function') window.__beforeMock(rows); // tests can shape the data first
   var options = Object.assign({ status: D.WORKFLOW.slice() }, fx.options);
   var reason =
     params.get('viewer') === '1'
