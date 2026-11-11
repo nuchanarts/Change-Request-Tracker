@@ -210,7 +210,7 @@
       }).join('') + '</div>';
       var week = m.closedThisWeek.count;
       var cheer = '<div class="od-cheer">' + onTimeRing(m.openCount, m.overdueCount) +
-        '<div><strong>ช่วยกันเคลียร์ให้เหลือศูนย์!</strong><p>เกินกำหนด <b class="hot num">' + list.length + '</b> งาน' +
+        '<div><p>เกินกำหนด <b class="hot num">' + list.length + '</b> งาน' +
         (week ? ' · สัปดาห์นี้ปิดไปแล้ว <b class="good num">' + week + '</b> งาน 💪' : ' · เริ่มปิดงานแรกของสัปดาห์กันเลย') + '</p>' + chart + '</div></div>';
       var body = '<ol class="od-list">' + list.slice(0, 12).map(function (r) {
         return '<li class="' + severity(r.overdueDays) + '"><div class="od-days num">' + r.overdueDays + '<small>วัน</small></div><div>' +
@@ -361,7 +361,7 @@
       ticket: 'ใส่เลข ticket หรือวางลิงก์ Taiga/MANTIS',
     };
 
-    function formField(state, key, value, errors, warnings, readOnly) {
+    function formField(state, key, value, errors, warnings, readOnly, row) {
       var col = D.COLUMN_BY_KEY[key];
       var o = { name: key, label: col.header, value: value, required: !!col.required, error: errors[key], warn: warnings[key], tip: TIPS[key], disabled: readOnly, readonly: readOnly };
       var opts = state.options;
@@ -379,9 +379,17 @@
       if (col.type === 'number') return UI.input(Object.assign(o, { inputmode: 'decimal' }));
       if (key === 'detail') return UI.textarea(Object.assign(o, { wide: true, hint: 'อธิบายสิ่งที่ต้องการให้แก้ไข ให้คนอื่นอ่านแล้วเข้าใจ' }));
       if (key === 'ticket') {
-        var url = D.ticketUrl(value);
-        var html = UI.input(Object.assign(o, { wide: true, placeholder: 'วางลิงก์ Taiga/MANTIS หรือใส่เลข ticket' }));
-        var links = '<div class="ticket-actions">' + (url ? UI.ticketLink({ ticket: value, ticketUrl: url }) : '') + UI.taigaButton(url ? 'เข้า Taiga' : 'เข้า Taiga เพื่อเพิ่มเอกสาร/ปรับสถานะ') + '</div>';
+        // links embedded in the sheet cell (rich text / =HYPERLINK) + a URL typed as text (2026-11-11)
+        var urls = ((row && row.ticketLinks) || []).slice();
+        var typed = D.ticketUrl(value);
+        if (typed && urls.indexOf(typed) === -1) urls.push(typed);
+        var html = UI.input(Object.assign(o, {
+          wide: true,
+          placeholder: 'วางลิงก์ Taiga/MANTIS หรือใส่เลข ticket',
+          hint: row && row.ticketLinks && row.ticketLinks.length ? 'ช่องนี้ในชีตมีลิงก์ฝังอยู่ ถ้าแก้ข้อความในช่องนี้ ลิงก์ที่ฝังไว้จะถูกแทนด้วยข้อความใหม่' : undefined,
+        }));
+        var links = '<div class="ticket-actions">' + urls.map(function (u) { return UI.ticketLink({ ticket: value, ticketUrl: u }); }).join('') +
+          UI.taigaButton(urls.length ? 'เข้า Taiga' : 'เข้า Taiga เพื่อเพิ่มเอกสาร/ปรับสถานะ') + '</div>';
         return html.replace(/<\/div><\/div>$/, '</div>' + links + '</div>');
       }
       return UI.input(o);
@@ -402,7 +410,7 @@
       html += '<form class="form" id="item-form" data-mode="' + mode + '" novalidate>';
       GROUPS.forEach(function (g) {
         html += '<fieldset><legend>' + esc(g.legend) + '</legend><div class="form-grid">' + g.keys.map(function (k) {
-          return formField(state, k, values[k], errs, warns, readOnly);
+          return formField(state, k, values[k], errs, warns, readOnly, row);
         }).join('') + '</div></fieldset>';
       });
       html += '<div class="form-actions">';
@@ -563,8 +571,14 @@
       var next = D.nextStatus(r.status);
       var actions = '<a class="btn small" href="#/items/' + encodeURIComponent(r.id) + '">เปิด</a>';
       var seqOk = r.seq !== null && !r.issues.some(function (x) { return x.code === 'SEQ_DUPLICATE'; });
-      if (state.user.canEdit && next && seqOk) {
-        actions += '<button class="btn small primary" data-action="quick-status" data-id="' + esc(r.id) + '" data-to="' + esc(next) + '">เปลี่ยนเป็น ' + esc(D.statusLabel(next)) + '</button>';
+      if (state.user.canEdit && seqOk) {
+        // pick any status (user request 2026-11-11); the next workflow step is pre-selected so one click still works
+        var pick = next || r.status;
+        var opt = function (s, label) { return '<option value="' + esc(s) + '"' + (s === pick ? ' selected' : '') + '>' + esc(label) + (s === r.status ? ' (ปัจจุบัน)' : '') + '</option>'; };
+        actions += '<form class="qs-form" data-id="' + esc(r.id) + '"><label class="sr-only" for="qs-' + esc(r.id) + '">เปลี่ยนสถานะ #' + esc(r.seq) + '</label>' +
+          '<select id="qs-' + esc(r.id) + '" name="to">' + UI.statusGroups().map(function (g) {
+            return '<optgroup label="' + esc(g.label) + '">' + g.options.map(function (o) { return opt(o.value, o.label); }).join('') + '</optgroup>';
+          }).join('') + '</select><button type="submit" class="btn small primary">เปลี่ยนสถานะ</button></form>';
       }
       return '<article class="work' + (r.isOverdue ? ' over' : '') + '"><div><a href="#/items/' + encodeURIComponent(r.id) + '" style="color:inherit">' + esc(r.detail) + '</a>' +
         '<div class="meta"><span>#' + esc(r.seq === null ? '–' : r.seq) + '</span><span>' + esc(r.platform) + ' / ' + esc(r.system) + '</span>' +
@@ -618,7 +632,7 @@
       return '<h2>สรุปรายงาน (Export)</h2>' +
         '<p class="muted" style="margin:4px 0 12px">สร้างข้อความสรุปพร้อมส่งใน LINE หรืออีเมล เลือก PM เพื่อแยกรายงานตามผู้รับผิดชอบ</p>' +
         '<div class="export-opts">' +
-        UI.select({ name: 'rep-pm', label: 'PM ผู้รับผิดชอบ', options: state.options.pm, value: opts.pm, emptyLabel: 'ทุกคน' }) +
+        UI.multiPick({ name: 'rep-pm', label: 'PM ผู้รับผิดชอบ', options: state.options.pm, value: opts.pm, wide: true, hint: 'เลือกได้หลายคน ถ้าไม่เลือกเลย = ทุกคน' }) +
         UI.input({ name: 'rep-since', label: 'ลำดับสุดท้ายของรายงานครั้งก่อน', value: opts.since === null || opts.since === undefined ? '' : String(opts.since), inputmode: 'numeric', tip: 'รายการที่มีลำดับมากกว่าเลขนี้นับเป็น "รายการขอแก้ไขใหม่" ระบบจำเลขล่าสุดให้ทุกครั้งที่คัดลอกหรือดาวน์โหลด' }) +
         '</div>' +
         '<label class="sr-only" for="rep-text">ข้อความรายงาน</label><textarea id="rep-text" class="export-text" readonly>' + esc(text) + '</textarea>' +

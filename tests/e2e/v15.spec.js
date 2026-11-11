@@ -72,10 +72,14 @@ test.describe('Export summary', () => {
     const text = page.locator('#rep-text');
     await expect(text).toHaveValue(/สรุปรายการขอแก้ไขโปรแกรม ประจำเดือน/);
     await expect(text).toHaveValue(/3\. รายการเกินกำหนดระยะเวลา/);
-    const pm = await page.locator('#f-rep-pm option').nth(1).textContent();
-    await page.selectOption('#f-rep-pm', pm);
+    // several PMs can be picked (2026-11-11)
     const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    await expect(text).toHaveValue(new RegExp('PM ผู้รับผิดชอบ: ' + escapeRe(pm)));
+    const picks = page.locator('input[name="rep-pm-pick"]');
+    const pms = await picks.evaluateAll((els) => els.slice(0, 2).map((e) => e.value));
+    await picks.nth(0).check();
+    await expect(text).toHaveValue(new RegExp('PM ผู้รับผิดชอบ: ' + escapeRe(pms[0]) + '\n'));
+    await picks.nth(1).check();
+    await expect(text).toHaveValue(new RegExp('PM ผู้รับผิดชอบ: ' + escapeRe(pms.join(', ')) + '\n'));
     await page.fill('#f-rep-since', '700');
     await page.locator('#f-rep-since').dispatchEvent('change');
     await expect(text).toHaveValue(/ตั้งแต่ลำดับ 701/);
@@ -102,6 +106,9 @@ test('user menu shows the account and logout / switch-account links', async ({ p
     /accounts\.google\.com\/Logout/,
   );
   await expect(page.getByRole('link', { name: 'ออกจากระบบ' })).toHaveAttribute('target', '_top');
+  // Google shows an error page for a continue URL outside google.com (user report 2026-11-11)
+  const href = await page.getByRole('link', { name: 'ออกจากระบบ' }).getAttribute('href');
+  expect(href).not.toMatch(/continue=/);
   await expect(page.getByRole('link', { name: 'สลับบัญชี Google' })).toBeVisible();
 });
 
@@ -163,4 +170,23 @@ test('งานพัฒนาของฉัน: developer menu with a week pla
   await expect(page).toHaveURL(/my-work\/pm$/);
   await expect(page.locator('h1')).toHaveText('งานที่ฉันดูแล (PM)');
   await expect(page.locator('#mw-plan')).toHaveCount(0);
+});
+
+test('My Work: pick any status from the card, not only the next step (2026-11-11)', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('ehp.myname.v1', JSON.stringify('นักพัฒนา แดง')));
+  await open(page, '/#/my-work');
+  const form = page.locator('.qs-form').first();
+  const id = await form.getAttribute('data-id');
+  await form.locator('select').selectOption('ส่งกลับนักพัฒนาแก้ไข');
+  await form.getByRole('button', { name: 'เปลี่ยนสถานะ' }).click();
+  await expect(page.locator('.toast').first()).toContainText('บันทึกการแก้ไขแล้ว (สถานะ)');
+  const row = await page.evaluate((s) => window.__mockSheet.rows.find((r) => r.seq === s), id);
+  expect(row.status).toBe('ส่งกลับนักพัฒนาแก้ไข');
+  // labels hide "0." but values stay exact
+  const values = await page
+    .locator('.qs-form')
+    .first()
+    .locator('option')
+    .evaluateAll((o) => o.map((x) => x.value));
+  expect(values).toContain('0.แก้ไขเรียบร้อย');
 });

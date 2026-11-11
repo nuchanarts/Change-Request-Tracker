@@ -271,6 +271,23 @@ var Domain = (function () {
   // ---------------------------------------------------------------- rows
 
   /** @param {any} v @returns {string|null} */
+  /**
+   * Links found in one cell: rich-text link URLs plus the URL of a =HYPERLINK(...) formula.
+   * Only http(s) is kept (no javascript:, mailto:, in-sheet anchors); order kept, duplicates dropped.
+   * @param {Array<string|null|undefined>} urls @param {string} formula
+   */
+  function collectLinks(urls, formula) {
+    var all = (urls || []).slice();
+    var f = /^\s*=\s*HYPERLINK\(\s*"([^"]+)"/i.exec(str(formula));
+    if (f) all.push(f[1]);
+    var out = [];
+    all.forEach(function (u) {
+      var v = str(u).trim();
+      if (/^https?:\/\/\S+$/i.test(v) && out.indexOf(v) === -1) out.push(v);
+    });
+    return out;
+  }
+
   function ticketUrl(v) {
     var m = /https?:\/\/\S+/.exec(str(v));
     return m ? m[0] : null;
@@ -297,7 +314,9 @@ var Domain = (function () {
     r.effectiveDue = r.postponedDate.date || r.dueDate.date;
     r.isOverdue = !!(r.isOpen && r.effectiveDue && compareDate(r.effectiveDue, today) < 0);
     r.overdueDays = r.isOverdue ? daysBetween(r.effectiveDue, today) : 0;
-    r.ticketUrl = ticketUrl(r.ticket);
+    // links embedded in the cell (rich text / =HYPERLINK) win over a URL typed as text (2026-11-11)
+    r.ticketLinks = collectLinks(raw.ticketLinks || [], '');
+    r.ticketUrl = r.ticketLinks[0] || ticketUrl(r.ticket);
     r.pms = splitPm(r.pm);
     return r;
   }
@@ -1116,6 +1135,7 @@ var Domain = (function () {
     computeMetrics: computeMetrics,
     pmBreakdown: pmBreakdown,
     unassignedQueue: unassignedQueue,
+    collectLinks: collectLinks,
     weekPlan: weekPlan,
     stageOf: stageOf,
     STAGE_LABELS: STAGE_LABELS,
