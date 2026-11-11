@@ -8,7 +8,7 @@ test.describe('Navigation order, Taiga link, access admin (2026-11-11)', () => {
       t.replace(/\d+/g, '').trim(),
     );
     expect(names).toEqual([
-      'ภาพรวม',
+      'หน้าหลัก',
       'มอบหมายงาน',
       'บอร์ดงาน',
       'งานของฉัน',

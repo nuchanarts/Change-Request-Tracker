@@ -19,11 +19,11 @@ test.describe('Navigation inside the Apps Script sandbox', () => {
     await visit('งาน PM', page.getByRole('heading', { name: 'งาน PM', level: 1 }));
     await visit('มอบหมายงาน', page.getByRole('heading', { name: 'มอบหมายงาน', level: 1 }));
     await visit('วิธีใช้งาน', page.getByRole('heading', { name: 'วิธีใช้งาน', level: 1 }));
-    await visit('ภาพรวม', page.getByRole('heading', { name: 'Change Request Tracker Systems' }));
+    await visit('หน้าหลัก', page.getByRole('heading', { name: 'Change Request Tracker Systems' }));
     const pushed = await page.evaluate(() => window.__gasHistory);
     expect(pushed).toEqual(['/kanban', '/my-work', '/items', '/my-work/pm', '/assign', '/help', '/monitor']);
     expect(await page.evaluate(() => window.__leftIframe)).toBe(false);
-    await expect(nav.getByRole('link', { name: 'ภาพรวม' })).toHaveAttribute('aria-current', 'page');
+    await expect(nav.getByRole('link', { name: 'หน้าหลัก' })).toHaveAttribute('aria-current', 'page');
   });
 
   test('item links, drill-down and the back button work', async ({ page }) => {
