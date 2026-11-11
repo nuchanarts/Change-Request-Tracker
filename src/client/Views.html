@@ -78,9 +78,6 @@
       return html;
     }
 
-    var CHEVRONS = '<svg class="hero-deco" viewBox="0 0 240 120" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M20 15l45 45-45 45"/><path d="M95 15l45 45-45 45"/><path d="M170 15l45 45-45 45"/></g></svg>';
-
     function greetingName(state) {
       var name = state.myName();
       if (name) return name;
@@ -113,24 +110,26 @@
 
     function hero(state, m, count) {
       var name = greetingName(state);
-      return '<section class="hero" aria-labelledby="hero-h">' + CHEVRONS +
-        '<div class="hero-text"><p class="hero-hello">' + (name ? 'สวัสดี คุณ' + esc(name) : 'สวัสดี') + '<span class="hero-date">' + esc(D.formatThaiLong(state.today)) + '</span></p>' +
+      return '<section class="hero" aria-labelledby="hero-h">' +
+        '<div class="hero-text"><p class="hero-hello">' + (name ? 'สวัสดี คุณ<strong>' + esc(name) + '</strong>' : 'สวัสดี') + '<span class="hero-date">' + esc(D.formatThaiLong(state.today)) + '</span></p>' +
         '<h1 id="hero-h">ภาพรวมงานขอแก้ไขโปรแกรม</h1>' +
         (count ? '<p class="hero-sub">' + esc(todaySentence(m)) + '</p>' : '') +
         '<div class="hero-actions">' + myWorkChip(state) +
-        '<button class="btn small on-dark" data-action="reload">โหลดข้อมูลใหม่</button>' +
+        '<button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button>' +
         '<span class="hero-meta">' + esc(filterSummary(state)) + ', ข้อมูล ณ ' + esc(state.loadedAt) + '</span></div></div>' +
+        '<div class="hero-art">' + UI.illustration() + '</div>' +
         (count ? '<div class="hero-stats">' +
-          stat(state, 'lead', 'open', m.openCount, 'งานค้าง', m.openIds, 'งานที่สถานะยังไม่ใช่ แก้ไขเรียบร้อย / ใช้งานได้อยู่แล้ว / ยกเลิก (รวมสถานะว่าง)') +
-          stat(state, 'danger', 'overdue', m.overdueCount, 'เกินกำหนด', m.overdueIds, 'งานค้างที่วันกำหนดผ่านไปแล้ว โดยใช้วันที่เลื่อนก่อน ถ้าไม่มีจึงใช้วันที่ต้องได้') +
-          stat(state, 'ok', 'closed-week', m.closedThisWeek.count, 'ปิดสัปดาห์นี้', m.closedThisWeek.ids, 'นับจากวันที่เสร็จ วันจันทร์ถึงวันอาทิตย์นี้') +
-          stat(state, '', 'closed-month', m.closedThisMonth.count, 'ปิดเดือนนี้', m.closedThisMonth.ids, 'นับจากวันที่เสร็จ ภายในเดือนนี้') +
+          stat(state, 'lead', 'open', m.openCount, 'งานค้าง', m.openIds, 'งานที่สถานะยังไม่ใช่ แก้ไขเรียบร้อย / ใช้งานได้อยู่แล้ว / ยกเลิก (รวมสถานะว่าง)', 'open') +
+          stat(state, 'danger', 'overdue', m.overdueCount, 'เกินกำหนด', m.overdueIds, 'งานค้างที่วันกำหนดผ่านไปแล้ว โดยใช้วันที่เลื่อนก่อน ถ้าไม่มีจึงใช้วันที่ต้องได้', 'overdue') +
+          stat(state, 'ok', 'closed-week', m.closedThisWeek.count, 'ปิดสัปดาห์นี้', m.closedThisWeek.ids, 'นับจากวันที่เสร็จ วันจันทร์ถึงวันอาทิตย์นี้', 'week') +
+          stat(state, 'month', 'closed-month', m.closedThisMonth.count, 'ปิดเดือนนี้', m.closedThisMonth.ids, 'นับจากวันที่เสร็จ ภายในเดือนนี้', 'month') +
           '</div>' : '') +
         '</section>';
     }
 
-    function stat(state, cls, metric, value, label, ids, tip) {
+    function stat(state, cls, metric, value, label, ids, tip, iconName) {
       return '<div class="stat ' + cls + '" data-metric="' + metric + '">' +
+        (iconName ? '<span class="ico">' + UI.icon(iconName) + '</span>' : '') +
         drillButton(state, label, ids, '<span class="value num">' + value.toLocaleString('th-TH') + '</span>', 'stat-btn') +
         '<span class="label">' + esc(label) + ' ' + UI.helpTip(tip) + '</span></div>';
     }

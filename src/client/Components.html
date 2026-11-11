@@ -55,6 +55,23 @@
       return '<span class="tip" tabindex="0" role="note" aria-label="' + esc(text) + '">i<span class="tip-body" aria-hidden="true">' + esc(text) + '</span></span>';
     }
 
+    /** The shared illustration (Illustration.html via <template id="tpl-illustration">). */
+    function illustration() {
+      var tpl = document.getElementById('tpl-illustration');
+      return tpl ? tpl.innerHTML : '';
+    }
+
+    /** Small line icons for the headline numbers (decorative; the label carries the meaning). */
+    var ICONS = {
+      open: '<path d="M9 4h6v3H9z"/><path d="M8 5H6v15h12V5h-2"/><path d="M9 11h6M9 15h4"/>',
+      overdue: '<circle cx="12" cy="13" r="7"/><path d="M12 9v4l3 2M5 4L3 6M19 4l2 2"/>',
+      week: '<circle cx="12" cy="12" r="8"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
+      month: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 14h2M13 14h2M9 17h2"/>',
+    };
+    function icon(name) {
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + (ICONS[name] || '') + '</svg>';
+    }
+
     /** In-app back button: returns to the page the user came from (see App back()). */
     function backButton() {
       return '<button type="button" class="btn small back" data-action="back" aria-label="กลับ"><span aria-hidden="true">←</span> กลับ</button>';
@@ -193,7 +210,7 @@
 
     return {
       esc: esc, statusBadge: statusBadge, statusClass: statusClass, urgency: urgency, due: due, ticket: ticket,
-      helpTip: helpTip, backButton: backButton, emptyState: emptyState, loading: loading, errorState: errorState,
+      helpTip: helpTip, backButton: backButton, illustration: illustration, icon: icon, emptyState: emptyState, loading: loading, errorState: errorState,
       select: select, statusGroups: statusGroups, input: input, textarea: textarea, combobox: combobox, dateField: dateField,
       toast: toast, confirm: confirm,
     };

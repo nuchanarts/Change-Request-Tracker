@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="th">
+<html lang="th" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -34,16 +34,16 @@
       </div>
     </header>
     <main id="main" tabindex="-1" aria-live="polite">
-      <div class="loading">
-        <svg class="logo pulse" viewBox="0 0 32 32" aria-hidden="true" focusable="false" style="width: 56px; height: 56px; display: block; margin: 0 auto 16px">
-          <rect width="32" height="32" rx="9" fill="currentColor" />
-          <path d="M8 10l5 6-5 6M14.5 10l5 6-5 6M21 10l5 6-5 6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-        กำลังเตรียมภาพรวมงานจากชีต…
+      <div class="loading welcome-loading">
+        <?!= include('Illustration'); ?>
+        <p class="welcome-title">ยินดีต้อนรับสู่ระบบติดตามรายการขอแก้ไขโปรแกรม</p>
+        <p>กำลังเตรียมภาพรวมงานจากชีต…</p>
+        <div class="welcome-bar" aria-hidden="true"><span></span></div>
       </div>
     </main>
     <div class="toast-host" id="toasts" role="status" aria-live="polite"></div>
     <dialog id="dialog"></dialog>
+    <template id="tpl-illustration"><?!= include('Illustration'); ?></template>
     <?!= include('DomainClient'); ?>
     <?!= include('Components'); ?>
     <?!= include('Views'); ?>

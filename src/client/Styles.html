@@ -154,49 +154,68 @@
   .logo { width: 34px; height: 34px; flex: none; color: var(--accent); }
   .brand-row .brand { margin-right: 0; }
 
-  /* ---------- hero: the welcome moment */
-  :root { --hero-bg: #0e3b38; --hero-ink: #ecf7f5; --hero-muted: #a8d1cb; --hero-hot: #ffb3a7; --hero-ok: #9fe3b9; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { --hero-bg: #0b2b29; } }
+  /* ---------- hero: the welcome moment (light, friendly, illustrated) */
   .hero {
     position: relative; overflow: hidden; isolation: isolate;
-    background: var(--hero-bg); color: var(--hero-ink); border-radius: 16px;
-    padding: clamp(20px, 3vw, 36px); margin-bottom: var(--s-5);
-    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-5) var(--s-6); align-items: end;
+    background: linear-gradient(120deg, #e6f6f2 0%, #f1f8ff 60%, #fff8ec 100%);
+    border: 1px solid #d3ebe5; border-radius: 20px;
+    padding: clamp(20px, 3vw, 32px); margin-bottom: var(--s-5);
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 380px); gap: var(--s-4) var(--s-6); align-items: center;
   }
-  .hero-deco { position: absolute; right: -40px; top: -30px; width: 420px; color: #ffffff; opacity: 0.07; z-index: -1; }
-  .hero-hello { color: var(--hero-muted); font-size: 15px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
-  .hero-date { color: var(--hero-ink); }
-  .hero h1 { font-size: clamp(24px, 3.2vw, 34px); margin: 6px 0 8px; color: var(--hero-ink); }
-  .hero-sub { font-size: 16px; color: var(--hero-ink); max-width: 60ch; }
+  .hero-hello { color: var(--muted); font-size: 15px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .hero-hello strong { color: var(--accent); font-weight: 600; }
+  .hero h1 { font-size: clamp(24px, 3.2vw, 34px); margin: 6px 0 8px; }
+  .hero-sub { font-size: 16px; max-width: 60ch; }
   .hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); margin-top: var(--s-4); }
-  .hero-chip { background: rgba(255, 255, 255, 0.12); color: var(--hero-ink); text-decoration: none; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.2); }
-  .hero-chip:hover { background: rgba(255, 255, 255, 0.2); }
-  .hero-chip .hot { color: var(--hero-hot); }
-  .hero-meta { color: var(--hero-muted); font-size: 13px; }
-  .btn.on-dark { background: transparent; color: var(--hero-ink); border-color: rgba(255, 255, 255, 0.35); }
-  .btn.on-dark:hover { background: rgba(255, 255, 255, 0.12); }
-  .hero :focus-visible { outline-color: #ffd166; }
-  .hero-stats { display: grid; grid-template-columns: repeat(2, minmax(120px, auto)); gap: var(--s-4) var(--s-6); }
-  .hero .stat { flex-direction: column; align-items: flex-start; gap: 0; }
-  .hero .stat .value { font-size: clamp(30px, 4vw, 44px); color: var(--hero-ink); }
-  .hero .stat.lead .value { font-size: clamp(40px, 6vw, 64px); }
-  .hero .stat.danger .value { color: var(--hero-hot); }
-  .hero .stat.ok .value { color: var(--hero-ok); }
-  .hero .stat .label { color: var(--hero-muted); }
-  .hero .tip { background: transparent; color: var(--hero-muted); border-color: rgba(255, 255, 255, 0.3); }
-  @media (max-width: 860px) {
-    .hero { grid-template-columns: 1fr; }
-    .hero-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hero-chip { background: var(--accent); color: var(--accent-ink); text-decoration: none; padding: 8px 16px; border-radius: 999px; font-weight: 500; box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25); }
+  .hero-chip:hover { filter: brightness(1.06); }
+  .hero-chip .hot { color: #ffe2dc; }
+  .hero-meta { color: var(--muted); font-size: 13px; }
+  .hero-art { align-self: stretch; display: flex; align-items: center; justify-content: center; }
+  .hero-art .illus { width: 100%; max-width: 380px; height: auto; }
+  .hero-stats { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-3); }
+  .hero .stat {
+    background: var(--surface); border-radius: 14px; padding: var(--s-3) var(--s-4);
+    display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: var(--s-3); align-items: center;
+    box-shadow: 0 2px 10px rgba(15, 61, 58, 0.06); border: 1px solid #e3efec;
   }
+  .hero .stat .ico { grid-row: 1 / span 2; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; }
+  .hero .stat .ico svg { width: 22px; height: 22px; }
+  .hero .stat .value { font-size: clamp(26px, 3vw, 36px); }
+  .hero .stat .label { font-size: 14px; }
+  .hero .stat.lead .ico { background: #d8efec; color: var(--accent); }
+  .hero .stat.danger .ico { background: #fde8e6; color: var(--danger); }
+  .hero .stat.ok .ico { background: #e1f2e7; color: var(--ok); }
+  .hero .stat.month .ico { background: #ece6fb; color: #5b3fb5; }
+  @media (max-width: 960px) { .hero-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 760px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero-art { order: -1; }
+    .hero-art .illus { max-width: 300px; }
+  }
+
+  /* ---------- illustration motion (gentle; off for reduced motion) */
+  .illus .il-float { animation: il-float 4.5s ease-in-out infinite; }
+  .illus .il-float-slow { animation: il-float 6.5s ease-in-out infinite; }
+  .illus .il-move { animation: il-move 7s cubic-bezier(0.45, 0, 0.2, 1) infinite; }
+  .illus .il-bar { transform-box: fill-box; transform-origin: bottom; animation: il-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0s); }
+  .illus .il-pop { transform-box: fill-box; transform-origin: center; animation: il-pop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) 0.6s both; }
+  @keyframes il-float { 50% { transform: translateY(-6px); } }
+  @keyframes il-move {
+    0%, 22% { transform: translate(0, 0); opacity: 1; }
+    42%, 78% { transform: translate(106px, -48px); opacity: 1; }
+    92% { transform: translate(106px, -48px); opacity: 0; }
+    100% { transform: translate(0, 0); opacity: 0; }
+  }
+  @keyframes il-grow { from { transform: scaleY(0); } }
+  @keyframes il-pop { from { transform: scale(0); } }
 
   /* ---------- one orchestrated entrance, first load only (skipped for reduced motion) */
   .intro .hero { animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-  .intro .hero-deco { animation: drift 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
   .intro .stage .fill { animation: grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(0.25s + var(--i, 0) * 70ms); transform-origin: bottom; }
   .pulse { animation: pulse 1.4s ease-in-out infinite; }
   @keyframes pulse { 50% { transform: scale(0.9); opacity: 0.7; } }
   @keyframes rise { from { opacity: 0; transform: translateY(12px); } }
-  @keyframes drift { from { opacity: 0; transform: translateX(-60px); } }
   @keyframes grow { from { transform: scaleY(0); } }
   @keyframes growx { from { transform: scaleX(0); } }
 
@@ -349,6 +368,13 @@
   .empty h2 { color: var(--ink); margin-bottom: var(--s-2); }
   .empty .btn { margin-top: var(--s-4); }
   .loading { padding: 80px var(--s-4); text-align: center; color: var(--muted); }
+  .welcome-loading { padding: 32px var(--s-4) 64px; }
+  .welcome-loading .illus { width: min(440px, 92%); height: auto; display: block; margin: 0 auto 8px; }
+  .welcome-title { color: var(--ink); font-size: clamp(18px, 2.4vw, 22px); font-weight: 600; margin-bottom: 4px; }
+  .welcome-bar { height: 4px; width: 180px; margin: 16px auto 0; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+  .welcome-bar span { display: block; height: 100%; width: 40%; background: var(--accent); border-radius: 4px; animation: slide 1.3s ease-in-out infinite; }
+  @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+  body { background: linear-gradient(180deg, #f2faf8 0, var(--paper) 320px); background-attachment: fixed; }
   .spinner { width: 28px; height: 28px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; margin: 0 auto var(--s-3); animation: spin 0.9s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
