@@ -32,6 +32,8 @@ function sendAppNotifications() {
     var sent = 0;
     for (var i = 1; i < data.length && sent < 10; i++) {
       if (data[i][COL.status] !== 'รอส่ง') continue;
+      // only messages the app itself queues (a hand-typed row in the sheet is not sent to LINE)
+      if (!/^digest(-now)?:[\d -:]+#\d+$/.test(String(data[i][0]))) continue;
       var text = String(data[i][COL.text] || '').slice(0, 5000);
       var res = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
         method: 'post',
