@@ -58,7 +58,7 @@
 
 - [x] T027 [P] [US5] Unit tests: search (detail, system, seq, ticket; ≥ 2 chars) in `tests/unit/domain.search.test.js`
 - [x] T028 [US5] Implement search; ItemsView with search, sort, paging, filters remembered in `localStorage`
-- [ ] T029 [US5] E2E: search + filter + ticket link in `tests/e2e/items.spec.js`
+- [x] T029 [US5] E2E: search + filter + ticket link in `tests/e2e/items.spec.js`
 
 ## Phase 8: US6 Data quality (P3)
 

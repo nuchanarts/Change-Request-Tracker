@@ -509,6 +509,13 @@ var Domain = (function () {
   function search(rows, query) {
     var q = clean(query).toLowerCase();
     if (q.length < 2) return rows;
+    if (/^\d+$/.test(q)) {
+      // A number means "item or ticket number": match whole numbers only, never digits inside other numbers.
+      var whole = new RegExp('(^|\\D)' + q + '(\\D|$)');
+      return rows.filter(function (r) {
+        return (r.seq !== null && String(r.seq) === q) || whole.test(r.ticket);
+      });
+    }
     return rows.filter(function (r) {
       if (r.seq !== null && String(r.seq) === q) return true;
       return (r.detail + '\n' + r.system + '\n' + r.ticket).toLowerCase().indexOf(q) !== -1;
