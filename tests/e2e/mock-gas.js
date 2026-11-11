@@ -32,6 +32,14 @@
     { email: 'newbie@example.com', name: 'คนใหม่', note: 'ทีมทดสอบ', role: 'ผู้แก้ไข', status: 'รออนุมัติ' },
   ];
   window.__mockAccess = members;
+  // in-memory _app_log / _app_notify (history, restore, LINE queue)
+  var log = [];
+  var notify = [];
+  window.__mockLog = log;
+  window.__mockNotify = notify;
+  var stamp = function () {
+    return '11/11/2026 10:' + String(10 + log.length).slice(-2) + ':00';
+  };
   var latency = Number(params.get('latency') || 250);
   var MSG = {
     FORBIDDEN: 'บัญชีของคุณมีสิทธิ์ดูอย่างเดียว จึงเพิ่มหรือแก้ไขรายการไม่ได้',
@@ -138,6 +146,15 @@
       var v = D.validateUpdate(req.changes, row, options);
       if (!v.ok) return fail('VALIDATION', { fields: v.errors });
       Object.keys(req.changes).forEach(function (k) {
+        log.push({
+          time: stamp(),
+          who: 'ผู้ทดสอบ',
+          action: 'UPDATE',
+          seq: Number(row.seq),
+          column: D.COLUMN_BY_KEY[k].header,
+          from: row[k] || '',
+          to: req.changes[k].to,
+        });
         row[k] = req.changes[k].to;
       });
       return ok({ rowNumber: row.rowNumber, seq: Number(row.seq), written: Object.keys(req.changes) });
@@ -157,10 +174,99 @@
       });
       if (Object.keys(conflicts).length) return fail('CONFLICT', conflicts);
       rows.splice(idx, 1);
+      log.push({
+        time: stamp(),
+        who: 'ผู้ทดสอบ',
+        action: 'DELETE',
+        seq: Number(row.seq),
+        column: '(ทั้งแถว)',
+        from: '',
+        to: '',
+        saved: row,
+      });
       rows.forEach(function (r) {
         if (r.rowNumber > req.rowNumber) r.rowNumber -= 1; // rows below move up, like Sheets
       });
       return ok({ rowNumber: req.rowNumber, seq: Number(req.seq) });
+    },
+    Api_itemHistory: function (seq) {
+      return ok(
+        log
+          .filter(function (e) {
+            return e.seq === Number(seq);
+          })
+          .slice()
+          .reverse()
+          .map(function (e) {
+            return { time: e.time, who: e.who, action: e.action, column: e.column, from: e.from, to: e.to };
+          }),
+      );
+    },
+    Api_listDeleted: function () {
+      if (!user.isAdmin) return { ok: false, code: 'NOT_ADMIN', message: 'เฉพาะผู้ดูแลเท่านั้น' };
+      return ok(
+        log
+          .map(function (e, i) {
+            return { e: e, logRow: i + 2 };
+          })
+          .filter(function (x) {
+            return (
+              x.e.action === 'DELETE' &&
+              !rows.some(function (r) {
+                return Number(r.seq) === x.e.seq;
+              })
+            );
+          })
+          .reverse()
+          .map(function (x) {
+            return {
+              logRow: x.logRow,
+              time: x.e.time,
+              who: x.e.who,
+              seq: x.e.seq,
+              detail: x.e.saved.detail,
+              status: x.e.saved.status,
+            };
+          }),
+      );
+    },
+    Api_restoreRequest: function (logRow) {
+      if (!user.isAdmin) return { ok: false, code: 'NOT_ADMIN', message: 'เฉพาะผู้ดูแลเท่านั้น' };
+      var e = log[logRow - 2];
+      if (!e || e.action !== 'DELETE') return fail('NOT_FOUND');
+      if (
+        rows.some(function (r) {
+          return Number(r.seq) === e.seq;
+        })
+      )
+        return { ok: false, code: 'SEQ_TAKEN', message: 'เลขลำดับนี้ถูกใช้แล้ว' };
+      var back = Object.assign({}, e.saved, { rowNumber: rows.length + 2 });
+      rows.push(back);
+      log.push({
+        time: stamp(),
+        who: 'ผู้ทดสอบ',
+        action: 'RESTORE',
+        seq: e.seq,
+        column: '(ทั้งแถว)',
+        from: '',
+        to: '',
+      });
+      return ok({ rowNumber: back.rowNumber, seq: e.seq });
+    },
+    Api_queueDigestNow: function () {
+      if (!user.isAdmin) return { ok: false, code: 'NOT_ADMIN', message: 'เฉพาะผู้ดูแลเท่านั้น' };
+      var t = fx.today;
+      var msgs = D.buildDigest(
+        rows.map(function (r) {
+          return D.enrich(r, t);
+        }),
+        t,
+        { appUrl: 'https://nuchanarts.github.io/Change-Request-Tracker/' },
+      );
+      msgs.forEach(function (m) {
+        notify.push(m);
+      });
+      return ok({ added: msgs.length });
     },
     Api_requestAccess: function () {
       user.editReason = 'PENDING';

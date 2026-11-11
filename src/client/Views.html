@@ -419,6 +419,7 @@
       if (row && !readOnly && row.seq !== null) html += '<span class="spacer"></span><button type="button" class="btn danger" data-action="delete-item">' + UI.withIcon('trash', 'ลบรายการนี้') + '</button>';
       html += '</div></form>';
       if (row) html += '<p class="muted" style="margin-top:12px;font-size:13px">แถวที่ ' + row.rowNumber + ' ในชีต ระบบจะบันทึกเฉพาะช่องที่คุณแก้ และเก็บประวัติไว้ในชีต _app_log</p>';
+      if (row && row.seq !== null) html += historyPanel(state, row);
       return html;
     }
 
@@ -623,7 +624,52 @@
           return '<tr class="st-' + (m.status === a.states.allowed ? 'ok' : m.status === a.states.pending ? 'wait' : 'off') + '"><td>' + esc(m.email) + (m.email === a.owner ? ' <span class="badge s-done">เจ้าของชีต</span>' : '') + '</td><td>' + esc(m.name) + '</td>' +
             '<td>' + sel('role', a.roles, m.role) + '</td><td>' + sel('status', [a.states.allowed, a.states.pending, a.states.suspended], m.status) + '</td></tr>';
         }).join('') + '</tbody></table></div></section>';
+      html += deletedPanel(state) + notifyPanel(state);
       return html;
+    }
+
+    var ACTION_TEXT = { CREATE: 'เพิ่มรายการ', UPDATE: 'แก้ไข', DELETE: 'ลบรายการ', RESTORE: 'กู้คืนรายการ' };
+
+    /** Who changed what on this item (loaded on demand from _app_log). */
+    function historyPanel(state, row) {
+      var h = state.history && state.history.seq === row.seq ? state.history : null;
+      var body;
+      if (!h || h.loading) body = '<p class="muted">' + (h ? 'กำลังโหลดประวัติ…' : 'กดเพื่อดูว่าใครเปลี่ยนอะไร เมื่อไร') + '</p>';
+      else if (h.error) body = '<p class="err">' + esc(h.error) + '</p>';
+      else if (!h.list.length) body = '<p class="muted">ยังไม่มีประวัติในแอป (รายการที่แก้ในชีตโดยตรงจะไม่มีประวัติ)</p>';
+      else {
+        body = '<ol class="hist">' + h.list.map(function (e) {
+          var what = e.action === 'UPDATE' || e.action === 'CREATE'
+            ? '<strong>' + esc(e.column) + '</strong>' + (e.action === 'UPDATE' ? ': <span class="hist-from">' + esc(e.from || '(ว่าง)') + '</span> → ' : ': ') + '<span class="hist-to">' + esc(e.to || '(ว่าง)') + '</span>'
+            : '<strong>' + esc(ACTION_TEXT[e.action] || e.action) + '</strong>';
+          return '<li><span class="hist-time num">' + esc(e.time) + '</span><span class="hist-who">' + esc(e.who) + '</span><span class="hist-what">' + (e.action === 'UPDATE' ? '' : esc(ACTION_TEXT[e.action] || '') + ' ') + what + '</span></li>';
+        }).join('') + '</ol>';
+      }
+      return '<details class="panel hist-panel" id="history"' + (h ? ' open' : '') + '><summary data-action="history-load" data-seq="' + esc(row.seq) + '">' + UI.withIcon('list', 'ประวัติการแก้ไข') + '</summary>' + body + '</details>';
+    }
+
+    /** Admins: deleted items that can be put back from their _app_log snapshot. */
+    function deletedPanel(state) {
+      var d = state.deleted;
+      var body;
+      if (!d) body = '<button class="btn" data-action="deleted-load">ดูรายการที่ถูกลบ</button>';
+      else if (d.loading) body = UI.loading('กำลังโหลด…');
+      else if (d.error) body = '<p class="err">' + esc(d.error) + '</p>';
+      else if (!d.list.length) body = '<p class="muted">ไม่มีรายการที่ถูกลบ (หรือกู้คืนครบแล้ว)</p>';
+      else {
+        body = '<div class="table-wrap"><table><thead><tr><th>ลำดับ</th><th>รายละเอียด</th><th>ลบเมื่อ</th><th>โดย</th><th></th></tr></thead><tbody>' + d.list.map(function (x) {
+          return '<tr><td class="num">' + esc(x.seq) + '</td><td>' + esc(x.detail) + ' <span class="muted">(' + esc(D.statusLabel(x.status)) + ')</span></td><td class="num">' + esc(x.time) + '</td><td>' + esc(x.who) + '</td>' +
+            '<td><button class="btn small" data-action="restore" data-log="' + esc(x.logRow) + '" data-seq="' + esc(x.seq) + '">กู้คืน</button></td></tr>';
+        }).join('') + '</tbody></table></div>';
+      }
+      return '<section class="panel" aria-labelledby="del-h"><h2 id="del-h">กู้คืนรายการที่ถูกลบ</h2><p class="muted">กู้คืนจากสำเนาใน _app_log รายการจะกลับไปท้ายชีตด้วยเลขลำดับเดิม</p>' + body + '</section>';
+    }
+
+    /** Admins: LINE digest via แมวส้ม (the app only queues messages in _app_notify). */
+    function notifyPanel() {
+      return '<section class="panel" aria-labelledby="ntf-h"><h2 id="ntf-h">แจ้งเตือน LINE ผ่านแมวส้ม</h2>' +
+        '<p class="muted">ทุกเช้าวันจันทร์ ระบบจะเตรียมสรุปงานเกินกำหนดและงานสัปดาห์นี้ของนักพัฒนาแต่ละคนไว้ในชีต _app_notify แล้วแมวส้มจะส่งเข้า LINE</p>' +
+        '<button class="btn" data-action="digest-now">ส่งสรุปตอนนี้ (ทดสอบ)</button></section>';
     }
 
     // ------------------------------------------------------------------ Text report export

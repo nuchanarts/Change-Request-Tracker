@@ -172,6 +172,7 @@
           state.byId[r.id] = r;
         });
         state.rows = rows;
+        if (!(state.history && state.history.loading)) state.history = null; // reload history next time (keep an in-flight load)
         state.phase = 'ready';
         document.getElementById('sheet-name').textContent = b.spreadsheetName;
         document.getElementById('nav-add').hidden = !(b.user.canEdit && b.schema.ok);
@@ -461,6 +462,15 @@
     }
 
     /** Change one item's status (My Work quick action and Kanban); same safe-write path as the form. */
+    function loadDeleted() {
+      state.deleted = { loading: true };
+      render();
+      return api('Api_listDeleted').then(function (res) {
+        state.deleted = res.ok ? { list: res.data } : { error: res.message };
+        if (route().name === 'access') render();
+      });
+    }
+
     function moveStatus(id, to) {
       var row = state.byId[id];
       if (!row || row.status === to) return;
@@ -706,6 +716,38 @@
         });
       },
       'reload-access': function () { state.access = null; render(); },
+      'history-load': function (el, ev) {
+        var seq = Number(el.getAttribute('data-seq'));
+        if (state.history && state.history.seq === seq && !state.history.error) return; // <details> toggles itself
+        if (ev) ev.preventDefault();
+        state.history = { seq: seq, loading: true };
+        render();
+        api('Api_itemHistory', seq).then(function (res) {
+          state.history = res.ok ? { seq: seq, list: res.data } : { seq: seq, error: res.message };
+          if (route().name === 'items') render();
+        });
+      },
+      'deleted-load': loadDeleted,
+      restore: function (el) {
+        var seq = el.getAttribute('data-seq');
+        UI.confirm('กู้คืนรายการ #' + seq + '?', 'รายการจะกลับไปท้ายชีตด้วยเลขลำดับเดิม และบันทึกใน _app_log', 'กู้คืน', false).then(function (yes) {
+          if (!yes) return;
+          el.disabled = true;
+          api('Api_restoreRequest', Number(el.getAttribute('data-log'))).then(function (res) {
+            if (!res.ok) UI.toast(res.message, 'error');
+            else UI.toast('กู้คืนรายการ #' + res.data.seq + ' แล้ว');
+            load().then(loadDeleted);
+          });
+        });
+      },
+      'digest-now': function (el) {
+        el.disabled = true;
+        api('Api_queueDigestNow').then(function (res) {
+          el.disabled = false;
+          if (!res.ok) return UI.toast(res.message, 'error');
+          UI.toast('เตรียมสรุปไว้ ' + res.data.added + ' ข้อความ แมวส้มจะส่งในรอบถัดไป (ไม่เกิน 15 นาที)');
+        });
+      },
       'repair-chips': function (el) {
         el.disabled = true;
         el.textContent = 'กำลังซ่อม…';
