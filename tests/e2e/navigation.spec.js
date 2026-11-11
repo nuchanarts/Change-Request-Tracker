@@ -18,7 +18,7 @@ test.describe('Navigation inside the Apps Script sandbox', () => {
     await visit('รายการทั้งหมด', page.getByRole('heading', { name: 'รายการทั้งหมด', level: 1 }));
     await visit('เพิ่มรายการ', page.getByRole('heading', { name: 'เพิ่มรายการขอแก้ไขใหม่' }));
     await visit('วิธีใช้งาน', page.getByRole('heading', { name: 'วิธีใช้งาน', level: 1 }));
-    await visit('ภาพรวม', page.getByRole('heading', { name: 'ภาพรวมงานขอแก้ไขโปรแกรม' }));
+    await visit('ภาพรวม', page.getByRole('heading', { name: 'Change Request Tracker Systems' }));
     const pushed = await page.evaluate(() => window.__gasHistory);
     expect(pushed).toEqual(['/kanban', '/my-work', '/items', '/new', '/help', '/monitor']);
     expect(await page.evaluate(() => window.__leftIframe)).toBe(false);

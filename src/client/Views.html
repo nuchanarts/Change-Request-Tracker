@@ -119,7 +119,7 @@
       var name = greetingName(state);
       return '<section class="hero" aria-labelledby="hero-h">' +
         '<div class="hero-text"><p class="hero-hello">' + (name ? 'สวัสดี คุณ<strong>' + esc(name) + '</strong>' : 'สวัสดี') + '<span class="hero-date">' + esc(D.formatThaiLong(state.today)) + '</span></p>' +
-        '<h1 id="hero-h">ภาพรวมงานขอแก้ไขโปรแกรม</h1>' +
+        '<h1 id="hero-h" lang="en">Change Request Tracker Systems</h1>' +
         (count ? '<p class="hero-sub">' + esc(todaySentence(m)) + '</p>' : '') +
         '<div class="hero-actions">' +
         (state.user.canEdit && state.schema.ok

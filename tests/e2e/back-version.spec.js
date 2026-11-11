@@ -21,7 +21,7 @@ for (const mode of ['', '?gas=1']) {
       await page.locator('[data-metric="overdue"] button').click();
       await expect(page.locator('.drill')).toBeVisible();
       await page.getByRole('button', { name: 'กลับ' }).click();
-      await expect(page.getByRole('heading', { name: 'ภาพรวมงานขอแก้ไขโปรแกรม' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Change Request Tracker Systems' })).toBeVisible();
     });
 
     test('opening an item directly → กลับ goes to the list', async ({ page }) => {
