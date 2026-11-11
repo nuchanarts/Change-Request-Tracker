@@ -81,7 +81,7 @@
 - [x] T034 Integration tests in Apps Script on the copy: `tests/integration/IntegrationTests.js` (create/update/conflict/log on `[TEST]` rows)
 - [ ] T035 T0 probes on the copy (R6 date cell types and locale, R8 `getEditors` for viewers), with results recorded in `research.md`
 - [ ] T036 Run quickstart validation V1–V13 on the TEST deployment
-- [ ] T037 Code review (`code-review` skill) and fix the findings
+- [x] T037 Code review (`code-review` skill) and fix the findings
 - [ ] T038 PROD project creation, push, named deployment, and V14 (done by a sheet editor)
 
 ## Dependencies

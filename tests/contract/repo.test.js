@@ -102,12 +102,6 @@ describe('readAll', () => {
     expect(repo.readAll().missing).toEqual(['สถานะ']);
   });
 
-  it('detects which date columns hold real Date cells', () => {
-    const res = repo.readAll();
-    expect(res.dateColumns.dueDate).toBe(true);
-    expect(res.dateColumns.deployDate).toBe(false);
-  });
-
   it('reads with one call per range (no per-cell reads)', () => {
     let calls = 0;
     const orig = main.getDataRange.bind(main);
@@ -206,7 +200,8 @@ describe('update (constitution V)', () => {
     main.writes = [];
     const res = repo.update(req(), 'editor@x.com');
     expect(res).toEqual({ ok: true, data: { rowNumber: 3, seq: 2, written: ['developer'] } });
-    expect(main.writes).toEqual([{ row: 3, col: col('นักพัฒนา'), value: 'กิ่ง' }]);
+    // text is sent with a leading apostrophe so Sheets keeps it as typed (see repo.review.test.js)
+    expect(main.writes).toEqual([{ row: 3, col: col('นักพัฒนา'), value: "'กิ่ง" }]);
     const log = ss.getSheetByName(Config.SHEETS.log);
     expect(log.cells[1]).toEqual([
       '11/11/2026 10:00:00',

@@ -46,6 +46,7 @@ export default [
         {
           varsIgnorePattern: '^(doGet|include|Api_|run|Domain|Config|makeRepo|Auth)',
           argsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
         },
       ],
     },

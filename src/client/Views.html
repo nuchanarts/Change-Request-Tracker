@@ -334,34 +334,37 @@
     // ------------------------------------------------------------------ Kanban (US8)
 
     var KANBAN_LIMIT = 40;
-    var URG_RANK = { 'ด่วนที่สุด': 0, 'ด่วน': 1, 'ปกติ': 2 };
+    var OTHER_COLUMN = '__other__';
 
     function kanban(state) {
       var rows = state.filteredRows();
       var open = D.WORKFLOW.filter(function (s) { return D.isOpen(s); });
       var week = D.weekRange(state.today);
-      var cols = open.map(function (s) {
-        return { status: s, title: s, rows: rows.filter(function (r) { return r.isOpen && r.status === s; }) };
+      var cols = open.map(function (s, i) {
+        return { status: s, title: s, step: i + 1, rows: rows.filter(function (r) { return r.isOpen && r.status === s; }) };
       });
+      // open items with an empty or unknown status still count as open, so they must be on the board too
+      var other = rows.filter(function (r) { return r.isOpen && open.indexOf(r.status) === -1; });
+      if (other.length) cols.unshift({ status: OTHER_COLUMN, title: 'สถานะว่าง / ไม่อยู่ในขั้นตอน', other: true, rows: other });
       cols.push({
         status: D.DONE,
         title: 'ปิดงานสัปดาห์นี้',
         closed: true,
         rows: rows.filter(function (r) { return !r.isOpen && D.inRange(r.doneDate.date, week); }),
       });
-      var max = Math.max.apply(null, cols.slice(0, -1).map(function (c) { return c.rows.length; }));
+      var max = Math.max.apply(null, cols.filter(function (c) { return c.step; }).map(function (c) { return c.rows.length; }));
       var html = readOnlyBanner(state) + '<div class="page-head"><h1>บอร์ดงาน</h1><span class="muted">' + esc(filterSummary(state)) + '</span><span class="spacer muted">' +
         (state.user.canEdit ? 'ลากการ์ดไปคอลัมน์อื่น หรือกดปุ่ม ◀ ▶ เพื่อเปลี่ยนสถานะ' : 'ดูอย่างเดียว') +
         '</span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button></div>' + filterBar(state);
-      html += '<div class="board" role="list" aria-label="บอร์ดงานตามสถานะ">' + cols.map(function (c, i) {
+      html += '<div class="board" role="list" aria-label="บอร์ดงานตามสถานะ">' + cols.map(function (c) {
         var sorted = c.rows.slice().sort(function (a, b) {
-          return (b.isOverdue - a.isOverdue) || ((URG_RANK[a.urgency] === undefined ? 3 : URG_RANK[a.urgency]) - (URG_RANK[b.urgency] === undefined ? 3 : URG_RANK[b.urgency])) ||
+          return (b.isOverdue - a.isOverdue) || (D.urgencyRank(a.urgency) - D.urgencyRank(b.urgency)) ||
             ((a.effectiveDue ? D.compareDate(a.effectiveDue, b.effectiveDue || { y: 9999, m: 1, d: 1 }) : 1));
         });
         var more = sorted.length - KANBAN_LIMIT;
-        var cls = 'kcol' + (c.closed ? ' closed' : '') + (!c.closed && c.rows.length === max && max > 0 ? ' bottleneck' : '');
+        var cls = 'kcol' + (c.closed ? ' closed' : '') + (c.other ? ' other' : '') + (c.step && c.rows.length === max && max > 0 ? ' bottleneck' : '');
         return '<section class="' + cls + '" role="listitem" data-status="' + esc(c.status) + '" aria-label="' + esc(c.title + ' ' + c.rows.length + ' งาน') + '">' +
-          '<header class="kcol-head"><h2>' + (c.closed ? '' : '<span class="kstep">' + (i + 1) + '</span>') + esc(c.title) + '</h2><span class="kcount num">' + c.rows.length + '</span></header>' +
+          '<header class="kcol-head"><h2>' + (c.step ? '<span class="kstep">' + c.step + '</span>' : '') + esc(c.title) + '</h2><span class="kcount num">' + c.rows.length + '</span></header>' +
           '<div class="kcards">' + (sorted.length ? sorted.slice(0, KANBAN_LIMIT).map(function (r) { return kcard(state, r, open); }).join('') : '<p class="kempty">ไม่มีงาน</p>') +
           (more > 0 ? '<p class="kmore">' + drillButton(state, c.title, c.rows.map(function (r) { return r.id; }), 'ดูทั้งหมด ' + c.rows.length + ' งาน') + '</p>' : '') +
           '</div></section>';
@@ -374,7 +377,8 @@
       var canMove = state.user.canEdit && state.schema.ok && seqOk && r.isOpen;
       var i = open.indexOf(r.status);
       var prev = i > 0 ? open[i - 1] : null;
-      var next = i >= 0 ? D.nextStatus(r.status) : null;
+      // items in the "other" column move forward to the first workflow step
+      var next = i >= 0 ? D.nextStatus(r.status) : D.nextStatus(r.status) || open[0];
       var btns = '';
       if (canMove) {
         btns = '<div class="kmove">' +

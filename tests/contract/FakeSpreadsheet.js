@@ -10,6 +10,20 @@ export function display(v) {
   return String(v);
 }
 
+/**
+ * Mimic how Google Sheets (en_US locale) interprets a string written with setValue/appendRow:
+ * a leading apostrophe forces text, digits become numbers, "=" becomes a formula, and m/d/yyyy becomes a Date.
+ */
+export function parseLikeSheets(v) {
+  if (typeof v !== 'string') return v;
+  if (v.startsWith("'")) return v.slice(1);
+  if (/^\d+(\.\d+)?$/.test(v)) return Number(v);
+  if (v.startsWith('=')) return { formula: v };
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(v);
+  if (m) return new Date(Number(m[3]), Number(m[1]) - 1, Number(m[2])); // US: month first
+  return v;
+}
+
 export class FakeValidation {
   constructor(type, values) {
     this.type = type;
@@ -74,8 +88,9 @@ export class FakeSheet {
     return line ? line[col - 1] : undefined;
   }
   _set(row, col, v) {
+    if (this.failOnWrite && this.failOnWrite(row, col)) throw new Error('Service error: Spreadsheets');
     while (this.cells.length < row) this.cells.push([]);
-    this.cells[row - 1][col - 1] = v;
+    this.cells[row - 1][col - 1] = parseLikeSheets(v);
     this.writes.push({ row, col, value: v });
   }
   getName() {
@@ -108,10 +123,21 @@ export class FakeSheet {
 }
 
 export class FakeSpreadsheet {
-  constructor(sheets = [], { editors = [], name = '[TEST] fake' } = {}) {
+  constructor(sheets = [], { editors = [], viewers = [], probeAllowed = false, name = '[TEST] fake' } = {}) {
     this.sheets = Object.fromEntries(sheets.map((s) => [s.name, s]));
     this.editors = editors;
+    this.viewers = viewers;
+    this.probeAllowed = probeAllowed; // edit access via group / link sharing (not listed in getEditors)
+    this.probes = 0;
     this.name = name;
+  }
+  getViewers() {
+    return this.viewers.map((e) => ({ getEmail: () => e }));
+  }
+  addDeveloperMetadata(key) {
+    this.probes++;
+    if (!this.probeAllowed) throw new Error('You do not have permission to access the requested document.');
+    return { getKey: () => key, remove: () => {} };
   }
   getSheetByName(name) {
     return this.sheets[name] || null;

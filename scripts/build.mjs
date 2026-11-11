@@ -69,6 +69,7 @@ if (args.has('--preview')) {
   Object.assign(rows[17], { dueDate: 'ปลายเดือน', postponedDate: '' });
   Object.assign(rows[25], { deployDate: `1/${m}/${y + 543}` });
   Object.assign(rows[40], { seq: rows[41].seq });
+  Object.assign(rows[60], { status: '' }); // blank status = still open (constitution IV)
   const options = {
     platform: ['EHP', 'NHIP', 'INV', 'EHP Pharmacy'],
     issueType: [
