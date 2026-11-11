@@ -130,7 +130,7 @@ test.describe('US3 Safe edit', () => {
 
   test('view-only users cannot add or edit', async ({ page }) => {
     await open(page, '/?viewer=1');
-    await expect(page.locator('#nav-add')).toBeHidden();
+    await expect(page.locator('.hero-add')).toHaveCount(0);
     await expect(page.locator('.banner.warn')).toContainText('สิทธิ์ดูอย่างเดียว');
     await page.goto('/?viewer=1#/items/5');
     await expect(page.getByRole('button', { name: 'บันทึกการแก้ไข' })).toHaveCount(0);

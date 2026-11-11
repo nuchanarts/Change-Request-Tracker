@@ -9,13 +9,13 @@ test.describe('Navigation order, Taiga link, access admin (2026-11-11)', () => {
     );
     expect(names).toEqual([
       'ภาพรวม',
-      'เพิ่มรายการ',
-      'บอร์ดงาน',
-      'งานพัฒนาของฉัน',
       'มอบหมายงาน',
+      'บอร์ดงาน',
+      'งานของฉัน',
+      'งาน PM',
       'รายการทั้งหมด',
-      'วิธีใช้งาน',
       'จัดการสิทธิ์',
+      'วิธีใช้งาน', // icon only; the name is for screen readers
       'Taiga ↗',
     ]);
     await expect(page.locator('.nav a.nav-ext')).toHaveAttribute('href', 'https://taiga.hosxp.net/login');
@@ -149,12 +149,12 @@ test('My Work (PM): "no due date" section belongs to the PM tab, no "done" encou
   await expect(page.locator('.mw-tile.plan')).toHaveCount(1);
 });
 
-test('งานพัฒนาของฉัน: developer menu with a week planner that moves by week; PM view is a link away', async ({
+test('งานของฉัน: developer menu with a week planner that moves by week; งาน PM is its own menu', async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('ehp.myname.v1', JSON.stringify('นักพัฒนา แดง')));
   await open(page, '/#/my-work');
-  await expect(page.locator('h1')).toHaveText('งานพัฒนาของฉัน');
+  await expect(page.locator('h1')).toHaveText('งานของฉัน');
   await expect(page.locator('#mw-urgent')).toHaveCount(1);
   const plan = page.locator('#mw-plan');
   await expect(plan).toContainText('สัปดาห์นี้');
@@ -166,9 +166,9 @@ test('งานพัฒนาของฉัน: developer menu with a week pla
   await expect(plan.locator('.plan-day.today')).toHaveCount(0);
   await page.getByRole('button', { name: 'กลับสัปดาห์นี้' }).click();
   await expect(plan.locator('.plan-range')).toContainText('สัปดาห์นี้');
-  await page.getByRole('link', { name: 'ดูงานที่ฉันดูแล (PM) →' }).click();
+  await page.getByRole('link', { name: 'งาน PM' }).click();
   await expect(page).toHaveURL(/my-work\/pm$/);
-  await expect(page.locator('h1')).toHaveText('งานที่ฉันดูแล (PM)');
+  await expect(page.locator('h1')).toHaveText('งาน PM');
   await expect(page.locator('#mw-plan')).toHaveCount(0);
 });
 
@@ -189,4 +189,45 @@ test('My Work: pick any status from the card, not only the next step (2026-11-11
     .locator('option')
     .evaluateAll((o) => o.map((x) => x.value));
   expect(values).toContain('0.แก้ไขเรียบร้อย');
+});
+
+test('วิธีใช้งาน is an icon after จัดการสิทธิ์, still named for screen readers (2026-11-11)', async ({
+  page,
+}) => {
+  await open(page);
+  const help = page.getByRole('link', { name: 'วิธีใช้งาน' });
+  await expect(help).toBeVisible();
+  await expect(help).toHaveAttribute('title', 'วิธีใช้งาน');
+  await expect(help.locator('.sr-only')).toHaveText('วิธีใช้งาน'); // name for screen readers only
+  expect(
+    await help.evaluate(
+      (a) => [...a.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim()).length,
+    ),
+  ).toBe(0);
+  const order = await page
+    .locator('.nav a:visible')
+    .evaluateAll((els) => els.map((e) => e.getAttribute('data-route')));
+  expect(order.indexOf('help')).toBe(order.indexOf('access') + 1);
+  await help.click();
+  await expect(page.getByRole('heading', { name: 'วิธีใช้งาน', level: 1 })).toBeVisible();
+});
+
+test('งาน PM lists only PMs; งานของฉัน lists only developers; no add button in the top menu (2026-11-11)', async ({
+  page,
+}) => {
+  await open(page, '/#/my-work/pm');
+  await expect(page.locator('h1')).toHaveText('งาน PM');
+  const pmNames = await page.locator('.mw-name').allTextContents();
+  expect(pmNames.length).toBeGreaterThan(0);
+  pmNames.forEach((n) => expect(n).toContain('พีเอ็ม'));
+  await page.locator('.mw-name').first().click();
+  await expect(page.locator('#mw-who')).toHaveValue(/พีเอ็ม/);
+  await expect(page.getByRole('link', { name: 'งาน PM' })).toHaveAttribute('aria-current', 'page');
+  await page.getByRole('link', { name: 'งานของฉัน' }).click();
+  await expect(page.locator('h1')).toHaveText('งานของฉัน');
+  const devNames = await page.locator('.mw-name').allTextContents();
+  devNames.forEach((n) => expect(n).toContain('นักพัฒนา'));
+  await expect(page.getByRole('link', { name: 'งานของฉัน' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('.nav a[href="#/new"]')).toHaveCount(0);
+  await expect(page.locator('.hero-add')).toHaveCount(0); // not on this page; it lives on ภาพรวม
 });
