@@ -22,6 +22,7 @@ const line = (seq, o = {}) => {
 };
 
 let main, ss, cache, userCache, repo;
+let effective = null; // email the script is running as (USER_ACCESSING → the caller)
 const build = (opts = {}) => {
   main = new FakeSheet(Config.SHEETS.main, [
     HEADERS.slice(),
@@ -36,6 +37,7 @@ const build = (opts = {}) => {
     getLock: () => new FakeLock(),
     cache,
     userCache,
+    effectiveEmail: () => effective,
     nowText: () => '11/11/2026 10:00:00',
     makeDate: (y, m, d) => new Date(y, m - 1, d),
   });
@@ -117,13 +119,22 @@ describe('canEdit covers group and link sharing (R8)', () => {
 
   it('unlisted users are probed once with harmless developer metadata, result cached per user', () => {
     build({ probeAllowed: true });
+    effective = 'groupmember@x.com';
     expect(repo.canEdit('groupmember@x.com')).toBe(true);
     expect(repo.canEdit('groupmember@x.com')).toBe(true);
     expect(ss.probes).toBe(1);
   });
 
+  it('never probes when the script is not running as the caller (fail closed if deployed "execute as me")', () => {
+    build({ probeAllowed: true });
+    effective = 'owner@x.com';
+    expect(repo.canEdit('groupmember@x.com')).toBe(false);
+    expect(ss.probes).toBe(0);
+  });
+
   it('a failed probe means view-only', () => {
     build({ probeAllowed: false });
+    effective = 'linkviewer@x.com';
     expect(repo.canEdit('linkviewer@x.com')).toBe(false);
   });
 });

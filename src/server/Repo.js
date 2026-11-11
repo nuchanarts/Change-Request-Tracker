@@ -8,6 +8,7 @@
  *   getLock: () => any,             // () => Lock with tryLock(ms)/releaseLock()
  *   cache?: any,                    // script Cache with get/put/remove (optional)
  *   userCache?: any,                // per-user Cache for the edit-permission probe (optional)
+ *   effectiveEmail?: () => string,  // account the script runs as; the probe is used only if it equals the caller
  *   nowText: () => string,          // 'd/m/yyyy HH:mm:ss' in Asia/Bangkok
  *   makeDate: (y:number, m:number, d:number) => any  // midnight Asia/Bangkok
  * }} deps
@@ -411,6 +412,10 @@ function makeRepo(deps) {
       }, e)
     )
       return false;
+    // The probe runs with the script's identity. It only proves the caller's access when the script
+    // runs AS the caller (executeAs USER_ACCESSING); otherwise fail closed (security review 2026-11-11).
+    var runningAs = deps.effectiveEmail ? clean(deps.effectiveEmail()).toLowerCase() : '';
+    if (runningAs !== e) return false;
     var key = 'canEdit:' + e;
     var cached = deps.userCache ? deps.userCache.get(key) : null;
     if (cached !== null) return cached === '1';

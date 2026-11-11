@@ -42,6 +42,9 @@ function context_() {
     },
     cache: CacheService.getScriptCache(),
     userCache: CacheService.getUserCache(),
+    effectiveEmail: function () {
+      return Session.getEffectiveUser().getEmail();
+    },
     nowText: function () {
       return Utilities.formatDate(new Date(), Config.TZ, 'd/M/yyyy HH:mm:ss');
     },
