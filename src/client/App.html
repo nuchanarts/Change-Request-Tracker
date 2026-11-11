@@ -584,10 +584,23 @@
         if (ev.target.closest('a')) return;
         go('#/items/' + encodeURIComponent(el.getAttribute('data-id')));
       },
-      'cancel-item': function () {
+      'delete-item': function (el) {
         var row = state.byId[route().id];
-        UI.confirm('ยกเลิกรายการ #' + row.seq + '?', 'ระบบจะเปลี่ยนสถานะเป็น "0.ยกเลิก" แถวในชีตยังอยู่ และย้อนกลับได้โดยเปลี่ยนสถานะใหม่', 'ยกเลิกรายการ', true).then(function (yes) {
-          if (yes) saveChanges(row, { status: { from: row.raw.status, to: D.CANCELLED } }, null);
+        if (!row) return;
+        UI.confirm('ลบรายการ #' + row.seq + '?', 'ระบบจะลบแถวนี้ออกจากชีต "' + D.clean(row.detail).slice(0, 60) + '" สำเนาข้อมูลทั้งแถวจะเก็บไว้ในชีต _app_log เผื่อต้องกู้คืน', 'ลบรายการ', true).then(function (yes) {
+          if (!yes) return;
+          el.disabled = true;
+          // the server re-checks ลำดับ and every column against what this screen shows, under the lock
+          api('Api_deleteRequest', { rowNumber: row.rowNumber, seq: row.seq, snapshot: row.raw }).then(function (res) {
+            if (!res.ok) {
+              el.disabled = false;
+              return failMessage(res, true), render();
+            }
+            UI.toast('ลบรายการ #' + row.seq + ' แล้ว');
+            resetForm();
+            go('#/items');
+            load();
+          });
         });
       },
       tab: function (el) { state.myTab = el.getAttribute('data-tab'); store(KEYS.tab, state.myTab); render(); },

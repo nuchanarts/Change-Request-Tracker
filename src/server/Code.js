@@ -140,6 +140,19 @@ function Api_updateRequest(req) {
   });
 }
 
+/**
+ * Delete one item row (any editor, user decision 2026-11-11). Repo.remove re-checks ลำดับ and the whole row
+ * under the lock and logs a full snapshot to _app_log.
+ * @param {{rowNumber:number, seq:number, snapshot:Object<string,string>}} req
+ */
+function Api_deleteRequest(req) {
+  return guard_(function (ctx) {
+    var denied = denied_(ctx);
+    if (denied) return denied;
+    return ctx.repo.remove(req || {}, ctx.email);
+  });
+}
+
 /** A signed-in person asks for edit access (pending until an admin allows it). @param {{name?:string, note?:string}} input */
 function Api_requestAccess(input) {
   return guard_(function (ctx) {

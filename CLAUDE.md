@@ -2,7 +2,7 @@
 
 This is a Google Apps Script Web App for recording and monitoring EHP / NHIP / INV change requests. The Google Sheet is the single source of truth.
 
-- **Constitution (highest authority)**: `.specify/memory/constitution.md` (v2.1.0)
+- **Constitution (highest authority)**: `.specify/memory/constitution.md` (v4.0.0)
 - **Active feature**: `specs/001-ehp-change-request-tracker/` (spec, plan, research, data-model, contracts, quickstart)
 
 ## Communication
@@ -38,7 +38,7 @@ npm run push:test    # push to the TEST COPY only
   - write changed cells only;
   - append new rows with `max+1`;
   - log every change to `_app_log`.
-- Never delete rows.
+- Delete rows only through `Repo.remove` / `Api_deleteRequest` (one row, lock, ลำดับ + full-row check, JSON snapshot in `_app_log`). Never delete rows any other way.
 - Keep option values exactly as spelled (`Requement`, `รอ Complie ต้องแจ้งอจ.`).
 - Develop and test only against the spreadsheet **copy**, through the TEST project.
 - Work test-first. Commit after every green cycle using Conventional Commits.

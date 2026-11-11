@@ -1,7 +1,10 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 2.1.1 → 3.0.0 (MAJOR: Data Contract status workflow reordered and two statuses added,
+Version change: 3.0.0 → 4.0.0 (MAJOR: the "never delete rows" rule is redefined. By user decision on
+2026-11-11, any editor may delete one item row from the app, through a guarded path only: lock, ลำดับ check,
+full-row conflict check, and a full JSON snapshot of the row in _app_log for manual restore.)
+Previous: 2.1.1 → 3.0.0 (MAJOR: Data Contract status workflow reordered and two statuses added,
 "0.จัดทำ Taiga" and "dev ขอ Sourecode อจ."; closed statuses ordered 0.ยกเลิก / 0.ใช้งานได้อยู่แล้ว /
 0.แก้ไขเรียบร้อย. Approved by the PM (sheet owner side) on 2026-11-11 as required by Governance.)
 Previous: 2.1.0 → 2.1.1 (PATCH: clarify that a static GitHub Pages entry page that only links to the
@@ -89,7 +92,10 @@ Follow-up TODOs: none.
 - ตอนแก้ไขรายการ ให้อ้างอิงทั้ง**เลขแถวและ `ลำดับ`** ก่อนเขียนต้องตรวจว่า `ลำดับ` ในแถวนั้นยังตรงอยู่ ถ้าไม่ตรง (เช่น มีคน sort ชีต) ให้หยุดและแจ้งผู้ใช้ ห้ามเขียนทับ
 - แอปต้องเขียนเฉพาะช่องที่ผู้ใช้แก้จริง ห้ามเขียนทับทั้งแถว
 - รายการใหม่ให้ต่อท้ายชีต โดยใช้ `ลำดับ` = ค่าสูงสุดเดิม + 1
-- **ห้ามลบแถวจากแอป** ถ้าจะยกเลิกงานให้เปลี่ยนสถานะเป็น `0.ยกเลิก`
+- **ลบแถวได้ผ่านช่องทางเดียวเท่านั้น** คือปุ่ม "ลบรายการนี้" สำหรับผู้มีสิทธิ์แก้ไข (ตัดสินใจโดยผู้ใช้ 2026-11-11)
+  ต้องทำภายใต้ lock, ตรวจ `ลำดับ` ที่แถวนั้น, ตรวจทุกคอลัมน์ว่ายังตรงกับที่ผู้ใช้เห็น และบันทึกสำเนาทั้งแถว
+  (JSON หัวคอลัมน์ → ค่า) ลง `_app_log` ก่อนรายงานสำเร็จ งานที่ยกเลิกยังให้เปลี่ยนสถานะเป็น `0.ยกเลิก` ได้ตามเดิม
+  การลบเกิน 1 แถวต่อครั้ง หรือลบโดยไม่มีสำเนาใน log ยังห้ามเหมือนเดิม
 - ทุกการเขียนต้องบันทึกลง `_app_log` ด้วยข้อมูลต่อไปนี้: เวลา, ผู้ใช้ (email), เลขแถว, ลำดับ, คอลัมน์, ค่าเดิม, ค่าใหม่
 
 ### VI. รูปแบบวันที่ (Date Handling)
@@ -292,4 +298,4 @@ Follow-up TODOs: none.
 - ทุก plan และทุก review ต้องตรวจว่าเป็นไปตาม constitution นี้ ความซับซ้อนที่ไม่มีเหตุผลรองรับจะทำให้รวมงานไม่ได้
 - คำแนะนำสำหรับ agent อยู่ใน `CLAUDE.md` และต้องสอดคล้องกับเอกสารนี้เสมอ
 
-**Version**: 3.0.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-11
+**Version**: 4.0.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-11

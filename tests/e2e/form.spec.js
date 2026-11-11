@@ -103,15 +103,29 @@ test.describe('US3 Safe edit', () => {
     await expect(page.getByRole('alert')).toContainText('มีคนแก้ไขรายการนี้ไปก่อนหน้าคุณ');
   });
 
-  test('cancel sets 0.ยกเลิก after confirmation (no delete)', async ({ page }) => {
+  test('delete removes the row after confirmation; rows below move up (user decision 2026-11-11)', async ({
+    page,
+  }) => {
+    await open(page);
+    const seq = await firstOpenSeq(page);
+    const before = await page.evaluate(() => window.__mockSheet.rows.length);
+    await page.goto(`/#/items/${seq}`);
+    await page.getByRole('button', { name: 'ลบรายการนี้' }).click();
+    await expect(page.locator('dialog')).toContainText('_app_log');
+    await page.locator('dialog').getByRole('button', { name: 'ลบรายการ' }).click();
+    await expect(page.locator('.toast', { hasText: 'ลบรายการ #' + seq + ' แล้ว' })).toBeVisible();
+    await expect(page).toHaveURL(/#\/items$/);
+    expect(await page.evaluate(() => window.__mockSheet.rows.length)).toBe(before - 1);
+    expect(await page.evaluate((s) => window.__mockSheet.rows.some((r) => r.seq === s), seq)).toBe(false);
+  });
+
+  test('closing the confirmation deletes nothing', async ({ page }) => {
     await open(page);
     const seq = await firstOpenSeq(page);
     await page.goto(`/#/items/${seq}`);
-    await page.getByRole('button', { name: 'ยกเลิกรายการนี้' }).click();
-    await page.locator('dialog').getByRole('button', { name: 'ยกเลิกรายการ' }).click();
-    await expect(page.locator('.toast')).toContainText('บันทึกการแก้ไขแล้ว (สถานะ)');
-    const row = await page.evaluate((s) => window.__mockSheet.rows.find((r) => r.seq === s), seq);
-    expect(row.status).toBe('0.ยกเลิก');
+    await page.getByRole('button', { name: 'ลบรายการนี้' }).click();
+    await page.keyboard.press('Escape');
+    expect(await page.evaluate((s) => window.__mockSheet.rows.some((r) => r.seq === s), seq)).toBe(true);
   });
 
   test('view-only users cannot add or edit', async ({ page }) => {

@@ -122,6 +122,14 @@ export class FakeSheet {
     this.hidden = true;
     return this;
   }
+  /** Sheet.deleteRow(rowPosition): rows below move up by one (like Sheets). */
+  deleteRow(row) {
+    if (this.failOnDelete) throw new Error('Service error: Spreadsheets');
+    if (row < 1 || row > this.cells.length) throw new Error('Those rows are out of bounds.');
+    this.deletes = (this.deletes || []).concat(row);
+    this.cells.splice(row - 1, 1);
+    return this;
+  }
   setValidation(row, col, validation) {
     this.validations[`${row}:${col}`] = validation;
   }
