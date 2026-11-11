@@ -2,7 +2,7 @@
 
 This is a Google Apps Script Web App for recording and monitoring EHP / NHIP / INV change requests. The Google Sheet is the single source of truth.
 
-- **Constitution (highest authority)**: `.specify/memory/constitution.md` (v2.0.0)
+- **Constitution (highest authority)**: `.specify/memory/constitution.md` (v2.1.0)
 - **Active feature**: `specs/001-ehp-change-request-tracker/` (spec, plan, research, data-model, contracts, quickstart)
 
 ## Communication
@@ -11,7 +11,8 @@ This is a Google Apps Script Web App for recording and monitoring EHP / NHIP / I
 
 ## Stack
 
-- Apps Script V8, container-bound, `HtmlService` UI with vanilla JS and SVG charts. Node 22 is used for tooling only.
+- Apps Script V8, **standalone** project, which opens the sheet with `openById(ScriptProperties.SPREADSHEET_ID)`. It has two projects: TEST (points at the `[TEST]` copy) and PROD. The UI is `HtmlService` with vanilla JS and SVG charts. Node 22 is used for tooling only.
+- ⚠ **Never push to, deploy, or edit the sheet's bound script project.** It hosts the LINE bot "แมวส้ม" (doGet/doPost, anonymous). Its IDs are listed in `scripts/bound-script-ids.txt`. Never commit the bot's code, because it contains a LINE token.
 - Layers: `src/shared/Domain.js` (pure rules, shared by server, client, and tests) → `src/server/Repo.js` (sheet I/O) → `src/server/Code.js` (thin `Api_*`) → `src/client/` (components and views).
 - `scripts/build.mjs` builds `src/` into `dist/` (pushed with clasp) and `preview/` (local E2E with a mocked `google.script.run`).
 
@@ -39,6 +40,6 @@ npm run push:test    # push to the TEST COPY only
   - log every change to `_app_log`.
 - Never delete rows.
 - Keep option values exactly as spelled (`Requement`, `รอ Complie ต้องแจ้งอจ.`).
-- Develop and test only against the spreadsheet **copy**. `src/legacy/` must be pushed unchanged every time (clasp push replaces the whole project).
+- Develop and test only against the spreadsheet **copy**, through the TEST project.
 - Work test-first. Commit after every green cycle using Conventional Commits.
 - Do not use the React, Next.js, or Vercel skills on this project.

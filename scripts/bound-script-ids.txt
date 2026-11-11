@@ -1,0 +1,4 @@
+# Sheet-bound Apps Script projects that host the LINE bot "แมวส้ม".
+# NEVER push or deploy to these IDs (clasp push would delete the bot).
+# One script ID per line. Add the real sheet's bound project ID when known.
+1LK5KdJECkre8soT6FxLOaTe7Zq6A05Gk0io9M9eB6HKWpwbHrClw8Fjn  # [TEST] copy's bound project

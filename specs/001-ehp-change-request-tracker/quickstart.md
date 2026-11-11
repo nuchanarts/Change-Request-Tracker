@@ -15,18 +15,15 @@ npm install
 npx clasp login
 ```
 
-1. **Make a test copy.** In Google Sheets, choose **File → Make a copy** of "สรุปขอแก้ไขโปรแกรม EHP และ แพลตฟอร์มกลาง" and name it `[TEST] สรุปขอแก้ไขโปรแกรม EHP`. The copy brings its bound script with it.
-2. **Get the script ID.** In the copy, open **Extensions → Apps Script → Project Settings** and copy the Script ID.
-3. **Create the test clasp target.** Put the ID into `.clasp.test.json` (this file is git-ignored):
-   ```json
-   { "scriptId": "<COPY_SCRIPT_ID>", "rootDir": "dist" }
-   ```
-4. **Run T0 gates.** Pull the existing code into `src/legacy/`, then record the findings for R2, R3, R6, and R8 in `research.md`:
+1. **Make a test copy.** In Google Sheets, choose **File → Make a copy** of "สรุปขอแก้ไขโปรแกรม EHP และ แพลตฟอร์มกลาง" and name it `[TEST] สรุปขอแก้ไขโปรแกรม EHP`. Copy the **spreadsheet ID** from its URL: the part between `/d/` and `/edit`.
+2. **Create the TEST standalone project.** The script is created in your own Drive:
    ```powershell
-   npm run legacy:pull
+   npm run clasp:create-test        # clasp create --type webapp --title "[TEST] EHP Tracker" --rootDir dist → .clasp.test.json
    ```
+3. **Point it at the copy.** Push once, then in the TEST project open **Project Settings → Script properties** and add `SPREADSHEET_ID` = `<COPY_SPREADSHEET_ID>`.
+4. **Run the T0 probes.** Run `runProbes` in the TEST project. It logs the date cell types per column, the spreadsheet locale and timezone, and the `getEditors()` behavior. Record the results in `research.md` (R6, R8).
 
-> ⚠ Never put the real spreadsheet's script ID in `.clasp.test.json`. Only `npm run push:prod` uses `.clasp.prod.json`, and it refuses to run unless you are on `main` with a clean tree.
+> ⚠ **Never** use the sheet's bound script project (Extensions → Apps Script inside the sheet). It hosts the LINE bot "แมวส้ม", and `clasp push` would delete it. `scripts/check-clasp-target.mjs` blocks pushes to the IDs listed in `scripts/bound-script-ids.txt`. Only `npm run push:prod` uses `.clasp.prod.json`, and it refuses to run unless you are on `main` with a clean tree.
 
 ## 2. Daily development loop (TDD)
 
@@ -43,7 +40,7 @@ Commit after every green cycle, using Conventional Commits (constitution XV).
 ## 3. Push to the test copy and run integration tests
 
 ```powershell
-npm run push:test          # build dist/ (includes src/legacy + integration tests) and clasp push to the copy
+npm run push:test          # build dist/ (+ integration tests) and clasp push to the TEST standalone project
 ```
 
 Then, in the copy's Apps Script editor, run `runIntegrationTests`. **Expected result**: the log shows `ALL PASSED`. The test rows tagged `[TEST]` end with the status `0.ยกเลิก`.
@@ -57,7 +54,7 @@ Deploy the copy using **Deploy → Test deployments** (or a named deployment), t
 | V1 | US1 Monitor | Open the app. In the sheet, filter สถานะ to exclude the 3 closed values and count the rows. Then also filter วันที่เลื่อน or วันที่ต้องได้ < today and count again. | The **งานค้าง** and **เกินกำหนด** cards equal the two manual counts exactly |
 | V2 | US1 drill-down | Click the overdue number for one developer | The list length equals that number, and every row belongs to that developer |
 | V3 | US1 filters | Set แพลตฟอร์ม = NHIP and ความเร่งด่วน = ด่วนที่สุด | All cards and charts change. Spot-check against a sheet filter |
-| V4 | US2 create | Add an item with every required field filled | A new last row appears with `ลำดับ` = previous max + 1, and dates are in `d/m/yyyy`. `_app_log` has one row per field. The `_แมวส้ม_` tracker logs the new status |
+| V4 | US2 create | Add an item with every required field filled | A new last row appears with `ลำดับ` = previous max + 1, and dates are in `d/m/yyyy`. `_app_log` has one row per field. (The แมวส้ม bot reads the **real** sheet, so tracker pickup is checked on PROD only, within 15 minutes, in V14.) |
 | V5 | US2 validation | Submit with รายละเอียด empty | Nothing is written. The field shows a Thai error |
 | V6 | US3 edit | Change only นักพัฒนา on an item | Only that cell changes, and `_app_log` gets one `UPDATE` row |
 | V7 | US3 seq guard | Open an item's edit form, sort the sheet in another tab, then save | `SEQ_MISMATCH` message appears. Nothing is written |
@@ -67,11 +64,13 @@ Deploy the copy using **Deploy → Test deployments** (or a named deployment), t
 | V11 | US6 data quality | Put a date in แพลตฟอร์ม on a test row | The row appears under "ข้อมูลไม่ครบ/ผิดช่อง" with the column named |
 | V12 | US7 guidance | Use a fresh browser profile | The tour starts, can be skipped, and can be replayed from วิธีใช้งาน |
 | V13 | Perf | Use the copy with ≥ 1,000 rows (duplicate rows in the copy if needed) | Monitor is usable in < 5 s, a save takes < 3 s, and filters respond instantly |
+| V14 | Tracker (PROD, after release) | Change one real item's status through the app, then wait ≤ 15 minutes | `_แมวส้ม_บันทึก` records the change, and LINE "แมวส้ม ความเคลื่อนไหว" shows it |
 
 ## 5. Release (production)
 
 1. Merge into `main` after review, with every gate in the constitution's Quality Gates passing.
-2. Run `npm run push:prod`. This builds, checks that the branch is `main` and the tree is clean, then runs `clasp push` to the real bound project. The legacy files are included unchanged.
-3. Run `npx clasp -P .clasp.prod.json deploy -d "vX.Y.Z – <summary>"`. Never give users `/dev`.
-4. Smoke test on production with V1, V2, and V9 (read-only checks), then share the `/exec` URL.
-5. **Rollback**: in **Manage deployments**, point the deployment back to the previous version.
+2. **First release only.** Someone with **edit** rights on the real sheet runs `npm run clasp:create-prod` to create the PROD standalone project, then sets the script property `SPREADSHEET_ID` = `1voV3mHQi7bH2PbBeWaVrk0EaUs-9BnqMpKc53oI__RE`. That person can be the owner `ehpcisplatform@gmail.com` or an editor.
+3. Run `npm run push:prod`. This builds, checks that the branch is `main`, the tree is clean, and the target is not a bound project, then runs `clasp push` to the PROD standalone project.
+4. Run `npx clasp -P .clasp.prod.json deploy -d "vX.Y.Z – <summary>"`. Never give users `/dev`. In **Manage deployments**, confirm that the web app is set to "Execute as: User accessing" and "Who has access: Anyone with a Google account".
+5. Smoke test on production with V1, V2, and V9 (read-only checks), and V14. Then share the `/exec` URL.
+6. **Rollback**: in **Manage deployments**, point the deployment back to the previous version.

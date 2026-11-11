@@ -40,7 +40,7 @@ Bootstrap = {
   schema:   { ok: bool, missing: string[] },
   options:  OptionSets,
   rows:     RawChangeRequest[],           // every row with a non-empty รายละเอียด, in sheet order
-  legacyTrackerMode: 'snapshot'|'onEdit'|'unknown'   // set from T0 findings; shown only on the admin/help page
+  spreadsheetName: string                 // shown in the header, so TEST vs PROD is always visible
 }
 ```
 
@@ -75,7 +75,7 @@ The function:
 3. runs `Domain.validateUpdate`;
 4. inside the lock, returns `NOT_FOUND`, `SEQ_INVALID`, or `SEQ_MISMATCH` (the cell `ลำดับ` at `rowNumber` ≠ `seq`) when they apply;
 5. returns `CONFLICT` if any target cell's display value ≠ `from`;
-6. writes each `to` value to its cell, logs every change as `UPDATE`, and invokes the legacy tracker hook if R3 calls for it.
+6. writes each `to` value to its cell and logs every change as `UPDATE`. The แมวส้ม tracker picks the change up on its own 15-minute run (R3).
 
 Cancelling an item is `changes: { status: { from, to: '0.ยกเลิก' } }`. **No delete API exists** (FR-022).
 

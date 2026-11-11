@@ -1,7 +1,15 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.1.0 → 2.0.0
+Version change: 2.0.0 → 2.1.0
+Bump rationale: MINOR. Principle VIII changed from "container-bound" to "standalone project
+that opens the sheet by ID (SPREADSHEET_ID script property)". The bound project already
+hosts the LINE bot "แมวส้ม" (doGet/doPost, deployed as anonymous). Sharing that project would
+collide on doGet and risk exposing the app anonymously or deleting the bot on clasp push.
+Access changed to "Anyone with a Google account", because the sheet owner is a personal Gmail
+account and no Workspace domain exists. Nothing had been implemented against the old wording.
+
+Previous: 1.1.0 → 2.0.0
 Bump rationale: MAJOR. The project scope changed from a generic project tracker to the
 EHP Change Request Tracker (Google Sheet + Google Apps Script). Principles were merged:
   - Domain principles I–VIII + Data Contract come from the "EHP Change Request Tracker
@@ -101,7 +109,8 @@ Follow-up TODOs: none.
 
 ### VIII. เรียบง่ายและไม่พึ่งของภายนอก (Simplicity)
 
-- Stack: **Google Apps Script Web App** (`HtmlService`) ผูกกับ Spreadsheet นี้ (container-bound)
+- Stack: **Google Apps Script Web App** (`HtmlService`) เป็น **project แบบ standalone แยกจาก project ที่ผูกกับชีต** และเปิดชีตด้วย `SpreadsheetApp.openById()` โดยอ่าน Spreadsheet ID จาก Script Properties (`SPREADSHEET_ID`) เพื่อให้ project ทดสอบชี้ไปที่สำเนา และ project จริงชี้ไปที่ชีตจริง โดยใช้โค้ดชุดเดียวกัน
+- **ห้ามแตะต้อง project ที่ผูกกับชีต** (ซึ่งมีบอท LINE "แมวส้ม" อยู่) ห้าม push, pull เพื่อแก้ไข หรือ deploy ทับ project นั้น
 - ไฟล์โค้ดใน Apps Script แยกตามหน้าที่ได้หลายไฟล์ เพื่อให้เป็นไปตาม Principle XI–XII โดยมีโครงหลักดังนี้:
   - `.gs` ฝั่ง server: `Code.gs` (entry point: `doGet` และฟังก์ชันที่ UI เรียก), ไฟล์ domain (กฎธุรกิจที่ไม่มี I/O), และไฟล์ data-access (อ่านและเขียนชีต)
   - `.html` ฝั่ง UI: `Index.html` และไฟล์ partial ที่ include เข้ามา เช่น `Styles.html`, `Scripts.html`, และ component ที่ใช้ซ้ำ
@@ -234,6 +243,7 @@ Follow-up TODOs: none.
 ## Additional Constraints
 
 - **สิทธิ์การใช้งาน**: Deploy แบบ "Execute as: User accessing the web app" เพื่อให้ log บันทึกตัวตนจริงของคนแก้ และให้สิทธิ์แก้ไขในแอปเป็นไปตามสิทธิ์ของชีต ผู้ที่มีแค่สิทธิ์ดูจะเปิดได้เฉพาะหน้า Monitor
+- **ใครเข้าถึงได้**: ชีตเป็นของบัญชี Gmail ส่วนตัว ไม่ใช่ Workspace domain จึงใช้ "Anyone with a Google account" ซึ่งต้องล็อกอินก่อน คนที่ไม่มีสิทธิ์ในชีตจะอ่านข้อมูลไม่ได้ เพราะแอปรันด้วยสิทธิ์ของผู้ใช้เอง
 - **ข้อมูลภายใน**: ห้ามส่งข้อมูลออกไปยังบริการภายนอก และห้ามเปิดเว็บแอปให้ "Anyone (anonymous)" เข้าถึง
 - **ข้อมูลไม่ครบ**: แถวที่ไม่มี `รายละเอียด` ไม่นับเป็นรายการ ส่วนแถวที่มีค่าผิดประเภทให้แสดงป้าย "ข้อมูลไม่ครบ/ผิดช่อง" ในหน้า Monitor เพื่อให้ PM ตามแก้
 
@@ -274,4 +284,4 @@ Follow-up TODOs: none.
 - ทุก plan และทุก review ต้องตรวจว่าเป็นไปตาม constitution นี้ ความซับซ้อนที่ไม่มีเหตุผลรองรับจะทำให้รวมงานไม่ได้
 - คำแนะนำสำหรับ agent อยู่ใน `CLAUDE.md` และต้องสอดคล้องกับเอกสารนี้เสมอ
 
-**Version**: 2.0.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-11
+**Version**: 2.1.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-11

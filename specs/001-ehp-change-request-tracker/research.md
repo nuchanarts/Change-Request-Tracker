@@ -8,25 +8,32 @@ Each topic is recorded as Decision / Rationale / Alternatives considered. Topics
 
 ## R1. Runtime and hosting
 
-- **Decision**: Use a Google Apps Script Web App (`HtmlService`) on the V8 runtime, **container-bound** to the spreadsheet "สรุปขอแก้ไขโปรแกรม EHP และ แพลตฟอร์มกลาง". Deploy with "Execute as: User accessing the web app" and "Who has access: anyone in the organization" (or specific users). No domain or hosting is needed; Google provides a `script.google.com/.../exec` URL.
-- **Rationale**: This is required by constitution VIII and the Additional Constraints. It costs nothing, the data never leaves Workspace, and the user's real identity reaches the audit log.
-- **Alternatives considered**: A standalone script project, which was rejected because the constitution requires container-bound. An external host (Vercel or Firebase), which was rejected by VIII.
+- **Decision** (revised 2026-11-11 after inspecting the bound project, constitution v2.1.0): Use a **standalone** Google Apps Script Web App (`HtmlService`, V8) that opens the sheet with `SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID'))`. There are two standalone projects running the same code:
+  - **TEST**: `SPREADSHEET_ID` = the `[TEST]` copy;
+  - **PROD**: `SPREADSHEET_ID` = `1voV3mHQi7bH2PbBeWaVrk0EaUs-9BnqMpKc53oI__RE`.
 
-## R2. ⚠ Existing code in the bound script project (critical risk)
+  Deploy with "Execute as: User accessing the web app" and "Who has access: **Anyone with a Google account**". The sheet owner `ehpcisplatform@gmail.com` is a personal Gmail account with no Workspace domain, so "domain only" is impossible. This setting is still **not** anonymous, because users must sign in, and data access follows each user's own sheet permission. No domain or hosting is needed; Google provides a `script.google.com/.../exec` URL.
+- **Rationale**: The bound project already hosts the LINE bot (see R2), so sharing it is unsafe. A standalone project keeps the bot untouched and gives our app its own deployment settings. It costs nothing, the data stays in Google, and the user's real identity reaches the audit log.
+- **Alternatives considered**: Putting the app in the same bound project, which was rejected (R2). An external host (Vercel or Firebase), which is rejected by VIII.
 
-- **Finding**: The `_แมวส้ม_บันทึก` and `_แมวส้ม_สถานะ` sheets show that a status tracker already exists. It is probably Apps Script code in the **same** bound project. `clasp push` **replaces every file in the project**, so a careless push would delete the tracker.
-- **Decision**: Task T0 must run `clasp clone` on the bound project of the **copy** and commit every existing file unchanged into `src/legacy/`. The build copies `src/legacy/` into `dist/` untouched, so a push always includes the legacy files. No feature code may share a file with legacy code, and global names must not collide (all new globals use the `App`, `Domain`, `Repo`, `Config`, and `Api_` prefixes).
-- **Rationale**: This satisfies constitution II (do not touch the `_แมวส้ม_` sheets) and the deploy checklist ("the tracker still works").
-- **Alternatives considered**: Keeping our code in a separate standalone project, which was rejected (see R1). Editing in the online editor only, which was rejected by XV (git is the source of truth).
+## R2. ✅ Resolved: the bound project contains the LINE bot "แมวส้ม"
 
-## R3. ⚠ Will the `_แมวส้ม_` tracker see status changes made by the app?
+- **Finding** (cloned the bound project of the copy, script `1LK5KdJE…Fjn`, into the scratchpad only; not committed):
+  - The project has 2 files: `appsscript.json` (V8, Asia/Bangkok) and `Checklist_Monitor_dev.js`, about 1,000 lines. The second file is the LINE bot "แมวส้ม" (`CODE_VERSION 'แมวส้ม-แก้ไขโปรแกรม v2026-11-10b'`).
+  - The bot defines **`doPost`**, which is the LINE webhook and must be deployed as anonymous, and **`doGet`**, a health text.
+  - It hard-codes `SHEET_ID` to the **real** sheet and opens it with `openById`, even when it runs from a copy.
+  - It contains a **hard-coded LINE channel token** as the fallback when the script property `LINE_TOKEN` is missing.
+- **Decision**:
+  - Our app lives in a **separate standalone project** (R1). We never push, deploy, or edit the bound project. `.clasp.*.json` must never contain the bound script ID.
+  - The bot's code is **not** copied into this repository, because it contains a secret (XV).
+  - Recommend to the sheet owner (outside this feature's scope): rotate the LINE token, store it only in Script Properties, and remove the hard-coded fallback.
+- **Rationale**: This avoids `doGet` collisions, anonymous exposure of our UI, and accidental deletion of the bot by `clasp push`.
 
-- **Finding**: Simple and installable `onEdit` triggers **do not fire** for changes made by scripts. If the tracker uses `onEdit`, status changes written by the app would be missed, which would break SC-007 and the deploy checklist.
-- **Decision**: T0 must read the legacy code and classify the tracker:
-  1. **Snapshot or diff based** (time-driven, or compares the main sheet against `_แมวส้ม_สถานะ`): it already catches app writes, so no action is needed.
-  2. **`onEdit` based**: after each successful status write, the app calls the tracker's own handler function in the same project with a synthetic event object (`{range, value, oldValue, source}`). The app does not write to the `_แมวส้ม_` sheets itself, so constitution II is kept. If the handler cannot be called safely, stop and ask the sheet-owner PM.
-- **Rationale**: Calling the tracker's own code preserves its logic without the app touching its sheets.
-- **Alternatives considered**: Writing to the `_แมวส้ม_` sheets directly, which was rejected by II.
+## R3. ✅ Resolved: the `_แมวส้ม_` tracker sees status changes made by the app
+
+- **Finding**: `setupAll()` installs a **time-driven** trigger, `watchChanges`, every 15 minutes (`WATCH_MINUTES`). It diffs the main sheet against the snapshot sheet `_แมวส้ม_สถานะ` and appends to `_แมวส้ม_บันทึก`. It does **not** use `onEdit`. Our app's writes are therefore detected at the next run, within 15 minutes, exactly like manual edits.
+- **Decision**: No bridge code is needed. `LegacyBridge.js` is removed from the plan.
+- **Note**: The bot reads columns by header regex and treats closed as `stripNo_(status)` ∈ {แก้ไขเรียบร้อย, ยกเลิก, ใช้งานได้อยู่แล้ว}. That matches our exact-set rule for every real value, so the bot's counts and the app's counts agree.
 
 ## R4. Sharing domain logic between server and client (constitution XII)
 
@@ -51,7 +58,8 @@ Each topic is recorded as Decision / Rationale / Alternatives considered. Topics
   - **Buddhist-era years**: a year ≥ 2400 (for example 16/4/2569) is converted by subtracting 543 for calculations only, and flagged as `DATE_BUDDHIST_YEAR`. The value in the sheet is not changed.
   - **Write**: if the target cell currently holds a Date (from `getValues()`), or is empty and the majority of the column holds Dates, write a JavaScript `Date` built for midnight Asia/Bangkok. The cell keeps its existing number format. Otherwise, write the text `d/m/yyyy` exactly.
 - **Rationale**: Display values avoid timezone and locale drift, which is what the constitution asks for. Writing the same type that the column already uses keeps sheet formulas and filters working.
-- **⚠ Verify in T0**: check the spreadsheet locale and timezone, and whether the date columns are real dates or text, on the copy.
+- **Partly verified**: the real sheet's 18 headers match the Data Contract exactly, and dates display as `16/4/2026`. The bot's parser accepts both Date cells and text, which suggests the sheet holds a mix.
+- **⚠ Verify in T0**: check the cell type per date column and the spreadsheet locale on the copy, using an integration probe.
 
 ## R7. Safe writes (constitution V)
 
@@ -86,7 +94,10 @@ Each topic is recorded as Decision / Rationale / Alternatives considered. Topics
 
 ## R11. Tooling and repository layout
 
-- **Decision**: Node 22 with npm. Dev dependencies: `@google/clasp`, `vitest`, `@vitest/coverage-v8`, `@playwright/test`, `@axe-core/playwright`, `eslint` (flat config, with `eslint-plugin-googleappsscript` globals), `prettier`, `typescript` (for `tsc --noEmit --checkJs` only), and `@types/google-apps-script`. Run `clasp` with `rootDir: dist`. Keep two clasp targets: `.clasp.test.json` for the copy's project and `.clasp.prod.json` for the real project. `npm run push:prod` refuses to run unless the branch is `main` and the tree is clean.
+- **Decision**: Node 22 with npm. Dev dependencies: `@google/clasp` (3.x), `vitest`, `@vitest/coverage-v8`, `@playwright/test`, `@axe-core/playwright`, `eslint` (flat config, with `globals` for Apps Script declared from `@types/google-apps-script`), `prettier`, `typescript` (for `tsc --noEmit --checkJs` only), and `@types/google-apps-script`. Run `clasp` with `rootDir: dist`.
+  - **Two standalone clasp targets** (both git-ignored): `.clasp.test.json`, created with `clasp create --type webapp`, whose `SPREADSHEET_ID` property points at the copy; and `.clasp.prod.json`, a separate project whose property points at the real sheet.
+  - `npm run push:prod` refuses to run unless the branch is `main` and the tree is clean.
+  - `scripts/check-clasp-target.mjs` refuses any push whose scriptId equals a known bound-project ID, which is a denylist kept in `scripts/bound-script-ids.txt`.
 - **Rationale**: This follows XV (git is the source; named, reversible deployments) and VIII (tooling is dev-only).
 
 ## R12. Week and month boundaries
@@ -101,4 +112,4 @@ Each topic is recorded as Decision / Rationale / Alternatives considered. Topics
 
 ---
 
-**All Technical Context unknowns are resolved.** The remaining ⚠ items (R2, R3, R6, R8) are environment facts that can only be observed on the spreadsheet copy, and they are scheduled as task T0 gates.
+**All Technical Context unknowns are resolved.** R2 and R3 were resolved by inspecting the bound project. The remaining ⚠ items (R6 date cell types and locale, R8 `getEditors` for viewers) can only be observed on the copy. They are scheduled as T0 integration probes.

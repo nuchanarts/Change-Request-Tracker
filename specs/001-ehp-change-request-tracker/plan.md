@@ -8,7 +8,7 @@
 
 Build a Thai-language, mobile-friendly web app that records and monitors EHP / NHIP / INV change requests. The data stays in the existing Google Sheet "สรุปขอแก้ไขโปรแกรม EHP และ แพลตฟอร์มกลาง", which is the single source of truth.
 
-The app is a **container-bound Google Apps Script Web App**. It needs no domain and no hosting. It provides four main screens:
+The app is a **standalone Google Apps Script Web App** that opens the sheet by ID. It is kept separate from the sheet's bound project, which hosts the LINE bot "แมวส้ม". It needs no domain and no hosting. It provides four main screens:
 
 1. **Monitor**: answers the 6 team questions, every number is clickable, and it has filters;
 2. **My Work**: each person's own items;
@@ -35,7 +35,7 @@ It also has a data-quality panel and built-in onboarding and help.
 - **Integration**: `runIntegrationTests()` inside Apps Script, on the copy only
 - **E2E**: Playwright and axe against the preview build, at desktop width and 375 px mobile
 
-**Target Platform**: A Google Apps Script Web App with "Execute as: user accessing" and access limited to the organization. Users open it in desktop and mobile browsers.
+**Target Platform**: A standalone Google Apps Script Web App (two projects, TEST and PROD, each with its own `SPREADSHEET_ID` script property) with "Execute as: user accessing" and "Anyone with a Google account" access (sign-in required, never anonymous). Users open it in desktop and mobile browsers.
 
 **Project Type**: A web application (single Apps Script project: server `.gs` files plus `HtmlService` client)
 
@@ -64,13 +64,13 @@ It also has a data-quality panel and built-in onboarding and help.
 | # | Principle | How this plan complies | Status |
 |---|---|---|---|
 | I | Single source of truth | Every read goes straight to the sheet, and Refresh re-reads it. Rows are never cached. Option sets are cached for at most 5 minutes (R5). | ✅ |
-| II | Schema preservation | `Repo` maps columns by header text, and a missing header produces a `SchemaError` that disables writes. The app's only own sheets are `_app_log` and `_app_users`. The `_แมวส้ม_*` sheets are never opened. Legacy code is preserved (R2). | ✅ |
+| II | Schema preservation | `Repo` maps columns by header text, and a missing header produces a `SchemaError` that disables writes. The app's only own sheets are `_app_log` and `_app_users`. The `_แมวส้ม_*` sheets are never opened. The bound project (the LINE bot) is never pushed to (R2), and the bot's 15-minute snapshot trigger still sees app writes (R3). | ✅ |
 | III | Value fidelity | Options come from validation, then distinct values, then `รายชื่อ`. Writes use the exact option strings. Option fields are dropdowns only, and `ระบบงาน` is a combobox that warns on a new value. | ✅ |
 | IV | Status semantics | `Domain.CLOSED` is an exact set. `isOpen`, `effectiveDue`, and `isOverdue` are defined once and used by every view. A unit test asserts that `0.รอแจ้งทีมพัฒนา` and `0.จัดทำไฟล์แก้ไข` are open. | ✅ |
 | V | Safe writes | `Repo.withLock` wraps `tryLock`, the ลำดับ check, a cell-level conflict check, writing changed cells only, appending at `max+1`, and logging to `_app_log`. There is no delete API (R7). | ✅ |
 | VI | Dates | Dates are parsed from display values as d/m/yyyy into date-only values. Unparseable values keep their original text and get a flag. Writes keep the column's existing cell type. The timezone is Asia/Bangkok (R6). | ✅ |
 | VII | Actionable monitor | `Domain.computeMetrics` covers the 6 questions. Each figure carries the ids behind it for drill-down. There are 5 filters. | ✅ |
-| VIII | Simplicity / Apps Script | The app is a container-bound HtmlService app split into several files, as the constitution allows. Tooling is dev only. The UI has no CDN library; charts are SVG. The UI is Thai and mobile-friendly. | ✅ |
+| VIII | Simplicity / Apps Script | The app is a standalone HtmlService app that opens the sheet with `openById(SPREADSHEET_ID)` (v2.1.0), split into several files. Tooling is dev only. The UI has no CDN library; charts are SVG. The UI is Thai and mobile-friendly. | ✅ |
 | IX | Code quality | ESLint, Prettier, and `tsc --checkJs` run with JSDoc types. All constants live in `Config.js`. Errors are returned as `Result` codes, with no silent catches. Every change gets a code review. | ✅ |
 | X | TDD | Test-first ordering is enforced in tasks.md. There are four test layers (R10). Integration tests run only on the copy. | ✅ |
 | XI | Reuse first | Shared components live in `src/client/components/`, and shared server helpers live in `Repo`. | ✅ |
@@ -80,7 +80,7 @@ It also has a data-quality panel and built-in onboarding and help.
 | XV | Commit and release | The work is on a feature branch with Conventional Commits. `clasp` pushes from `dist/`. `push:prod` is guarded. Deployments are named. `.clasprc.json` and `.clasp.*.json` are git-ignored, and fixtures are synthetic. | ✅ |
 | XVI | Skills | The skill map is applied per phase. Vercel and React skills are excluded. Apps Script APIs are checked against the docs. | ✅ |
 
-**Result: PASS** (initial check and again after Phase 1 design). There are no unjustified violations. Four environment facts must be verified in task T0 before feature code is written: legacy code in the bound project (R2), the tracker type (R3), the date cell types and locale (R6), and `getEditors` for viewers (R8). They are gates, not violations.
+**Result: PASS** (initial check, after Phase 1 design, and again after the v2.1.0 amendment). There are no unjustified violations. R2 and R3 are resolved. Two environment facts remain to probe in T0 on the copy: the date cell types and locale (R6), and `getEditors` for viewers (R8).
 
 ## Project Structure
 
@@ -110,7 +110,6 @@ src/
 │   ├── Config.js            # sheet names, header map, CLOSED/WORKFLOW, limits, Thai messages
 │   ├── Repo.js              # header mapping, reads, options, withLock, create/update, _app_log, _app_users
 │   ├── Auth.js              # current email, canEdit, name mapping
-│   ├── LegacyBridge.js      # calls the _แมวส้ม_ handler only if T0 finds it is onEdit-based (R3)
 │   └── Code.js              # doGet, include(), Api_* thin wrappers
 ├── client/
 │   ├── Index.html           # shell + router outlet; includes everything below
@@ -119,8 +118,7 @@ src/
 │   ├── components/          # StatCard, StatusBadge, DataTable, FilterBar, SelectField, DateField,
 │   │                        # Combobox, ConfirmDialog, Toast, EmptyState, Charts (SVG), Tour, HelpTip
 │   └── views/               # MonitorView, MyWorkView, ItemsView, ItemFormView, HelpView, DataQualityPanel
-├── legacy/                  # existing bound-project files from T0, never edited
-└── appsscript.json          # V8, timeZone Asia/Bangkok, webapp: executeAs USER_ACCESSING, access DOMAIN
+└── appsscript.json          # V8, timeZone Asia/Bangkok, webapp: executeAs USER_ACCESSING, access ANYONE (Google sign-in required)
 
 tests/
 ├── unit/                    # Domain.*.test.js
@@ -130,7 +128,9 @@ tests/
 └── fixtures/                # synthetic rows (no real data), 1,000-row generator
 
 scripts/
-└── build.mjs                # src → dist/ (flatten, wrap Domain for client, copy legacy), --preview, --with-integration
+├── build.mjs                # src → dist/ (flatten, wrap Domain for client), --preview, --with-integration
+├── check-clasp-target.mjs   # refuses pushes to bound-project IDs and unguarded prod pushes
+└── bound-script-ids.txt     # denylist: the sheet-bound (LINE bot) project IDs
 
 dist/                        # build output pushed by clasp (git-ignored)
 preview/                     # local E2E build (git-ignored)
@@ -142,6 +142,5 @@ preview/                     # local E2E build (git-ignored)
 
 | Item | Why needed | Simpler alternative rejected because |
 |---|---|---|
-| Build script (`scripts/build.mjs`) | Shares one `Domain.js` across server, client, and Node. Keeps legacy files in every push. Produces the E2E preview. | Hand-copying would duplicate the rules (violating XII) and risk deleting legacy code on push (R2). |
-| Two clasp targets (test and prod) | Development must happen on the copy, and production pushes must be deliberate. | A single target makes it too easy to push to the real sheet by mistake. |
-| `LegacyBridge.js` (conditional) | Only needed if the `_แมวส้ม_` tracker uses `onEdit`, which does not fire on script writes (R3). | Writing to the `_แมวส้ม_` sheets directly is forbidden by II. |
+| Build script (`scripts/build.mjs`) | Shares one `Domain.js` across server, client, and Node. Produces the E2E preview. | Hand-copying would duplicate the rules, violating XII. |
+| Two standalone projects (TEST and PROD) with a push guard | Development must happen on the copy, production pushes must be deliberate, and the LINE bot's bound project must never be overwritten. | A single target makes it too easy to push to the real sheet by mistake, or into the bot's project. |
