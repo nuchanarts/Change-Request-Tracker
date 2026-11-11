@@ -1,8 +1,10 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: (none) → 1.0.0
-Bump rationale: Initial ratification of the project constitution.
+Version change: 1.0.0 → 1.1.0
+Bump rationale: MINOR. Principle V now requires a user-friendly, attractive UI and
+built-in "how to use" guidance (onboarding, contextual help, a Help page). Gate 6 was
+updated to match. Principle II already mandates unit, integration, and E2E tests.
 
 Principles defined:
   I.    Code Quality (NON-NEGOTIABLE)
@@ -86,6 +88,13 @@ Follow-up TODOs:
 - Layouts MUST be responsive and usable on the target devices defined in the spec.
 - User-facing messages MUST be clear, actionable, and consistent in tone and language. Raw technical errors MUST NOT be shown to users.
 - New UI work MUST use the `frontend-design` skill to set a deliberate visual direction within the design system.
+- **User-friendly and attractive**: screens MUST be clean and uncluttered, with a clear visual hierarchy. The most important information and the primary action MUST be obvious at a glance. Visual polish (spacing, alignment, typography, subtle motion, and good empty-state illustrations) is part of "done", not an optional extra.
+- **Built-in "how to use" guidance**: every feature MUST teach itself. This means:
+  - a first-run onboarding or guided tour for key screens;
+  - contextual help (tooltips, helper text, and inline hints) on non-obvious controls and fields;
+  - empty states that explain what goes here and how to start;
+  - an in-app Help / User Guide page that covers each primary user journey step by step, kept up to date with each feature.
+- Usability is verified: each primary journey MUST be completable by a first-time user without outside help, and the Playwright E2E tests MUST cover these journeys, including the onboarding flow.
 
 **Rationale**: In a monitoring context, users must read status quickly and act correctly. Inconsistency causes hesitation and errors.
 
@@ -143,7 +152,7 @@ A change is **done** only when all of the following are true:
 3. Lint, format, and type check pass with zero errors.
 4. No duplicated logic was introduced. Shared components and functions were reused or created.
 5. Business logic lives only in the domain layer.
-6. UI follows the design system, includes all four view states, and meets WCAG 2.1 AA.
+6. UI follows the design system, includes all four view states, meets WCAG 2.1 AA, and ships with its "how to use" guidance (onboarding, contextual help, and a Help page entry).
 7. Performance budgets are verified for the affected paths.
 8. Code review is complete and its findings are resolved.
 9. The work is committed with a Conventional Commit message.
@@ -167,4 +176,4 @@ A change is **done** only when all of the following are true:
 - **Compliance**: every plan and every review MUST check conformance with this constitution. Unjustified complexity or violations block the merge.
 - Runtime development guidance for agents lives in `CLAUDE.md` and MUST stay consistent with this document.
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-11
+**Version**: 1.1.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-11
