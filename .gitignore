@@ -1,0 +1,9 @@
+# Claude Code local/private files
+.claude/settings.local.json
+.claude/*.local.md
+.claude/*.local.json
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
