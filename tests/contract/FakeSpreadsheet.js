@@ -73,6 +73,11 @@ class FakeRange {
   getDataValidation() {
     return this.sheet.validations[`${this.row}:${this.col}`] || null;
   }
+  // Real API: Range.canEdit() — whether the effective user may edit the range (no write needed).
+  canEdit() {
+    if (this.sheet.rangeCanEdit === 'throw') throw new Error('Exception: unsupported');
+    return !!this.sheet.rangeCanEdit;
+  }
 }
 
 export class FakeSheet {
@@ -134,10 +139,33 @@ export class FakeSpreadsheet {
   getViewers() {
     return this.viewers.map((e) => ({ getEmail: () => e }));
   }
+  // Real API: Spreadsheet.addDeveloperMetadata(key) returns the Spreadsheet (for chaining), NOT the metadata.
   addDeveloperMetadata(key) {
     this.probes++;
     if (!this.probeAllowed) throw new Error('You do not have permission to access the requested document.');
-    return { getKey: () => key, remove: () => {} };
+    this.metadata = (this.metadata || []).concat([key]);
+    return this;
+  }
+  createDeveloperMetadataFinder() {
+    const ss = this;
+    let wanted = null;
+    const finder = {
+      withKey(k) {
+        wanted = k;
+        return finder;
+      },
+      find() {
+        return (ss.metadata || [])
+          .filter((k) => wanted === null || k === wanted)
+          .map((k) => ({
+            getKey: () => k,
+            remove: () => {
+              ss.metadata = ss.metadata.filter((x) => x !== k);
+            },
+          }));
+      },
+    };
+    return finder;
   }
   getSheetByName(name) {
     return this.sheets[name] || null;

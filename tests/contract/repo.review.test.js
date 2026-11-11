@@ -117,12 +117,40 @@ describe('canEdit covers group and link sharing (R8)', () => {
     expect(ss.probes).toBe(0);
   });
 
-  it('unlisted users are probed once with harmless developer metadata, result cached per user', () => {
+  it('link/group editors are recognised with Range.canEdit() — no write to the sheet', () => {
     build({ probeAllowed: true });
+    main.rangeCanEdit = true;
     effective = 'groupmember@x.com';
     expect(repo.canEdit('groupmember@x.com')).toBe(true);
+    expect(ss.probes).toBe(0);
+  });
+
+  it('link/group viewers get false from Range.canEdit()', () => {
+    build({ probeAllowed: false });
+    main.rangeCanEdit = false;
+    effective = 'linkviewer@x.com';
+    expect(repo.canEdit('linkviewer@x.com')).toBe(false);
+  });
+
+  it('falls back to the metadata probe (real API shape) and leaves no metadata behind', () => {
+    // Regression (production 2026-11-11): addDeveloperMetadata returns the Spreadsheet, so calling
+    // .remove() on it threw and every link/group editor was cached as view-only for 6 hours.
+    build({ probeAllowed: true });
+    main.rangeCanEdit = 'throw';
+    effective = 'groupmember@x.com';
+    ss.metadata = [Config.EDIT_PROBE_KEY]; // leftover from the buggy version
     expect(repo.canEdit('groupmember@x.com')).toBe(true);
-    expect(ss.probes).toBe(1);
+    expect(repo.canEdit('groupmember@x.com')).toBe(true);
+    expect(ss.probes).toBe(1); // cached per user
+    expect(ss.metadata).toEqual([]);
+  });
+
+  it('ignores answers cached by the buggy version (new cache key)', () => {
+    build({ probeAllowed: true });
+    main.rangeCanEdit = true;
+    effective = 'groupmember@x.com';
+    userCache.put('canEdit:groupmember@x.com', '0');
+    expect(repo.canEdit('groupmember@x.com')).toBe(true);
   });
 
   it('never probes when the script is not running as the caller (fail closed if deployed "execute as me")', () => {
@@ -134,6 +162,7 @@ describe('canEdit covers group and link sharing (R8)', () => {
 
   it('a failed probe means view-only', () => {
     build({ probeAllowed: false });
+    main.rangeCanEdit = 'throw';
     effective = 'linkviewer@x.com';
     expect(repo.canEdit('linkviewer@x.com')).toBe(false);
   });
