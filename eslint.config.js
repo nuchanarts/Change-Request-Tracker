@@ -10,6 +10,7 @@ const gas = Object.fromEntries(
     'Session',
     'Utilities',
     'PropertiesService',
+    'console',
     'Logger',
     'ContentService',
     'ScriptApp',
