@@ -106,5 +106,11 @@ export function generateRows(n, seed = 1, today = { y: 2026, m: 11, d: 11 }) {
       devEnd: '',
     });
   }
+  // Like the real sheet: some ticket numbers carry a link inside the cell (rich text). Deterministic, so the
+  // random sequence (and every count other tests rely on) stays the same.
+  rows.forEach((row, i) => {
+    if (/^\d+$/.test(row.ticket) && i % 3 === 0)
+      row.ticketLinks = [`https://taiga.example/project/ehp/us/${row.ticket}`];
+  });
   return rows;
 }

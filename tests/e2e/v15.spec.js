@@ -72,10 +72,14 @@ test.describe('Export summary', () => {
     const text = page.locator('#rep-text');
     await expect(text).toHaveValue(/สรุปรายการขอแก้ไขโปรแกรม ประจำเดือน/);
     await expect(text).toHaveValue(/3\. รายการเกินกำหนดระยะเวลา/);
-    const pm = await page.locator('#f-rep-pm option').nth(1).textContent();
-    await page.selectOption('#f-rep-pm', pm);
+    // several PMs can be picked (2026-11-11)
     const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    await expect(text).toHaveValue(new RegExp('PM ผู้รับผิดชอบ: ' + escapeRe(pm)));
+    const picks = page.locator('input[name="rep-pm-pick"]');
+    const pms = await picks.evaluateAll((els) => els.slice(0, 2).map((e) => e.value));
+    await picks.nth(0).check();
+    await expect(text).toHaveValue(new RegExp('PM ผู้รับผิดชอบ: ' + escapeRe(pms[0]) + '\n'));
+    await picks.nth(1).check();
+    await expect(text).toHaveValue(new RegExp('PM ผู้รับผิดชอบ: ' + escapeRe(pms.join(', ')) + '\n'));
     await page.fill('#f-rep-since', '700');
     await page.locator('#f-rep-since').dispatchEvent('change');
     await expect(text).toHaveValue(/ตั้งแต่ลำดับ 701/);

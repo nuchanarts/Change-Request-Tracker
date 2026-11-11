@@ -517,7 +517,8 @@
     var exportOpts = null;
 
     function reportRows() {
-      return D.applyFilters(state.rows, { pm: exportOpts.pm ? [exportOpts.pm] : [] });
+      // several PMs can be picked (2026-11-11); none = everyone
+      return D.applyFilters(state.rows, { pm: D.splitPm(exportOpts.pm) });
     }
     function reportText() {
       return D.buildReport(reportRows(), state.today, { sinceSeq: exportOpts.since, pm: exportOpts.pm });
@@ -533,7 +534,9 @@
     function refreshExport() {
       var form = document.getElementById('export-form');
       var sinceRaw = form.elements['rep-since'].value.trim();
-      exportOpts.pm = form.elements['rep-pm'].value;
+      var picked = Array.prototype.slice.call(form.querySelectorAll('input[name="rep-pm-pick"]:checked')).map(function (x) { return x.value; });
+      exportOpts.pm = D.joinPm(picked, state.options.pm);
+      form.elements['rep-pm'].value = exportOpts.pm;
       exportOpts.since = /^\d+$/.test(sinceRaw) ? Number(sinceRaw) : null;
       document.getElementById('rep-text').value = reportText();
     }

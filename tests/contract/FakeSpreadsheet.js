@@ -73,6 +73,29 @@ class FakeRange {
   getDataValidation() {
     return this.sheet.validations[`${this.row}:${this.col}`] || null;
   }
+  // Real API shape: RichTextValue.getLinkUrl() (whole cell) and getRuns()[i].getLinkUrl() (part of the text).
+  getRichTextValues() {
+    this.sheet.richReads = (this.sheet.richReads || 0) + 1;
+    const out = [];
+    for (let r = 0; r < this.numRows; r++) {
+      const line = [];
+      for (let c = 0; c < this.numCols; c++) {
+        const links = (this.sheet.links || {})[`${this.row + r}:${this.col + c}`] || [];
+        const whole = links.length === 1 ? links[0] : null;
+        line.push({
+          getLinkUrl: () => whole,
+          getRuns: () => links.map((u) => ({ getLinkUrl: () => u })),
+        });
+      }
+      out.push(line);
+    }
+    return out;
+  }
+  getFormulas() {
+    return this._matrix(() => '').map((line, r) =>
+      line.map((_, c) => (this.sheet.formulas || {})[`${this.row + r}:${this.col + c}`] || ''),
+    );
+  }
   // Real API: Range.canEdit() — whether the effective user may edit the range (no write needed).
   canEdit() {
     if (this.sheet.rangeCanEdit === 'throw') throw new Error('Exception: unsupported');

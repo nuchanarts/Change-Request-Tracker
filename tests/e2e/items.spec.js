@@ -104,3 +104,20 @@ test('dragging a header moves the column', async ({ page }) => {
   await page.locator('th[data-col="due"]').dragTo(page.locator('th[data-col="platform"]'));
   expect((await headerTexts(page)).slice(0, 3)).toEqual(['ลำดับ', 'กำหนดส่ง', 'แพลตฟอร์ม']);
 });
+
+test('a ticket number with a link embedded in the sheet cell is clickable (2026-11-11)', async ({ page }) => {
+  await open(page, '/#/items');
+  const seq = await page.evaluate(
+    () => window.__mockSheet.rows.find((r) => r.ticketLinks && r.ticketLinks.length).seq,
+  );
+  const url = await page.evaluate(
+    (s) => window.__mockSheet.rows.find((r) => r.seq === s).ticketLinks[0],
+    seq,
+  );
+  await page.fill('#q', seq);
+  const link = page.locator('tbody tr').first().locator('a.ticket-link');
+  await expect(link).toHaveAttribute('href', url);
+  await page.goto(`/#/items/${seq}`);
+  await expect(page.locator('.ticket-actions a.ticket-link').first()).toHaveAttribute('href', url);
+  await expect(page.locator('#h-ticket')).toContainText('มีลิงก์ฝังอยู่');
+});

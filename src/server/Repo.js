@@ -140,9 +140,11 @@ function makeRepo(deps) {
 
   /** Read the whole main sheet in one call (constitution XIV). */
   function readAll() {
-    var display = mainSheet().getDataRange().getDisplayValues();
+    var sh = mainSheet();
+    var display = sh.getDataRange().getDisplayValues();
     var map = mapHeaders(display[0] || []);
     var hasDetail = map.index.detail !== undefined;
+    var links = ticketLinks(sh, map.index.ticket, display.length - 1);
     var rows = [];
     for (var i = 1; i < display.length; i++) {
       var line = display[i];
@@ -151,9 +153,43 @@ function makeRepo(deps) {
         : line.some(function (/** @type {any} */ c) {
             return clean(c) !== '';
           });
-      if (isItem) rows.push(rowObject(line, map.index, i + 1));
+      if (!isItem) continue;
+      var o = rowObject(line, map.index, i + 1);
+      if (links[i - 1] && links[i - 1].length) o.ticketLinks = links[i - 1];
+      rows.push(o);
     }
     return { rows: rows, missing: map.missing };
+  }
+
+  /**
+   * Links hidden inside the Taiga/MANTIS cells (text with a link, or =HYPERLINK): display values only give
+   * the text, e.g. "2132". One rich-text read + one formula read for that column (constitution XIV).
+   * Best effort: if the API is missing or fails, the app still works with the text.
+   * @param {any} sh @param {number|undefined} colIdx @param {number} count data rows
+   * @returns {string[][]}
+   */
+  function ticketLinks(sh, colIdx, count) {
+    if (colIdx === undefined || count < 1) return [];
+    try {
+      var range = sh.getRange(2, colIdx + 1, count, 1);
+      var rich = typeof range.getRichTextValues === 'function' ? range.getRichTextValues() : [];
+      var formulas = typeof range.getFormulas === 'function' ? range.getFormulas() : [];
+      var out = [];
+      for (var r = 0; r < count; r++) {
+        var cell = rich[r] && rich[r][0];
+        var urls = [];
+        if (cell) {
+          urls.push(cell.getLinkUrl());
+          (cell.getRuns ? cell.getRuns() : []).forEach(function (/** @type {any} */ run) {
+            urls.push(run.getLinkUrl());
+          });
+        }
+        out.push(D.collectLinks(urls, (formulas[r] && formulas[r][0]) || ''));
+      }
+      return out;
+    } catch (_e) {
+      return [];
+    }
   }
 
   /** @param {number} rowNumber */
