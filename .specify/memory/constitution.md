@@ -1,7 +1,9 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 2.0.0 → 2.1.0
+Version change: 2.1.0 → 2.1.1 (PATCH: clarify that a static GitHub Pages entry page that only links to the
+Apps Script URL is allowed under Principle VIII; it holds no data or logic.)
+Previous: 2.0.0 → 2.1.0
 Bump rationale: MINOR. Principle VIII changed from "container-bound" to "standalone project
 that opens the sheet by ID (SPREADSHEET_ID script property)". The bound project already
 hosts the LINE bot "แมวส้ม" (doGet/doPost, deployed as anonymous). Sharing that project would
@@ -115,6 +117,7 @@ Follow-up TODOs: none.
   - `.gs` ฝั่ง server: `Code.gs` (entry point: `doGet` และฟังก์ชันที่ UI เรียก), ไฟล์ domain (กฎธุรกิจที่ไม่มี I/O), และไฟล์ data-access (อ่านและเขียนชีต)
   - `.html` ฝั่ง UI: `Index.html` และไฟล์ partial ที่ include เข้ามา เช่น `Styles.html`, `Scripts.html`, และ component ที่ใช้ซ้ำ
 - ห้ามใช้ backend หรือ hosting ภายนอก และห้ามเก็บข้อมูลไว้นอก Google Workspace
+  - ข้อยกเว้นเดียว: **หน้าทางเข้า (entry page) แบบ static บน GitHub Pages** (`docs/index.html`) ที่มีแค่ลิงก์หรือพาไปยัง URL ของ Apps Script web app ได้ โดยต้องไม่มีข้อมูล ไม่มี Spreadsheet ID ไม่เรียก API และไม่ฝังแอปไว้ใน iframe
 - เครื่องมือสำหรับพัฒนาบนเครื่อง (`clasp`, ตัวรันเทสต์บน Node, Playwright) ใช้ได้ เพราะไม่ใช่ส่วนหนึ่งของแอปที่ deploy และไม่ได้รับข้อมูลจริง
 - กราฟเขียนด้วย SVG/CSS ล้วน หรือใช้ library เดียวผ่าน CDN ที่ล็อกเวอร์ชันไว้
 - UI เป็นภาษาไทย และต้องใช้งานบนมือถือได้
@@ -284,4 +287,4 @@ Follow-up TODOs: none.
 - ทุก plan และทุก review ต้องตรวจว่าเป็นไปตาม constitution นี้ ความซับซ้อนที่ไม่มีเหตุผลรองรับจะทำให้รวมงานไม่ได้
 - คำแนะนำสำหรับ agent อยู่ใน `CLAUDE.md` และต้องสอดคล้องกับเอกสารนี้เสมอ
 
-**Version**: 2.1.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-11
+**Version**: 2.1.1 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-11
