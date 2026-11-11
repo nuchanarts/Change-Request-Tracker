@@ -95,3 +95,11 @@ describe('day math', () => {
     expect(D.inRange(null, r)).toBe(false);
   });
 });
+
+describe('formatThaiLong (hero greeting)', () => {
+  it('shows weekday, full month and Buddhist year', () => {
+    expect(D.formatThaiLong(d(2026, 11, 11))).toBe('วันพุธที่ 11 พฤศจิกายน 2569');
+    expect(D.formatThaiLong(d(2027, 1, 3))).toBe('วันอาทิตย์ที่ 3 มกราคม 2570');
+    expect(D.formatThaiLong(null)).toBe('');
+  });
+});
