@@ -1,0 +1,40 @@
+{
+  "name": "bgs-ehp-change-request-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Google Apps Script web app to record and monitor EHP/NHIP/INV change requests",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "lint": "eslint . && prettier --check \"src/**/*.{js,json}\" \"tests/**/*.js\" \"scripts/**/*.mjs\"",
+    "format": "prettier --write \"src/**/*.{js,json}\" \"tests/**/*.js\" \"scripts/**/*.mjs\"",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/build.mjs --preview && node scripts/serve.mjs",
+    "test:e2e": "node scripts/build.mjs --preview && playwright test",
+    "clasp:create-test": "clasp create --type standalone --title \"[TEST] EHP Change Request Tracker\" --rootDir dist && node -e \"require('fs').renameSync('.clasp.json','.clasp.test.json')\"",
+    "push:test": "node scripts/build.mjs --with-integration && node scripts/check-clasp-target.mjs .clasp.test.json && clasp -P .clasp.test.json push --force",
+    "push:prod": "node scripts/build.mjs && node scripts/check-clasp-target.mjs .clasp.prod.json --prod && clasp -P .clasp.prod.json push --force",
+    "clasp:create-prod": "node scripts/build.mjs && clasp create --type standalone --title \"EHP Change Request Tracker\" --rootDir dist && node -e \"require('fs').renameSync('.clasp.json','.clasp.prod.json')\"",
+    "deploy:prod": "clasp -P .clasp.prod.json create-deployment",
+    "deployments:prod": "clasp -P .clasp.prod.json list-deployments"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@eslint/js": "^9.39.5",
+    "@google/clasp": "^3.4.1",
+    "@playwright/test": "^1.65.0",
+    "@types/google-apps-script": "^2.0.15",
+    "@vitest/coverage-v8": "^3.2.7",
+    "eslint": "^9.39.5",
+    "globals": "^17.14.0",
+    "prettier": "^3.9.10",
+    "typescript": "^7.0.2",
+    "vitest": "^3.2.7"
+  },
+  "type": "module"
+}

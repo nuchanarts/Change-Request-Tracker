@@ -1,0 +1,468 @@
+<script>
+  /* App: state store, router, API client and event handling. */
+  (function () {
+    'use strict';
+    var D = Domain;
+    var KEYS = { filters: 'ehp.filters.v1', tour: 'ehp.tour.v1', name: 'ehp.myname.v1', tab: 'ehp.mytab.v1' };
+    var EMPTY_FILTERS = { platform: '', pm: '', developer: '', urgency: '', from: '', to: '' };
+
+    function store(key, value) {
+      try {
+        if (value === undefined) return JSON.parse(localStorage.getItem(key) || 'null');
+        localStorage.setItem(key, JSON.stringify(value));
+      } catch (e) {
+        return null; // storage unavailable (private mode): app still works, just doesn't remember
+      }
+      return value;
+    }
+
+    var state = {
+      phase: 'loading',
+      error: null,
+      rows: [],
+      byId: {},
+      options: null,
+      user: null,
+      today: null,
+      schema: { ok: true, missing: [] },
+      loadedAt: '',
+      filters: Object.assign({}, EMPTY_FILTERS, store(KEYS.filters) || {}),
+      drill: null,
+      drills: {},
+      itemsQuery: '',
+      itemsState: 'open',
+      itemsPage: 0,
+      sort: { key: 'due', dir: 1 },
+      myTab: store(KEYS.tab) || 'developer',
+      choosingName: false,
+      formErrors: null,
+      formWarnings: null,
+      formDraft: null,
+      formAlert: null,
+      tourStep: null,
+    };
+
+    state.registerDrill = function (title, ids) {
+      var key = 'd' + Object.keys(state.drills).length;
+      state.drills[key] = { title: title, ids: ids.slice() };
+      return key;
+    };
+    state.myName = function () {
+      return (state.user && state.user.name) || store(KEYS.name) || '';
+    };
+    state.domainFilters = function () {
+      var f = state.filters;
+      var one = function (v) { return v ? [v] : []; };
+      var from = D.parseDate(f.from);
+      var to = D.parseDate(f.to);
+      return {
+        platform: one(f.platform), pm: one(f.pm), developer: one(f.developer), urgency: one(f.urgency),
+        dateFrom: from.issue ? null : from.date, dateTo: to.issue ? null : to.date,
+      };
+    };
+    state.filteredRows = function () {
+      return D.applyFilters(state.rows, state.domainFilters());
+    };
+    state.itemRows = function () {
+      var list = state.drill
+        ? D.applyFilters(state.rows, { ids: state.drill.ids })
+        : D.applyFilters(state.rows, Object.assign(state.domainFilters(), { state: state.itemsState === 'all' ? null : state.itemsState }));
+      list = D.search(list, state.itemsQuery);
+      return sortRows(list);
+    };
+
+    function sortRows(list) {
+      var k = state.sort.key;
+      var dir = state.sort.dir;
+      var val = function (r) {
+        if (k === 'due') return r.effectiveDue ? r.effectiveDue.y * 10000 + r.effectiveDue.m * 100 + r.effectiveDue.d : 99999999;
+        if (k === 'seq') return r.seq === null ? 1e9 : r.seq;
+        if (k === 'status') return D.statusRank(r.status);
+        if (k === 'urgency') return ['ด่วนที่สุด', 'ด่วน', 'ปกติ'].indexOf(r.urgency) + 1 || 9;
+        return r[k] || '￿';
+      };
+      return list.slice().sort(function (a, b) {
+        var x = val(a);
+        var y = val(b);
+        return (x < y ? -1 : x > y ? 1 : (a.seq || 0) - (b.seq || 0)) * dir;
+      });
+    }
+
+    // ------------------------------------------------------------------ API
+
+    function api(name, arg) {
+      return new Promise(function (resolve) {
+        google.script.run
+          .withSuccessHandler(function (res) {
+            resolve(res || { ok: false, code: 'ERROR', message: 'ไม่ได้รับข้อมูลจากเซิร์ฟเวอร์' });
+          })
+          .withFailureHandler(function (err) {
+            console.error(name, err);
+            resolve({ ok: false, code: 'ERROR', message: 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่' });
+          })[name](arg);
+      });
+    }
+
+    function load() {
+      state.phase = state.rows.length ? 'refreshing' : 'loading';
+      if (state.phase === 'loading') render();
+      return api('Api_bootstrap').then(function (res) {
+        if (!res.ok) {
+          state.phase = 'error';
+          state.error = res.message;
+          return render();
+        }
+        var b = res.data;
+        state.today = b.today;
+        state.user = b.user;
+        state.options = b.options;
+        state.schema = b.schema;
+        state.loadedAt = b.loadedAt;
+        var rows = b.rows.map(function (r) { return D.enrich(r, b.today); });
+        var seqCounts = D.countSeq(rows);
+        state.byId = {};
+        rows.forEach(function (r) {
+          r.issues = D.detectIssues(r, b.options, seqCounts);
+          // duplicate ลำดับ must not share an id, or links/moves could hit the wrong row
+          if (r.seq !== null && seqCounts[r.seq] > 1) r.id = 'row:' + r.rowNumber;
+          state.byId[r.id] = r;
+        });
+        state.rows = rows;
+        state.phase = 'ready';
+        document.getElementById('sheet-name').textContent = b.spreadsheetName;
+        document.getElementById('nav-add').hidden = !(b.user.canEdit && b.schema.ok);
+        render();
+        if (!store(KEYS.tour)) startTour();
+      });
+    }
+
+    // ------------------------------------------------------------------ router & render
+
+    function route() {
+      var h = (location.hash || '#/monitor').slice(2).split('/');
+      return { name: h[0] || 'monitor', id: h[1] ? decodeURIComponent(h[1]) : null };
+    }
+
+    function render() {
+      var main = document.getElementById('main');
+      var r = route();
+      document.querySelectorAll('.nav a').forEach(function (a) {
+        var active = a.getAttribute('data-route') === r.name;
+        if (active) a.setAttribute('aria-current', 'page');
+        else a.removeAttribute('aria-current');
+      });
+      if (state.phase === 'loading') return (main.innerHTML = UI.loading('กำลังโหลดข้อมูลจากชีต…'));
+      if (state.phase === 'error') return (main.innerHTML = UI.errorState(state.error, 'reload'));
+      state.drills = {};
+      var html;
+      if (r.name === 'items' && r.id) {
+        var row = state.byId[r.id];
+        html = row ? Views.form(state, 'edit', row) : UI.emptyState('ไม่พบรายการนี้', 'รายการอาจถูกเปลี่ยนเลขลำดับในชีต ลองโหลดข้อมูลใหม่', '<a class="btn" href="#/items">กลับไปที่รายการทั้งหมด</a>');
+      } else if (r.name === 'items') html = Views.items(state);
+      else if (r.name === 'new') html = Views.form(state, 'new', null);
+      else if (r.name === 'my-work') html = Views.myWork(state);
+      else if (r.name === 'kanban') html = Views.kanban(state);
+      else if (r.name === 'help') html = Views.help(state);
+      else html = Views.monitor(state);
+      if (state.tourStep !== null) html += Views.tour(state.tourStep);
+      main.innerHTML = html;
+    }
+
+    function go(hash) {
+      if (location.hash === hash) render();
+      else location.hash = hash;
+    }
+
+    function resetForm() {
+      state.formErrors = state.formWarnings = state.formDraft = state.formAlert = null;
+    }
+
+    window.addEventListener('hashchange', function () {
+      resetForm();
+      render();
+      document.getElementById('main').focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+    });
+
+    // ------------------------------------------------------------------ form helpers
+
+    function todaySheet() {
+      return D.formatDate(state.today);
+    }
+
+    /** Read the form into sheet-format strings; unchanged-but-different-looking values keep the original. */
+    function collect(form, original) {
+      var out = {};
+      D.COLUMNS.forEach(function (c) {
+        if (c.key === 'seq') return;
+        var el = form.elements[c.key];
+        if (!el) return;
+        var v = el.value.trim();
+        var orig = original ? original[c.key] || '' : '';
+        if (c.type === 'date') {
+          var origCell = D.parseDate(orig);
+          var typed = D.parseDate(v);
+          if (!v) v = origCell.issue ? orig : ''; // untouched unparseable value stays as-is
+          else if (typed.date && !typed.issue) {
+            // same date written differently (05/01 vs 5/1) is not a change; otherwise normalize to d/m/yyyy
+            v = origCell.date && !origCell.issue && D.compareDate(origCell.date, typed.date) === 0 ? orig : D.formatDate(typed.date);
+          } // invalid text is kept so validation can point at it
+        }
+        out[c.key] = v;
+      });
+      return out;
+    }
+
+    function failMessage(res) {
+      if (res.code === 'VALIDATION') {
+        state.formErrors = (res.details && res.details.fields) || {};
+        return UI.toast(res.message, 'error');
+      }
+      var reload = res.code === 'CONFLICT' || res.code === 'SEQ_MISMATCH' || res.code === 'NOT_FOUND';
+      state.formAlert = { message: res.message, reload: reload };
+      if (res.code === 'CONFLICT' && res.details) {
+        state.formAlert.message += ' (ช่องที่ถูกแก้: ' + Object.keys(res.details).map(function (k) {
+          return D.COLUMN_BY_KEY[k] ? D.COLUMN_BY_KEY[k].header + ' = "' + res.details[k].actual + '"' : k;
+        }).join(', ') + ')';
+      }
+    }
+
+    function submitForm(form) {
+      var mode = form.getAttribute('data-mode');
+      var r = route();
+      var row = mode === 'edit' ? state.byId[r.id] : null;
+      var values = collect(form, row ? row.raw : null);
+      state.formDraft = values;
+      state.formAlert = null;
+      var btn = document.getElementById('save-btn');
+      if (mode === 'new') {
+        var v = D.validateCreate(values, state.options);
+        state.formErrors = v.errors;
+        state.formWarnings = v.warnings;
+        if (!v.ok) {
+          render();
+          return focusFirstError();
+        }
+        btn.disabled = true;
+        btn.textContent = 'กำลังบันทึก…';
+        return api('Api_createRequest', values).then(function (res) {
+          if (!res.ok) {
+            failMessage(res);
+            return render();
+          }
+          UI.toast('บันทึกรายการใหม่แล้ว ลำดับที่ ' + res.data.seq);
+          resetForm();
+          return load().then(function () { go('#/items/' + res.data.seq); });
+        });
+      }
+      var changes = D.diffChanges(row.raw, values);
+      if (!Object.keys(changes).length) return UI.toast('ยังไม่มีช่องไหนเปลี่ยน');
+      var vu = D.validateUpdate(changes, row.raw, state.options);
+      state.formErrors = vu.errors;
+      state.formWarnings = vu.warnings;
+      if (!vu.ok) {
+        render();
+        return focusFirstError();
+      }
+      return saveChanges(row, changes, btn);
+    }
+
+    function saveChanges(row, changes, btn) {
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'กำลังบันทึก…';
+      }
+      return api('Api_updateRequest', { rowNumber: row.rowNumber, seq: row.seq, changes: changes }).then(function (res) {
+        if (!res.ok) {
+          failMessage(res);
+          render();
+          if (!btn) UI.toast(res.message, 'error');
+          return false;
+        }
+        UI.toast('บันทึกการแก้ไขแล้ว (' + res.data.written.map(function (k) { return D.COLUMN_BY_KEY[k].header; }).join(', ') + ')');
+        resetForm();
+        return load().then(function () { return true; });
+      });
+    }
+
+    /** Change one item's status (My Work quick action and Kanban); same safe-write path as the form. */
+    function moveStatus(id, to) {
+      var row = state.byId[id];
+      if (!row || row.status === to) return;
+      if (!state.user.canEdit) return UI.toast('บัญชีนี้มีสิทธิ์ดูอย่างเดียว', 'error');
+      var changes = { status: { from: row.raw.status, to: to } };
+      if (to === D.DONE && !row.doneDate.date) changes.doneDate = { from: row.raw.doneDate, to: todaySheet() };
+      return saveChanges(row, changes, null);
+    }
+
+    function focusFirstError() {
+      var el = document.querySelector('[aria-invalid="true"]');
+      if (el) el.focus();
+    }
+
+    // ------------------------------------------------------------------ tour
+
+    function startTour() {
+      state.tourStep = 0;
+      render();
+    }
+    function endTour() {
+      state.tourStep = null;
+      store(KEYS.tour, true);
+      render();
+    }
+
+    // ------------------------------------------------------------------ events
+
+    var actions = {
+      reload: function () { load(); },
+      'reload-item': function () { resetForm(); load(); },
+      drill: function (el) {
+        state.drill = state.drills[el.getAttribute('data-drill')];
+        state.itemsPage = 0;
+        state.itemsQuery = '';
+        go('#/items');
+      },
+      'clear-drill': function () { state.drill = null; render(); },
+      'clear-filters': function () {
+        state.filters = Object.assign({}, EMPTY_FILTERS);
+        store(KEYS.filters, state.filters);
+        render();
+      },
+      'items-state': function (el) { state.itemsState = el.getAttribute('data-value'); state.itemsPage = 0; render(); },
+      sort: function (el) {
+        var k = el.getAttribute('data-key');
+        state.sort = { key: k, dir: state.sort.key === k ? -state.sort.dir : 1 };
+        render();
+      },
+      page: function (el) { state.itemsPage += Number(el.getAttribute('data-dir')); render(); window.scrollTo(0, 0); },
+      'open-item': function (el, ev) {
+        if (ev.target.closest('a')) return;
+        go('#/items/' + encodeURIComponent(el.getAttribute('data-id')));
+      },
+      'cancel-item': function () {
+        var row = state.byId[route().id];
+        UI.confirm('ยกเลิกรายการ #' + row.seq + '?', 'ระบบจะเปลี่ยนสถานะเป็น "0.ยกเลิก" แถวในชีตยังอยู่ และย้อนกลับได้โดยเปลี่ยนสถานะใหม่', 'ยกเลิกรายการ', true).then(function (yes) {
+          if (yes) saveChanges(row, { status: { from: row.raw.status, to: D.CANCELLED } }, null);
+        });
+      },
+      tab: function (el) { state.myTab = el.getAttribute('data-tab'); store(KEYS.tab, state.myTab); render(); },
+      'change-name': function () { state.choosingName = true; render(); },
+      'quick-status': function (el) {
+        el.disabled = true;
+        el.textContent = 'กำลังบันทึก…';
+        moveStatus(el.getAttribute('data-id'), el.getAttribute('data-to'));
+      },
+      kmove: function (el) {
+        el.disabled = true;
+        moveStatus(el.getAttribute('data-id'), el.getAttribute('data-to'));
+      },
+      'date-today': function (el) {
+        var input = document.getElementById(el.getAttribute('data-target'));
+        input.value = todaySheet();
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      },
+      'tour-start': startTour,
+      'tour-next': function () {
+        if (state.tourStep >= Views.TOUR_STEPS - 1) return endTour();
+        state.tourStep++;
+        render();
+      },
+      'tour-skip': endTour,
+    };
+
+    document.addEventListener('click', function (ev) {
+      var el = ev.target.closest('[data-action]');
+      if (!el || !actions[el.getAttribute('data-action')]) return;
+      if (el.tagName === 'A') ev.preventDefault();
+      actions[el.getAttribute('data-action')](el, ev);
+    });
+
+    document.addEventListener('change', function (ev) {
+      var form = ev.target.form;
+      if (form && form.id === 'filters') {
+        ['platform', 'pm', 'developer', 'urgency', 'from', 'to'].forEach(function (k) { state.filters[k] = form.elements[k].value; });
+        store(KEYS.filters, state.filters);
+        state.itemsPage = 0;
+        render();
+      } else if (form && form.id === 'item-form' && ev.target.name === 'status' && ev.target.value === D.DONE) {
+        var done = form.elements.doneDate;
+        if (done && !done.value) {
+          done.value = todaySheet();
+          UI.toast('ใส่วันที่เสร็จเป็นวันนี้ให้แล้ว แก้ได้ถ้าไม่ใช่');
+        }
+      }
+    });
+
+    var searchTimer = null;
+    document.addEventListener('input', function (ev) {
+      if (ev.target.id !== 'q') return;
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(function () {
+        state.itemsQuery = ev.target.value;
+        state.itemsPage = 0;
+        var pos = ev.target.selectionStart;
+        render();
+        var q = document.getElementById('q');
+        q.focus();
+        q.setSelectionRange(pos, pos);
+      }, 150);
+    });
+
+    document.addEventListener('submit', function (ev) {
+      var form = ev.target;
+      if (form.id === 'item-form') {
+        ev.preventDefault();
+        submitForm(form);
+      } else if (form.id === 'name-form') {
+        ev.preventDefault();
+        var name = form.elements.myname.value;
+        if (!name) return UI.toast('กรุณาเลือกชื่อของคุณ', 'error');
+        store(KEYS.name, name);
+        state.choosingName = false;
+        if (state.user) state.user.name = name;
+        render();
+        api('Api_setMyName', name).then(function (res) {
+          if (!res.ok && res.code !== 'FORBIDDEN') UI.toast(res.message, 'error');
+        });
+      }
+    });
+
+    // Kanban drag & drop (buttons ◀ ▶ are the keyboard/touch alternative)
+    document.addEventListener('dragstart', function (ev) {
+      var card = ev.target.closest && ev.target.closest('.kcard[draggable="true"]');
+      if (!card) return;
+      ev.dataTransfer.setData('text/plain', card.getAttribute('data-id'));
+      ev.dataTransfer.effectAllowed = 'move';
+      card.classList.add('dragging');
+    });
+    document.addEventListener('dragend', function (ev) {
+      if (ev.target.classList) ev.target.classList.remove('dragging');
+      document.querySelectorAll('.kcol.drop-target').forEach(function (c) { c.classList.remove('drop-target'); });
+    });
+    document.addEventListener('dragover', function (ev) {
+      var col = ev.target.closest && ev.target.closest('.kcol');
+      if (!col) return;
+      ev.preventDefault();
+      document.querySelectorAll('.kcol.drop-target').forEach(function (c) { if (c !== col) c.classList.remove('drop-target'); });
+      col.classList.add('drop-target');
+    });
+    document.addEventListener('drop', function (ev) {
+      var col = ev.target.closest && ev.target.closest('.kcol');
+      if (!col) return;
+      ev.preventDefault();
+      col.classList.remove('drop-target');
+      moveStatus(ev.dataTransfer.getData('text/plain'), col.getAttribute('data-status'));
+    });
+
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && state.tourStep !== null) endTour();
+      if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('tr[data-action]')) {
+        ev.preventDefault();
+        actions['open-item'](ev.target, ev);
+      }
+    });
+
+    load();
+  })();
+</script>

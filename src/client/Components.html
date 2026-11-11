@@ -1,0 +1,196 @@
+<script>
+  /* Shared UI components (constitution XI). Each returns an HTML string; all text is escaped. */
+  var UI = (function () {
+    'use strict';
+    var D = Domain;
+
+    function esc(v) {
+      return String(v === null || v === undefined ? '' : v)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function statusClass(status) {
+      var s = String(status || '').trim();
+      if (s === D.DONE) return 's-done';
+      if (!D.isOpen(s)) return 's-closed';
+      if (s === 'ส่งกลับนักพัฒนาแก้ไข') return 's-back';
+      if (s === 'กำลังทดสอบ' || s === 'รอ PM ตรวจสอบ Taiga') return 's-test';
+      if (s === 'กำลังพัฒนา' || s === '0.จัดทำไฟล์แก้ไข' || s === 'รอ compile' || s === 'รอ Complie ต้องแจ้งอจ.') return 's-dev';
+      return 's-wait';
+    }
+
+    function statusBadge(status) {
+      var s = String(status || '').trim();
+      return '<span class="badge ' + statusClass(s) + '">' + esc(s || '(ไม่ระบุสถานะ)') + '</span>';
+    }
+
+    function urgency(u) {
+      var cls = u === 'ด่วนที่สุด' ? 'urg-top' : u === 'ด่วน' ? 'urg-high' : '';
+      return u ? '<span class="' + cls + '">' + esc(u) + '</span>' : '<span class="muted">–</span>';
+    }
+
+    /** Due date text with overdue/today emphasis (never color alone: the words carry the meaning). */
+    function due(r, today) {
+      if (!r.effectiveDue) return '<span class="muted">ไม่มีกำหนด</span>';
+      var label = D.formatThai(r.effectiveDue);
+      var moved = r.postponedDate && r.postponedDate.date ? ' <span class="muted">(เลื่อน)</span>' : '';
+      if (!r.isOpen) return esc(label) + moved;
+      var diff = D.daysBetween(today, r.effectiveDue);
+      if (diff < 0) return '<span class="due-over">' + esc(label) + ' · เกิน ' + -diff + ' วัน</span>' + moved;
+      if (diff === 0) return '<span class="due-today">' + esc(label) + ' · วันนี้</span>' + moved;
+      return esc(label) + ' <span class="muted">(อีก ' + diff + ' วัน)</span>' + moved;
+    }
+
+    function ticket(r) {
+      if (!r.ticket) return '';
+      if (r.ticketUrl) return '<a href="' + esc(r.ticketUrl) + '" target="_blank" rel="noopener">Taiga/MANTIS</a>';
+      return '<span>#' + esc(r.ticket) + '</span>';
+    }
+
+    function helpTip(text) {
+      return '<span class="tip" tabindex="0" role="note" aria-label="' + esc(text) + '">i<span class="tip-body" aria-hidden="true">' + esc(text) + '</span></span>';
+    }
+
+    function emptyState(title, text, actionHtml) {
+      return '<div class="empty"><h2>' + esc(title) + '</h2><p>' + esc(text) + '</p>' + (actionHtml || '') + '</div>';
+    }
+
+    function loading(text) {
+      return '<div class="loading"><div class="spinner" aria-hidden="true"></div>' + esc(text || 'กำลังโหลด…') + '</div>';
+    }
+
+    function errorState(message, retryAction) {
+      return (
+        '<div class="empty" role="alert"><h2>โหลดข้อมูลไม่สำเร็จ</h2><p>' + esc(message) + '</p>' +
+        (retryAction ? '<button class="btn primary" data-action="' + esc(retryAction) + '">ลองอีกครั้ง</button>' : '') +
+        '</div>'
+      );
+    }
+
+    /** Select field. opts: {name,label,options,value,required,hint,error,warn,disabled,allowEmpty,emptyLabel} */
+    function select(o) {
+      var list = (o.options || []).slice();
+      var cur = o.value || '';
+      var extra = cur && list.indexOf(cur) === -1;
+      var html = '<select id="f-' + esc(o.name) + '" name="' + esc(o.name) + '"' + (o.required ? ' required' : '') +
+        (o.disabled ? ' disabled' : '') + (o.error ? ' aria-invalid="true"' : '') + ' aria-describedby="h-' + esc(o.name) + '">';
+      if (o.allowEmpty !== false) html += '<option value="">' + esc(o.emptyLabel || '— เลือก —') + '</option>';
+      if (extra) html += '<option value="' + esc(cur) + '" selected>' + esc(cur) + ' (ค่าเดิม ไม่อยู่ในรายการ)</option>';
+      var opt = function (v, label) {
+        return '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(label || v) + '</option>';
+      };
+      if (o.groups) {
+        // groups: [{label, options:[{value,label}]}] — labels may differ, values stay exact (constitution III)
+        o.groups.forEach(function (g) {
+          html += '<optgroup label="' + esc(g.label) + '">' + g.options.map(function (x) { return opt(x.value, x.label); }).join('') + '</optgroup>';
+        });
+      } else {
+        list.forEach(function (v) { html += opt(v); });
+      }
+      html += '</select>';
+      return fieldWrap(o, html, extra ? 'ค่าเดิมไม่อยู่ในรายการตัวเลือก กรุณาเลือกค่าที่ถูกต้อง' : '');
+    }
+
+    /** Status options in workflow order: numbered open steps, then the closing statuses. */
+    function statusGroups() {
+      var open = D.WORKFLOW.filter(function (s) { return D.isOpen(s); });
+      var closed = D.WORKFLOW.filter(function (s) { return !D.isOpen(s); });
+      return [
+        { label: 'ขั้นตอนงาน (เรียงตามลำดับ)', options: open.map(function (s, i) { return { value: s, label: (i + 1) + ') ' + s }; }) },
+        { label: 'ปิดงาน', options: closed.map(function (s) { return { value: s, label: s }; }) },
+      ];
+    }
+
+    function fieldWrap(o, control, autoWarn) {
+      return (
+        '<div class="field' + (o.wide ? ' wide' : '') + '"><label for="f-' + esc(o.name) + '">' + esc(o.label) +
+        (o.required ? ' <span class="req" aria-hidden="true">*</span>' : '') + (o.tip ? ' ' + helpTip(o.tip) : '') + '</label>' +
+        control +
+        '<div id="h-' + esc(o.name) + '">' +
+        (o.hint ? '<div class="hint">' + esc(o.hint) + '</div>' : '') +
+        (o.error ? '<div class="err">' + esc(o.error) + '</div>' : '') +
+        (o.warn || autoWarn ? '<div class="warn">' + esc(o.warn || autoWarn) + '</div>' : '') +
+        '</div></div>'
+      );
+    }
+
+    function input(o) {
+      var attrs = ' id="f-' + esc(o.name) + '" name="' + esc(o.name) + '" type="' + (o.type || 'text') + '" value="' + esc(o.value || '') + '"' +
+        (o.required ? ' required' : '') + (o.readonly ? ' readonly' : '') + (o.list ? ' list="' + esc(o.list) + '"' : '') +
+        (o.inputmode ? ' inputmode="' + o.inputmode + '"' : '') + (o.placeholder ? ' placeholder="' + esc(o.placeholder) + '"' : '') +
+        (o.error ? ' aria-invalid="true"' : '') + ' aria-describedby="h-' + esc(o.name) + '" autocomplete="off"';
+      return fieldWrap(o, '<input' + attrs + ' />');
+    }
+
+    function textarea(o) {
+      return fieldWrap(
+        o,
+        '<textarea id="f-' + esc(o.name) + '" name="' + esc(o.name) + '"' + (o.required ? ' required' : '') + (o.readonly ? ' readonly' : '') +
+          (o.error ? ' aria-invalid="true"' : '') + ' aria-describedby="h-' + esc(o.name) + '">' + esc(o.value || '') + '</textarea>',
+      );
+    }
+
+    /** Combobox for ระบบงาน: pick from the list or type a new value (constitution III / Data Contract). */
+    function combobox(o) {
+      var id = 'dl-' + o.name;
+      var dl = '<datalist id="' + esc(id) + '">' + (o.options || []).map(function (v) {
+        return '<option value="' + esc(v) + '"></option>';
+      }).join('') + '</datalist>';
+      return input(Object.assign({}, o, { list: id })).replace('</div></div>', '</div>' + dl + '</div>');
+    }
+
+    /**
+     * Date field in the sheet's own format d/m/yyyy (C.E.). A text box avoids the browser's
+     * locale-dependent date picker (mm/dd vs dd/mm confusion). Includes a "วันนี้" shortcut.
+     */
+    function dateField(o) {
+      var cell = D.parseDate(o.value);
+      var warn = cell.issue === 'DATE_UNPARSEABLE' ? 'ค่าเดิมในชีตอ่านเป็นวันที่ไม่ได้: "' + cell.raw + '" (จะไม่ถูกแก้ ถ้าไม่กรอกวันที่ใหม่)' :
+        cell.issue === 'DATE_BUDDHIST_YEAR' ? 'ค่าเดิมใช้ปี พ.ศ.: "' + cell.raw + '" ถ้ากรอกวันที่ใหม่ ระบบจะบันทึกเป็น ค.ศ.' : '';
+      var html = input(Object.assign({}, o, {
+        type: 'text', inputmode: 'numeric', placeholder: 'วว/ดด/ปปปป เช่น 16/4/2026',
+        value: cell.date && !cell.issue ? cell.raw.trim() : '', warn: o.warn || warn,
+      }));
+      if (o.readonly || o.disabled) return html;
+      var btn = '<button type="button" class="btn small" data-action="date-today" data-target="f-' + esc(o.name) + '" aria-label="ใส่วันนี้ในช่อง ' + esc(o.label) + '">วันนี้</button>';
+      return html.replace(/(<input[^>]*\/>)/, '<div style="display:flex;gap:6px">$1' + btn + '</div>');
+    }
+
+    function toast(message, type) {
+      var host = document.getElementById('toasts');
+      var el = document.createElement('div');
+      el.className = 'toast' + (type === 'error' ? ' error' : '');
+      el.textContent = message;
+      host.appendChild(el);
+      setTimeout(function () { el.remove(); }, type === 'error' ? 8000 : 4000);
+    }
+
+    /** Promise-based confirm dialog using <dialog>. */
+    function confirm(title, text, okLabel, danger) {
+      return new Promise(function (resolve) {
+        var dlg = document.getElementById('dialog');
+        dlg.innerHTML = '<h2>' + esc(title) + '</h2><p style="margin-top:8px">' + esc(text) + '</p>' +
+          '<div class="dialog-actions"><button class="btn" value="no">ยกเลิก</button><button class="btn ' + (danger ? 'danger' : 'primary') + '" value="yes">' + esc(okLabel) + '</button></div>';
+        dlg.querySelectorAll('button').forEach(function (b) {
+          b.addEventListener('click', function () { dlg.close(b.value); });
+        });
+        dlg.addEventListener('close', function onClose() {
+          dlg.removeEventListener('close', onClose);
+          resolve(dlg.returnValue === 'yes');
+        });
+        dlg.showModal();
+      });
+    }
+
+    return {
+      esc: esc, statusBadge: statusBadge, statusClass: statusClass, urgency: urgency, due: due, ticket: ticket,
+      helpTip: helpTip, emptyState: emptyState, loading: loading, errorState: errorState,
+      select: select, statusGroups: statusGroups, input: input, textarea: textarea, combobox: combobox, dateField: dateField,
+      toast: toast, confirm: confirm,
+    };
+  })();
+</script>
