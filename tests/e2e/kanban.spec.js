@@ -67,3 +67,22 @@ test.describe('US8 Kanban board', () => {
     await expect(page.locator('.kcard[draggable="true"]')).toHaveCount(0);
   });
 });
+
+test.describe('Kanban navigation and collapse (2026-11-11)', () => {
+  test('jump bar on top scrolls to a column; columns can be collapsed and remembered', async ({ page }) => {
+    await open(page, '/#/kanban');
+    await expect(page.locator('.kjump')).toBeVisible();
+    const bar = await page.locator('.kjump').boundingBox();
+    const board = await page.locator('.board').boundingBox();
+    expect(bar.y).toBeLessThan(board.y); // navigation sits above the board
+    await page.locator('.kjump-chip', { hasText: 'รอ Complie' }).click();
+    await expect(page.locator('.kcol[data-status="รอ Complie ต้องแจ้งอจ."]')).toBeInViewport();
+    await page.getByRole('button', { name: 'ยุบคอลัมน์ กำลังพัฒนา' }).click();
+    await expect(page.locator('.kcol[data-status="กำลังพัฒนา"]')).toHaveClass(/collapsed/);
+    await expect(page.locator('.kcol[data-status="กำลังพัฒนา"] .kcard')).toHaveCount(0);
+    await page.reload();
+    await expect(page.locator('.kcol[data-status="กำลังพัฒนา"]')).toHaveClass(/collapsed/);
+    await page.getByRole('button', { name: 'ขยายคอลัมน์ กำลังพัฒนา' }).click();
+    await expect(page.locator('.kcol[data-status="กำลังพัฒนา"] .kcard').first()).toBeVisible();
+  });
+});

@@ -34,6 +34,7 @@
       itemsPage: 0,
       sort: { key: 'due', dir: 1 },
       myTab: store(KEYS.tab) || 'developer',
+      kanbanCollapsed: store('ehp.kcollapsed.v1') || {},
       choosingName: false,
       formErrors: null,
       formWarnings: null,
@@ -47,6 +48,29 @@
       state.drills[key] = { title: title, ids: ids.slice() };
       return key;
     };
+    var COLS_KEY = 'ehp.itemcols.v1';
+    /** Column order for the items table: saved order (known keys only) + any new columns, else the default. */
+    state.itemCols = function () {
+      var def = Views.ITEM_COLS_DEFAULT;
+      var saved = store(COLS_KEY);
+      if (!Array.isArray(saved)) return def.slice();
+      var order = saved.filter(function (k) { return def.indexOf(k) !== -1; });
+      def.forEach(function (k) { if (order.indexOf(k) === -1) order.push(k); });
+      return order;
+    };
+    function saveCols(order) {
+      store(COLS_KEY, order);
+      render();
+    }
+    function moveCol(key, toIndex) {
+      var order = state.itemCols();
+      var from = order.indexOf(key);
+      if (from === -1 || toIndex < 0 || toIndex >= order.length) return;
+      order.splice(toIndex, 0, order.splice(from, 1)[0]);
+      saveCols(order);
+    }
+    state.moveCol = moveCol;
+
     state.myName = function () {
       return (state.user && state.user.name) || store(KEYS.name) || '';
     };
@@ -574,6 +598,39 @@
         closeCalendar();
       },
       back: back,
+      'cols-toggle': function () { state.colsOpen = !state.colsOpen; render(); },
+      'cols-move': function (el) {
+        var key = el.getAttribute('data-key');
+        moveCol(key, state.itemCols().indexOf(key) + Number(el.getAttribute('data-dir')));
+        var again = document.querySelector('.cols-move[data-key="' + key + '"][data-dir="' + el.getAttribute('data-dir') + '"]');
+        if (again && !again.disabled) again.focus();
+      },
+      'cols-reset': function () { saveCols(Views.ITEM_COLS_DEFAULT.slice()); },
+      kjump: function (el) {
+        var col = document.querySelector('.kcol[data-status="' + el.getAttribute('data-status').replace(/"/g, '\\"') + '"]');
+        if (col) col.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+      },
+      kscroll: function (el) {
+        var board = document.querySelector('.board');
+        if (board) board.scrollBy({ left: Number(el.getAttribute('data-dir')) * Math.max(300, board.clientWidth * 0.8), behavior: 'smooth' });
+      },
+      kcollapse: function (el) {
+        var key = el.getAttribute('data-status');
+        if (state.kanbanCollapsed[key]) delete state.kanbanCollapsed[key];
+        else state.kanbanCollapsed[key] = true;
+        store('ehp.kcollapsed.v1', state.kanbanCollapsed);
+        render();
+      },
+      'kcollapse-all': function () {
+        if (Object.keys(state.kanbanCollapsed).length) state.kanbanCollapsed = {};
+        else {
+          document.querySelectorAll('.kcol').forEach(function (c) {
+            if (c.querySelector('.kempty')) state.kanbanCollapsed[c.getAttribute('data-status')] = true;
+          });
+        }
+        store('ehp.kcollapsed.v1', state.kanbanCollapsed);
+        render();
+      },
       'request-access': function (el) {
         el.disabled = true;
         api('Api_requestAccess', { name: state.myName() }).then(function (res) {
@@ -708,6 +765,27 @@
         });
       }
     });
+
+    // Items table: drag a column header onto another to move it ("จัดคอลัมน์" is the keyboard/touch alternative)
+    var dragCol = null;
+    document.addEventListener('dragstart', function (ev) {
+      var th = ev.target.closest && ev.target.closest('th[data-col]');
+      if (!th) return;
+      dragCol = th.getAttribute('data-col');
+      ev.dataTransfer.setData('text/plain', 'col:' + dragCol);
+      ev.dataTransfer.effectAllowed = 'move';
+    });
+    document.addEventListener('dragover', function (ev) {
+      if (dragCol && ev.target.closest && ev.target.closest('th[data-col]')) ev.preventDefault();
+    });
+    document.addEventListener('drop', function (ev) {
+      var th = dragCol && ev.target.closest && ev.target.closest('th[data-col]');
+      if (!th) return;
+      ev.preventDefault();
+      moveCol(dragCol, state.itemCols().indexOf(th.getAttribute('data-col')));
+      dragCol = null;
+    });
+    document.addEventListener('dragend', function () { dragCol = null; });
 
     // Kanban drag & drop (buttons ◀ ▶ are the keyboard/touch alternative)
     document.addEventListener('dragstart', function (ev) {

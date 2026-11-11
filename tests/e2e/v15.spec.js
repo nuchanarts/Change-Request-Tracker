@@ -115,3 +115,27 @@ test('admins can repair dropdown chips', async ({ page }) => {
   await page.getByRole('button', { name: 'ซ่อมสี dropdown' }).click();
   await expect(page.locator('.toast')).toContainText('ซ่อมแล้ว 3 ช่อง');
 });
+
+test('My Work (developer): urgent and this week side by side, done this week, no "no due" section', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('ehp.myname.v1', JSON.stringify('นักพัฒนา แดง')));
+  await open(page, '/#/my-work');
+  await expect(page.locator('.mw-two > #mw-urgent')).toHaveCount(1);
+  await expect(page.locator('.mw-two > #mw-this')).toHaveCount(1);
+  await expect(page.locator('#mw-nodue')).toHaveCount(0);
+  await expect(page.locator('.mw-tile.good')).toHaveCount(1);
+});
+
+test('My Work (PM): "no due date" section belongs to the PM tab, no "done" encouragement', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('ehp.myname.v1', JSON.stringify('พีเอ็ม สมใจ'));
+    localStorage.setItem('ehp.mytab.v1', JSON.stringify('pm'));
+  });
+  await open(page, '/#/my-work');
+  await expect(page.locator('#mw-nodue')).toHaveCount(1);
+  await expect(page.locator('#mw-done')).toHaveCount(0);
+  await expect(page.locator('.mw-tile.plan')).toHaveCount(1);
+});

@@ -263,6 +263,33 @@
 
     // ------------------------------------------------------------------ Items (US5 + drill-down)
 
+    /** Column definitions for "รายการทั้งหมด" (order is configurable; default per user request 2026-11-11). */
+    var ITEM_COLS = {
+      seq: { label: 'ลำดับ', sort: 'seq', cell: function (r) { return '<td class="num" data-hide-mobile>' + esc(r.seq === null ? '–' : r.seq) + '</td>'; } },
+      platform: { label: 'แพลตฟอร์ม', sort: 'platform', cell: function (r) { return '<td class="platform-cell" data-hide-mobile><span class="kplat">' + esc(r.platform || '–') + '</span></td>'; } },
+      system: { label: 'ระบบงาน', sort: 'system', cell: function (r) { return '<td class="system-cell" data-hide-mobile>' + esc(r.system || '–') + '</td>'; } },
+      detail: {
+        label: 'รายละเอียด',
+        cell: function (r) {
+          return '<td class="detail-cell"><a href="#/items/' + encodeURIComponent(r.id) + '">' + esc(r.detail) + '</a>' +
+            '<div class="sub"><span class="mobile-only">#' + esc(r.seq === null ? '–' : r.seq) + ' / ' + esc(r.platform) + ' / ' + esc(r.system) + ' </span>' +
+            (r.issues.length ? '<span class="flag">ข้อมูลไม่ครบ/ผิดช่อง</span>' : '') + '</div></td>';
+        },
+      },
+      ticket: {
+        label: 'Taiga/MANTIS',
+        cell: function (r) {
+          return '<td class="ticket-cell">' + (r.ticketUrl ? UI.ticketLink(r) : r.ticket ? '<span class="num">#' + esc(r.ticket) + '</span>' : '<span class="muted">–</span>') + '</td>';
+        },
+      },
+      status: { label: 'สถานะ', sort: 'status', cell: function (r) { return '<td>' + UI.statusBadge(r.status) + '</td>'; } },
+      urgency: { label: 'ความเร่งด่วน', sort: 'urgency', cell: function (r) { return '<td data-hide-mobile>' + UI.urgency(r.urgency) + '</td>'; } },
+      developer: { label: 'นักพัฒนา', sort: 'developer', cell: function (r) { return '<td>' + esc(r.developer || '–') + '</td>'; } },
+      pm: { label: 'PM', sort: 'pm', cell: function (r) { return '<td data-hide-mobile>' + esc(r.pm) + '</td>'; } },
+      due: { label: 'กำหนดส่ง', sort: 'due', cell: function (r, state) { return '<td>' + UI.due(r, state.today) + '</td>'; } },
+    };
+    var ITEM_COLS_DEFAULT = ['seq', 'platform', 'system', 'detail', 'ticket', 'status', 'urgency', 'developer', 'pm', 'due'];
+
     var PAGE = 50;
     var STATES = [['open', 'งานค้าง'], ['overdue', 'เกินกำหนด'], ['closed', 'ปิดแล้ว'], ['all', 'ทั้งหมด']];
 
@@ -294,18 +321,23 @@
         var cur = state.sort.key === key;
         return '<th class="' + (cls || '') + '" aria-sort="' + (cur ? (state.sort.dir > 0 ? 'ascending' : 'descending') : 'none') + '"><button data-action="sort" data-key="' + key + '">' + label + (cur ? (state.sort.dir > 0 ? ' ▲' : ' ▼') : '') + '</button></th>';
       };
-      // Taiga/MANTIS has its own column (user request 2026-11-11) so testers find it without reading the detail
-      html += '<div class="table-wrap"><table class="responsive"><thead><tr>' + th('seq', 'ลำดับ') + '<th>รายละเอียด</th>' + th('system', 'ระบบงาน') + '<th>Taiga/MANTIS</th>' + th('status', 'สถานะ') + th('urgency', 'ความเร่งด่วน') +
-        th('developer', 'นักพัฒนา') + th('pm', 'PM') + th('due', 'กำหนดส่ง') + '</tr></thead><tbody>' +
+      // Columns are user-arrangeable (drag a header, or "จัดคอลัมน์"); the order is remembered per browser.
+      var order = state.itemCols();
+      html += '<div class="cols-bar"><button type="button" class="btn small" data-action="cols-toggle" aria-expanded="' + !!state.colsOpen + '">' + UI.withIcon('kanban', 'จัดคอลัมน์') + '</button>' +
+        '<span class="muted">ลากหัวคอลัมน์เพื่อย้ายตำแหน่งได้</span></div>';
+      if (state.colsOpen) {
+        html += '<div class="cols-panel" role="group" aria-label="จัดลำดับคอลัมน์">' + order.map(function (k, i) {
+          return '<span class="cols-item"><button type="button" class="cols-move" data-action="cols-move" data-key="' + k + '" data-dir="-1"' + (i === 0 ? ' disabled' : '') + ' aria-label="ย้าย ' + esc(ITEM_COLS[k].label) + ' ไปทางซ้าย">←</button>' +
+            '<span>' + esc(ITEM_COLS[k].label) + '</span><button type="button" class="cols-move" data-action="cols-move" data-key="' + k + '" data-dir="1"' + (i === order.length - 1 ? ' disabled' : '') + ' aria-label="ย้าย ' + esc(ITEM_COLS[k].label) + ' ไปทางขวา">→</button></span>';
+        }).join('') + '<button type="button" class="btn small" data-action="cols-reset">คืนค่าเริ่มต้น</button></div>';
+      }
+      html += '<div class="table-wrap"><table class="responsive"><thead><tr>' + order.map(function (k) {
+        var c = ITEM_COLS[k];
+        var inner = c.sort ? th(c.sort, c.label, c.cls).replace(/^<th /, '<th draggable="true" data-col="' + k + '" ') : '<th draggable="true" data-col="' + k + '" class="' + (c.cls || '') + '">' + esc(c.label) + '</th>';
+        return inner;
+      }).join('') + '</tr></thead><tbody>' +
         slice.map(function (r) {
-          var ticketCell = r.ticketUrl ? UI.ticketLink(r) : r.ticket ? '<span class="num">#' + esc(r.ticket) + '</span>' : '<span class="muted">–</span>';
-          return '<tr class="clickable" data-action="open-item" data-id="' + esc(r.id) + '"><td class="num" data-hide-mobile>' + esc(r.seq === null ? '–' : r.seq) + '</td>' +
-            '<td class="detail-cell"><a href="#/items/' + encodeURIComponent(r.id) + '">' + esc(r.detail) + '</a><div class="sub">' +
-            '<span class="mobile-only">#' + esc(r.seq === null ? '–' : r.seq) + ' </span>' + esc(r.platform) + '<span class="mobile-only"> / ' + esc(r.system) + '</span>' +
-            (r.issues.length ? ' <span class="flag">ข้อมูลไม่ครบ/ผิดช่อง</span>' : '') + '</div></td>' +
-            '<td class="system-cell" data-hide-mobile>' + esc(r.system || '–') + '</td>' +
-            '<td class="ticket-cell">' + ticketCell + '</td>' +
-            '<td>' + UI.statusBadge(r.status) + '</td><td data-hide-mobile>' + UI.urgency(r.urgency) + '</td><td>' + esc(r.developer || '–') + '</td><td data-hide-mobile>' + esc(r.pm) + '</td><td>' + UI.due(r, state.today) + '</td></tr>';
+          return '<tr class="clickable" data-action="open-item" data-id="' + esc(r.id) + '">' + order.map(function (k) { return ITEM_COLS[k].cell(r, state); }).join('') + '</tr>';
         }).join('') + '</tbody></table></div>';
       if (pages > 1) {
         html += '<nav class="pager" aria-label="หน้า"><button class="btn small" data-action="page" data-dir="-1"' + (page === 0 ? ' disabled' : '') + '>ก่อนหน้า</button><span class="muted">หน้า ' + (page + 1) + ' จาก ' + pages +
@@ -417,19 +449,25 @@
         tile('hot', 'urgent', g.urgent.length, 'ต้องตามด่วน', 'เกินกำหนดหรือด่วนที่สุด') +
         tile('warm', 'this', g.thisWeek.length, 'ต้องทำสัปดาห์นี้', D.formatThai(week.from) + ' – ' + D.formatThai(week.to)) +
         tile('cool', 'next', g.nextWeek.length, 'สัปดาห์หน้า', D.formatThai(next.from) + ' – ' + D.formatThai(next.to)) +
-        tile('good', 'done', g.doneThisWeek.length, 'ปิดได้สัปดาห์นี้', g.doneThisWeek.length ? 'เก่งมาก ทำต่อเลย 💪' : 'มาปิดงานแรกกัน') +
+        (role === 'developer'
+          ? tile('good', 'done', g.doneThisWeek.length, 'ปิดได้สัปดาห์นี้', g.doneThisWeek.length ? 'เก่งมาก ทำต่อเลย 💪' : 'มาปิดงานแรกกัน')
+          : tile('plan', 'nodue', g.noDue.length, 'ยังไม่มีวันกำหนด', g.noDue.length ? 'ใส่วันกำหนดให้ครบ' : 'ครบทุกงานแล้ว')) +
         '</div>';
       var section = function (key, title, note, list, empty) {
         return '<section class="group mw-group mw-' + key + '" id="mw-' + key + '" aria-labelledby="g-' + key + '"><h2 id="g-' + key + '">' + title + ' <span class="count">' + list.length + ' งาน</span></h2>' +
           (note ? '<p class="mw-note">' + note + '</p>' : '') +
           (list.length ? list.map(function (r) { return workCard(state, r); }).join('') : '<p class="muted mw-empty">' + empty + '</p>') + '</section>';
       };
-      html += section('urgent', '🔥 ต้องตามด่วน', 'งานที่เกินกำหนดแล้ว หรือถูกตั้งเป็น "ด่วนที่สุด" เรียงจากเร่งที่สุดก่อน', g.urgent, 'ไม่มีงานด่วน เยี่ยมมาก');
-      html += section('this', '📅 ต้องทำสัปดาห์นี้', 'กำหนดส่งภายในสัปดาห์นี้ (ยังไม่เกินกำหนด)', g.thisWeek, 'ไม่มีงานที่ครบกำหนดสัปดาห์นี้');
+      // urgent (left) and this week (right) side by side (user request 2026-11-11)
+      html += '<div class="mw-two">' +
+        section('urgent', '🔥 ต้องตามด่วน', 'เกินกำหนดแล้ว หรือ "ด่วนที่สุด" เรียงจากเร่งที่สุดก่อน', g.urgent, 'ไม่มีงานด่วน เยี่ยมมาก') +
+        section('this', '📅 ต้องทำสัปดาห์นี้', 'กำหนดส่งภายในสัปดาห์นี้ (ยังไม่เกินกำหนด)', g.thisWeek, 'ไม่มีงานที่ครบกำหนดสัปดาห์นี้') +
+        '</div>';
       html += section('next', '🗓️ สัปดาห์หน้า', 'เตรียมไว้ล่วงหน้า', g.nextWeek, 'ยังไม่มีงานสัปดาห์หน้า');
       if (g.later.length) html += section('later', 'ภายหลัง', '', g.later, '');
-      if (g.noDue.length) html += section('nodue', 'ยังไม่มีวันกำหนด', 'ควรขอให้ PM ใส่วันที่ต้องได้', g.noDue, '');
-      if (g.doneThisWeek.length) {
+      // PM tab: items without a due date (PMs set dates). Developer tab: what I finished this week (encouragement).
+      if (role === 'pm') html += section('nodue', '🗂️ ยังไม่มีวันกำหนด', 'ใส่ "วันที่ต้องได้" ให้ครบ ทีมจะได้วางแผนได้', g.noDue, 'ทุกงานมีวันกำหนดแล้ว');
+      if (role === 'developer' && g.doneThisWeek.length) {
         html += '<section class="group mw-group mw-done" id="mw-done"><h2>✅ ปิดได้สัปดาห์นี้ <span class="count">' + g.doneThisWeek.length + ' งาน</span></h2>' +
           '<ul class="mw-donelist">' + g.doneThisWeek.map(function (r) {
             return '<li><a href="#/items/' + encodeURIComponent(r.id) + '">' + esc(r.detail) + '</a> <span class="muted">' + esc(r.doneDate.raw) + '</span></li>';
@@ -531,18 +569,30 @@
       var html = readOnlyBanner(state) + '<div class="page-head"><h1>บอร์ดงาน</h1><span class="muted">' + esc(filterSummary(state)) + '</span><span class="spacer muted">' +
         (state.user.canEdit ? 'ลากการ์ดไปคอลัมน์อื่น หรือกดปุ่ม ◀ ▶ เพื่อเปลี่ยนสถานะ' : 'ดูอย่างเดียว') +
         '</span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button></div>' + filterBar(state);
+      var collapsed = state.kanbanCollapsed || {};
+      // Jump bar ON TOP (user request): chips per column + ◀ ▶ to scroll the board without the bottom scrollbar
+      html += '<div class="kjump" role="toolbar" aria-label="เลื่อนไปยังคอลัมน์">' +
+        '<button type="button" class="kjump-arrow" data-action="kscroll" data-dir="-1" aria-label="เลื่อนบอร์ดไปทางซ้าย">‹</button>' +
+        '<div class="kjump-chips">' + cols.map(function (c) {
+          return '<button type="button" class="kjump-chip g-' + stageGroup(c) + (c.rows.length === max && c.step && max > 0 ? ' hot' : '') + '" data-action="kjump" data-status="' + esc(c.status) + '">' +
+            (c.step ? '<span class="kjump-step">' + c.step + '</span>' : '') + '<span class="kjump-name">' + esc(c.title) + '</span><span class="kjump-count num">' + c.rows.length + '</span></button>';
+        }).join('') + '</div>' +
+        '<button type="button" class="kjump-arrow" data-action="kscroll" data-dir="1" aria-label="เลื่อนบอร์ดไปทางขวา">›</button>' +
+        '<button type="button" class="btn small kjump-all" data-action="kcollapse-all">' + (Object.keys(collapsed).length ? 'ขยายทุกคอลัมน์' : 'ยุบคอลัมน์ว่าง') + '</button></div>';
       html += '<div class="board" role="list" aria-label="บอร์ดงานตามสถานะ">' + cols.map(function (c) {
         var sorted = c.rows.slice().sort(function (a, b) {
           return (b.isOverdue - a.isOverdue) || (D.urgencyRank(a.urgency) - D.urgencyRank(b.urgency)) ||
             ((a.effectiveDue ? D.compareDate(a.effectiveDue, b.effectiveDue || { y: 9999, m: 1, d: 1 }) : 1));
         });
         var more = sorted.length - KANBAN_LIMIT;
-        var cls = 'kcol' + (c.closed ? ' closed' : '') + (c.other ? ' other' : '') + (c.step && c.rows.length === max && max > 0 ? ' bottleneck' : '');
+        var isCollapsed = !!collapsed[c.status];
+        var cls = 'kcol g-' + stageGroup(c) + (c.closed ? ' closed' : '') + (c.other ? ' other' : '') + (c.step && c.rows.length === max && max > 0 ? ' bottleneck' : '') + (isCollapsed ? ' collapsed' : '');
         return '<section class="' + cls + '" role="listitem" data-status="' + esc(c.status) + '" aria-label="' + esc(c.title + ' ' + c.rows.length + ' งาน') + '">' +
-          '<header class="kcol-head"><h2>' + (c.step ? '<span class="kstep">' + c.step + '</span>' : '') + esc(c.title) + '</h2><span class="kcount num">' + c.rows.length + '</span></header>' +
-          '<div class="kcards">' + (sorted.length ? sorted.slice(0, KANBAN_LIMIT).map(function (r) { return kcard(state, r, open); }).join('') : '<p class="kempty">ไม่มีงาน</p>') +
+          '<header class="kcol-head"><h2>' + (c.step ? '<span class="kstep">' + c.step + '</span>' : '') + '<span class="ktitle-h">' + esc(c.title) + '</span></h2>' + (cls.indexOf('bottleneck') !== -1 && !isCollapsed ? '<span class="kbadge">คอขวด</span>' : '') + '<span class="kcount num">' + c.rows.length + '</span>' +
+          '<button type="button" class="kcollapse" data-action="kcollapse" data-status="' + esc(c.status) + '" aria-expanded="' + !isCollapsed + '" aria-label="' + (isCollapsed ? 'ขยาย' : 'ยุบ') + 'คอลัมน์ ' + esc(c.title) + '">' + (isCollapsed ? '⤢' : '⤡') + '</button></header>' +
+          (isCollapsed ? '' : '<div class="kcards">' + (sorted.length ? sorted.slice(0, KANBAN_LIMIT).map(function (r) { return kcard(state, r, open); }).join('') : '<p class="kempty">ไม่มีงาน</p>') +
           (more > 0 ? '<p class="kmore">' + drillButton(state, c.title, c.rows.map(function (r) { return r.id; }), 'ดูทั้งหมด ' + c.rows.length + ' งาน') + '</p>' : '') +
-          '</div></section>';
+          '</div>') + '</section>';
       }).join('') + '</div>';
       return html;
     }
@@ -561,10 +611,32 @@
           (next ? '<button class="btn small" data-action="kmove" data-id="' + esc(r.id) + '" data-to="' + esc(next) + '" aria-label="ย้าย #' + esc(r.seq) + ' ไป ' + esc(next) + '" title="ไป ' + esc(next) + '">▶</button>' : '') +
           '</div>';
       }
-      return '<article class="kcard' + (r.isOverdue ? ' over' : '') + '"' + (canMove ? ' draggable="true"' : '') + ' data-id="' + esc(r.id) + '">' +
+      var dev = r.developer || D.UNASSIGNED;
+      var urg = D.urgencyRank(r.urgency);
+      var dueCls = !r.effectiveDue ? 'none' : r.isOverdue ? 'over' : D.daysBetween(state.today, r.effectiveDue) <= 3 ? 'soon' : 'ok';
+      var dueText = !r.effectiveDue ? 'ไม่มีกำหนด' : r.isOverdue ? '🔥 เกิน ' + r.overdueDays + ' วัน' : D.formatThai(r.effectiveDue);
+      return '<article class="kcard u-' + urg + (r.isOverdue ? ' over' : '') + '"' + (canMove ? ' draggable="true"' : '') + ' data-id="' + esc(r.id) + '">' +
+        '<div class="kcard-top"><span class="kseq num">#' + esc(r.seq === null ? '–' : r.seq) + '</span><span class="kplat">' + esc(r.platform) + '</span>' +
+        (urg < 2 ? '<span class="kurg">' + esc(r.urgency) + '</span>' : '') + (r.ticketUrl ? UI.ticketLink(r) : '') + '</div>' +
         '<a href="#/items/' + encodeURIComponent(r.id) + '" class="ktitle">' + esc(r.detail) + '</a>' +
-        '<div class="meta"><span>#' + esc(r.seq === null ? '–' : r.seq) + '</span><span>' + esc(r.platform) + '</span>' + (r.urgency !== 'ปกติ' ? '<span>' + UI.urgency(r.urgency) + '</span>' : '') + '</div>' +
-        '<div class="meta"><span>' + esc(r.developer || D.UNASSIGNED) + '</span><span>' + UI.due(r, state.today) + '</span>' + (r.ticketUrl ? UI.ticketLink(r) : '') + '</div>' + btns + '</article>';
+        '<div class="kcard-foot"><span class="kavatar" title="' + esc(dev) + '" aria-hidden="true">' + esc(initials(dev)) + '</span><span class="kdev">' + esc(dev) + '</span>' +
+        '<span class="kdue ' + dueCls + '">' + esc(dueText) + '</span></div>' + btns + '</article>';
+    }
+
+    /** Colour group for a column: waiting / developing / testing / sent back / closed / other. */
+    function stageGroup(c) {
+      if (c.closed) return 'done';
+      if (c.other) return 'other';
+      var s = c.status;
+      if (s === 'ส่งกลับนักพัฒนาแก้ไข') return 'back';
+      if (s === 'กำลังทดสอบ' || s === 'รอ compile' || s === 'รอ Complie ต้องแจ้งอจ.') return 'test';
+      if (s === 'กำลังพัฒนา' || s === 'รอทีมพัฒนา' || s === 'dev ขอ Sourecode อจ.') return 'dev';
+      return 'prep';
+    }
+
+    function initials(name) {
+      var n = String(name || '').replace(/^(นักพัฒนา|พีเอ็ม)\s+/, '').trim();
+      return n ? n.charAt(0) : '?';
     }
 
     // ------------------------------------------------------------------ Help (US7)
@@ -614,6 +686,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>
