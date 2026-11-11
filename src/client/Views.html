@@ -160,9 +160,9 @@
         var c = counts[s] ? counts[s].count : 0;
         var h = max ? Math.round((c / max) * 100) : 0;
         var cls = 'stage' + (s === maxStatus && c > 0 ? ' bottleneck' : '') + (c === 0 ? ' zero' : '');
-        var key = state.registerDrill('สถานะ ' + s, counts[s] ? counts[s].ids : []);
-        return '<button type="button" class="' + cls + '" data-action="drill" data-drill="' + key + '" aria-label="' + esc(s + ' ' + c + ' รายการ') + '">' +
-          '<span class="fill" style="height:' + h + '%;--i:' + idx + '"></span><span class="count num">' + c + '</span><span class="name">' + esc(s) + '</span></button>';
+        var key = state.registerDrill('สถานะ ' + D.statusLabel(s), counts[s] ? counts[s].ids : []);
+        return '<button type="button" class="' + cls + '" data-action="drill" data-drill="' + key + '" aria-label="' + esc(D.statusLabel(s) + ' ' + c + ' รายการ') + '">' +
+          '<span class="fill" style="height:' + h + '%;--i:' + idx + '"></span><span class="count num">' + c + '</span><span class="name">' + esc(D.statusLabel(s)) + '</span></button>';
       }).join('');
       var others = m.byStatus.filter(function (s) { return open.indexOf(s.value) === -1; });
       var extra = others.length
@@ -231,7 +231,7 @@
           var od = p.open ? Math.round((p.overdue / p.open) * 100) : 0;
           var fill = 'linear-gradient(90deg, var(--danger) ' + od + '%, var(--accent) ' + od + '%)';
           return '<tr><td>' + esc(p.name) + '<div class="bar" aria-hidden="true"><span style="width:' + pct + '%;background:' + fill + '"></span></div></td>' +
-            '<td class="n">' + drillButton(state, label + ' ' + p.name + ' งานค้าง', p.ids, String(p.open)) + '</td>' +
+            '<td class="n">' + (p.open ? drillButton(state, label + ' ' + p.name + ' งานค้าง', p.ids, String(p.open)) : '<span class="muted">0</span>') + '</td>' +
             (withOverdue ? '<td class="n">' + (p.overdue ? drillButton(state, label + ' ' + p.name + ' เกินกำหนด', p.overdueIds, '<span class="due-over">' + p.overdue + '</span>') : '<span class="muted">0</span>') + '</td>' : '') +
             '</tr>';
         }).join('') + '</tbody></table></div>';
@@ -244,7 +244,7 @@
 
     function pmPanel(state, m) {
       return '<section class="panel" aria-labelledby="pm-h"><div class="panel-head"><h2 id="pm-h">PM แต่ละคน</h2></div>' +
-        peopleTable(state, m.byPm, 'PM', true) + '</section>';
+        peopleTable(state, D.pmBreakdown(m.byPm, state.options.pm || []), 'PM', true) + '</section>';
     }
 
     function qualityPanel(state) {
@@ -369,6 +369,7 @@
       if (col.type === 'status') {
         return UI.select(Object.assign(o, { options: D.WORKFLOW, groups: UI.statusGroups(), allowEmpty: false, hint: 'เรียงตามขั้นตอนงานจริง เลือกขั้นถัดไปเมื่องานคืบหน้า' }));
       }
+      if (key === 'pm') return UI.multiPick(Object.assign(o, { options: opts.pm }));
       if (col.type === 'person') return UI.select(Object.assign(o, { options: key === 'pm' ? opts.pm : opts.developer, emptyLabel: key === 'developer' ? '— ยังไม่มอบหมาย —' : undefined }));
       if (col.type === 'freeOption') return UI.combobox(Object.assign(o, { options: opts.system }));
       if (col.type === 'freePerson') {
@@ -481,7 +482,7 @@
       var actions = '<a class="btn small" href="#/items/' + encodeURIComponent(r.id) + '">เปิด</a>';
       var seqOk = r.seq !== null && !r.issues.some(function (x) { return x.code === 'SEQ_DUPLICATE'; });
       if (state.user.canEdit && next && seqOk) {
-        actions += '<button class="btn small primary" data-action="quick-status" data-id="' + esc(r.id) + '" data-to="' + esc(next) + '">เปลี่ยนเป็น ' + esc(next) + '</button>';
+        actions += '<button class="btn small primary" data-action="quick-status" data-id="' + esc(r.id) + '" data-to="' + esc(next) + '">เปลี่ยนเป็น ' + esc(D.statusLabel(next)) + '</button>';
       }
       return '<article class="work' + (r.isOverdue ? ' over' : '') + '"><div><a href="#/items/' + encodeURIComponent(r.id) + '" style="color:inherit">' + esc(r.detail) + '</a>' +
         '<div class="meta"><span>#' + esc(r.seq === null ? '–' : r.seq) + '</span><span>' + esc(r.platform) + ' / ' + esc(r.system) + '</span>' +
@@ -547,6 +548,7 @@
     // ------------------------------------------------------------------ Kanban (US8)
 
     var KANBAN_LIMIT = 40;
+    var KANBAN_TAIL = ['dev ขอ Sourecode อจ.', 'รอ Complie ต้องแจ้งอจ.'];
     var OTHER_COLUMN = '__other__';
 
     function kanban(state) {
@@ -554,7 +556,7 @@
       var open = D.WORKFLOW.filter(function (s) { return D.isOpen(s); });
       var week = D.weekRange(state.today);
       var cols = open.map(function (s, i) {
-        return { status: s, title: s, step: i + 1, rows: rows.filter(function (r) { return r.isOpen && r.status === s; }) };
+        return { status: s, title: D.statusLabel(s), step: i + 1, rows: rows.filter(function (r) { return r.isOpen && r.status === s; }) };
       });
       // open items with an empty or unknown status still count as open, so they must be on the board too
       var other = rows.filter(function (r) { return r.isOpen && open.indexOf(r.status) === -1; });
@@ -565,6 +567,9 @@
         closed: true,
         rows: rows.filter(function (r) { return !r.isOpen && D.inRange(r.doneDate.date, week); }),
       });
+      // Waiting-on-อจ. columns sit after "ปิดงานสัปดาห์นี้" (user request 2026-11-11); the workflow order is unchanged
+      var tail = cols.filter(function (c) { return KANBAN_TAIL.indexOf(c.status) !== -1; });
+      cols = cols.filter(function (c) { return KANBAN_TAIL.indexOf(c.status) === -1; }).concat(tail);
       var max = Math.max.apply(null, cols.filter(function (c) { return c.step; }).map(function (c) { return c.rows.length; }));
       var html = readOnlyBanner(state) + '<div class="page-head"><h1>บอร์ดงาน</h1><span class="muted">' + esc(filterSummary(state)) + '</span><span class="spacer muted">' +
         (state.user.canEdit ? 'ลากการ์ดไปคอลัมน์อื่น หรือกดปุ่ม ◀ ▶ เพื่อเปลี่ยนสถานะ' : 'ดูอย่างเดียว') +
@@ -607,8 +612,8 @@
       var btns = '';
       if (canMove) {
         btns = '<div class="kmove">' +
-          (prev ? '<button class="btn small" data-action="kmove" data-id="' + esc(r.id) + '" data-to="' + esc(prev) + '" aria-label="ย้าย #' + esc(r.seq) + ' กลับไป ' + esc(prev) + '" title="กลับไป ' + esc(prev) + '">◀</button>' : '<span></span>') +
-          (next ? '<button class="btn small" data-action="kmove" data-id="' + esc(r.id) + '" data-to="' + esc(next) + '" aria-label="ย้าย #' + esc(r.seq) + ' ไป ' + esc(next) + '" title="ไป ' + esc(next) + '">▶</button>' : '') +
+          (prev ? '<button class="btn small" data-action="kmove" data-id="' + esc(r.id) + '" data-to="' + esc(prev) + '" aria-label="ย้าย #' + esc(r.seq) + ' กลับไป ' + esc(D.statusLabel(prev)) + '" title="กลับไป ' + esc(D.statusLabel(prev)) + '">◀</button>' : '<span></span>') +
+          (next ? '<button class="btn small" data-action="kmove" data-id="' + esc(r.id) + '" data-to="' + esc(next) + '" aria-label="ย้าย #' + esc(r.seq) + ' ไป ' + esc(D.statusLabel(next)) + '" title="ไป ' + esc(D.statusLabel(next)) + '">▶</button>' : '') +
           '</div>';
       }
       var dev = r.developer || D.UNASSIGNED;

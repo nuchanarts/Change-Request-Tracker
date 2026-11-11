@@ -86,3 +86,13 @@ test.describe('Kanban navigation and collapse (2026-11-11)', () => {
     await expect(page.locator('.kcol[data-status="กำลังพัฒนา"] .kcard').first()).toBeVisible();
   });
 });
+
+test('columns waiting on อจ. sit after "ปิดงานสัปดาห์นี้" (2026-11-11)', async ({ page }) => {
+  await open(page, '/#/kanban');
+  const order = await page
+    .locator('.kcol')
+    .evaluateAll((els) => els.map((e) => e.getAttribute('data-status')));
+  expect(order.slice(-3)).toEqual(['0.แก้ไขเรียบร้อย', 'dev ขอ Sourecode อจ.', 'รอ Complie ต้องแจ้งอจ.']);
+  const chips = await page.locator('.kjump-chip .kjump-name').allTextContents();
+  expect(chips.slice(-2)).toEqual(['dev ขอ Sourecode อจ.', 'รอ Complie ต้องแจ้งอจ.']);
+});

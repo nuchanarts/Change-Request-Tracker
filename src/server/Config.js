@@ -68,9 +68,11 @@ var Config = (function () {
     },
     /** PM list set by the PM on 2026-11-11: the only choices for "PM รับผิดชอบ", in this order. */
     PM_LIST: ['นุชนารถ (แก๊ส)', 'วนิดา (แพท)', 'ทิพวรรณ (พี่ส้ม)', 'กษิดิ์เดช (พี่ป้อง)'],
+    // People who left the team: hidden from the developer / person pickers (their past rows stay as they are).
+    RETIRED: ['แฮ่ม'],
     LOCK_MS: 10000,
     CACHE_SECONDS: 300,
-    CACHE_KEYS: { options: 'options:v1' },
+    CACHE_KEYS: { options: 'options:v2' },
     EDIT_PROBE_KEY: 'bgs_app_edit_probe',
     EDIT_PROBE_CACHE_SECONDS: 21600,
     EDIT_CACHE_PREFIX: 'canEdit:v3:',

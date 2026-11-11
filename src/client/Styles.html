@@ -667,4 +667,12 @@
   .cols-move:disabled { opacity: 0.35; cursor: default; }
   table.responsive thead th[draggable='true'] { cursor: grab; }
   table.responsive td.platform-cell .kplat { font-size: 13.5px; }
+
+  /* PM: pick several */
+  .pick { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pick-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; background: var(--surface); font-size: 14px; }
+  .pick-chip:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .pick-chip input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+  .pick-chip:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .pick[aria-invalid='true'] .pick-chip { border-color: var(--danger); }
 </style>

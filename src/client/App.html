@@ -326,6 +326,8 @@
         if (!el) return;
         var v = el.value.trim();
         var orig = original ? original[c.key] || '' : '';
+        // same PMs in a different order or spacing is not a change
+        if (c.key === 'pm' && orig && D.joinPm(D.splitPm(v), state.options.pm) === D.joinPm(D.splitPm(orig), state.options.pm)) v = orig;
         if (c.type === 'date') {
           var origCell = D.parseDate(orig);
           var typed = D.parseDate(v);
@@ -716,6 +718,10 @@
         store(KEYS.filters, state.filters);
         state.itemsPage = 0;
         render();
+      } else if (form && ev.target.name === 'pm-pick') {
+        // keep the hidden "A, B" value in sync with the checked PMs (in PM-list order)
+        var picked = Array.prototype.slice.call(form.querySelectorAll('input[name="pm-pick"]:checked')).map(function (x) { return x.value; });
+        form.elements.pm.value = D.joinPm(picked, state.options.pm);
       } else if (form && form.id === 'item-form' && ev.target.name === 'status' && ev.target.value === D.DONE) {
         var done = form.elements.doneDate;
         if (done && !done.value) {

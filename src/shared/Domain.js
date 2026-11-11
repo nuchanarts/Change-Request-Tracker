@@ -239,6 +239,17 @@ var Domain = (function () {
     return CLOSED.indexOf(clean(status)) === -1;
   }
   /** @param {any} status */
+  /**
+   * Screen label for a status: drops the leading "0." the sheet uses for sorting (user request
+   * 2026-11-11). Display only; the value written to the sheet stays exactly as spelled.
+   * @param {string} status
+   */
+  function statusLabel(status) {
+    return String(status || '')
+      .trim()
+      .replace(/^0\.\s*/, '');
+  }
+
   function statusRank(status) {
     var s = clean(status);
     if (s === '') return WORKFLOW.length + 1;
@@ -287,6 +298,7 @@ var Domain = (function () {
     r.isOverdue = !!(r.isOpen && r.effectiveDue && compareDate(r.effectiveDue, today) < 0);
     r.overdueDays = r.isOverdue ? daysBetween(r.effectiveDue, today) : 0;
     r.ticketUrl = ticketUrl(r.ticket);
+    r.pms = splitPm(r.pm);
     return r;
   }
 
@@ -298,6 +310,31 @@ var Domain = (function () {
       if (r.seq !== null && r.seq !== undefined) counts[r.seq] = (counts[r.seq] || 0) + 1;
     });
     return counts;
+  }
+
+  var PM_SEP = ', ';
+
+  /** Several PMs live in one cell joined with ", " (Google Sheets multi-select chip format). @param {string} v */
+  function splitPm(v) {
+    return String(v || '')
+      .split(',')
+      .map(clean)
+      .filter(Boolean);
+  }
+
+  /** @param {string[]} names @param {string[]} [order] PM list order */
+  function joinPm(names, order) {
+    var list = names.map(clean).filter(function (n, i, a) {
+      return n && a.indexOf(n) === i;
+    });
+    if (order) {
+      list.sort(function (a, b) {
+        var ia = order.indexOf(a);
+        var ib = order.indexOf(b);
+        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+      });
+    }
+    return list.join(PM_SEP);
   }
 
   /** @param {any} options @param {string} key @returns {string[]} */
@@ -322,12 +359,22 @@ var Domain = (function () {
     var out = [];
     OPTION_KEYS.concat(['pm']).forEach(function (key) {
       var list = optionList(options, key);
-      if (r[key] !== '' && list.length && list.indexOf(r[key]) === -1) {
+      var bad =
+        key === 'pm'
+          ? splitPm(r.pm)
+              .filter(function (p) {
+                return list.indexOf(p) === -1;
+              })
+              .join(PM_SEP)
+          : list.indexOf(r[key]) === -1
+            ? r[key]
+            : '';
+      if (r[key] !== '' && list.length && bad) {
         out.push(
           issue(
             'OPTION_INVALID',
             key,
-            'ค่าในช่อง "' + COLUMN_BY_KEY[key].header + '" ไม่อยู่ในรายการตัวเลือก: ' + r[key],
+            'ค่าในช่อง "' + COLUMN_BY_KEY[key].header + '" ไม่อยู่ในรายการตัวเลือก: ' + bad,
           ),
         );
       }
@@ -371,7 +418,15 @@ var Domain = (function () {
     f = f || {};
     return rows.filter(function (r) {
       if (!inList(f.platform, r.platform)) return false;
-      if (!inList(f.pm, r.pm)) return false;
+      if (
+        f.pm &&
+        f.pm.length &&
+        !splitPm(r.pm).some(function (p) {
+          return f.pm.indexOf(p) !== -1;
+        }) &&
+        f.pm.indexOf(r.pm) === -1
+      )
+        return false;
       if (!inList(f.developer, r.developer === '' ? UNASSIGNED : r.developer)) return false;
       if (!inList(f.urgency, r.urgency)) return false;
       if (!inList(f.issueType, r.issueType)) return false;
@@ -391,6 +446,63 @@ var Domain = (function () {
     });
   }
 
+  var OTHER_PM = 'อื่นๆ (ไม่อยู่ในรายชื่อ PM)';
+
+  /**
+   * PM table rows: always the fixed PMs in order (even with no open work), then one "อื่นๆ" row for
+   * any other or empty PM value so the totals still match the open count.
+   * @param {Array<{name:string, open:number, overdue:number, ids:string[], overdueIds:string[]}>} byPm
+   * @param {string[]} pmList
+   */
+  function pmBreakdown(byPm, pmList) {
+    var out = pmList.map(function (name) {
+      var hit = byPm.filter(function (p) {
+        return p.name === name;
+      })[0];
+      return hit || { name: name, open: 0, overdue: 0, ids: [], overdueIds: [] };
+    });
+    var rest = byPm.filter(function (p) {
+      return pmList.indexOf(p.name) === -1;
+    });
+    if (rest.length) {
+      out.push({
+        name: OTHER_PM,
+        other: true,
+        open: rest.reduce(function (n, p) {
+          return n + p.open;
+        }, 0),
+        overdue: rest.reduce(function (n, p) {
+          return n + p.overdue;
+        }, 0),
+        ids: [].concat.apply(
+          [],
+          rest.map(function (p) {
+            return p.ids;
+          }),
+        ),
+        overdueIds: [].concat.apply(
+          [],
+          rest.map(function (p) {
+            return p.overdueIds;
+          }),
+        ),
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Remove people who left the team from option lists (the sheet keeps their history).
+   * @param {string[]} names @param {string[]} retired names or nicknames, matched as a whole word/nickname
+   */
+  function withoutRetired(names, retired) {
+    return names.filter(function (n) {
+      return !retired.some(function (x) {
+        return n === x || n.indexOf('(' + x + ')') !== -1 || n.split(/\s+/).indexOf(x) !== -1;
+      });
+    });
+  }
+
   /** @param {any[]} rows */
   function ids(rows) {
     return rows.map(function (r) {
@@ -403,8 +515,10 @@ var Domain = (function () {
     /** @type {Object<string, any[]>} */
     var g = {};
     rows.forEach(function (r) {
-      var k = keyFn(r);
-      (g[k] = g[k] || []).push(r);
+      // a key function may return several keys (a row shared by several PMs counts for each)
+      [].concat(keyFn(r)).forEach(function (k) {
+        (g[k] = g[k] || []).push(r);
+      });
     });
     return g;
   }
@@ -454,7 +568,8 @@ var Domain = (function () {
       });
 
     var byPmMap = groupBy(open, function (r) {
-      return r.pm || NO_PM;
+      var list = splitPm(r.pm);
+      return list.length ? list : [NO_PM];
     });
     var byPm = Object.keys(byPmMap)
       .map(function (name) {
@@ -511,7 +626,7 @@ var Domain = (function () {
    */
   function groupMyWork(rows, name, role, today) {
     var mine = rows.filter(function (r) {
-      return name && r.isOpen && r[role] === name;
+      return name && r.isOpen && (role === 'pm' ? r.pms.indexOf(name) !== -1 : r[role] === name);
     });
     var sortFn = function (/** @type {any} */ a, /** @type {any} */ b) {
       var qa = a.devQueue === null ? Infinity : a.devQueue;
@@ -556,7 +671,7 @@ var Domain = (function () {
    */
   function groupMyWeek(rows, name, role, today) {
     var mine = rows.filter(function (r) {
-      return name && r[role] === name;
+      return name && (role === 'pm' ? r.pms.indexOf(name) !== -1 : r[role] === name);
     });
     var open = mine.filter(function (r) {
       return r.isOpen;
@@ -784,7 +899,13 @@ var Domain = (function () {
     var col = COLUMN_BY_KEY[key];
     var v = clean(value);
     if (v === '') return col.required ? 'กรุณากรอก "' + col.header + '"' : null;
-    if (col.type === 'option' || col.type === 'person') {
+    if (key === 'pm') {
+      var pmList = optionList(options, key);
+      var unknown = splitPm(v).filter(function (p) {
+        return pmList.indexOf(p) === -1;
+      });
+      if (unknown.length || !splitPm(v).length) return 'กรุณาเลือก "' + col.header + '" จากรายการ';
+    } else if (col.type === 'option' || col.type === 'person') {
       var list = optionList(options, key);
       if (list.indexOf(v) === -1) return 'กรุณาเลือก "' + col.header + '" จากรายการ';
     } else if (col.type === 'status') {
@@ -900,6 +1021,13 @@ var Domain = (function () {
     detectIssues: detectIssues,
     applyFilters: applyFilters,
     computeMetrics: computeMetrics,
+    pmBreakdown: pmBreakdown,
+    splitPm: splitPm,
+    joinPm: joinPm,
+    PM_SEP: PM_SEP,
+    statusLabel: statusLabel,
+    withoutRetired: withoutRetired,
+    OTHER_PM: OTHER_PM,
     groupMyWork: groupMyWork,
     groupMyWeek: groupMyWeek,
     overdueBuckets: overdueBuckets,

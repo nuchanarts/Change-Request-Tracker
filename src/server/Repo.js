@@ -241,8 +241,8 @@ function makeRepo(deps) {
     var people = peopleFromSheet();
     var fallback = distinct(rows, ['pm', 'developer']);
     o.pm = C.PM_LIST.slice(); // fixed by the PM (overrides validation / รายชื่อ)
-    o.developer = fromValidation('developer') || people || fallback;
-    o.person = (people || fallback).slice();
+    o.developer = D.withoutRetired(fromValidation('developer') || people || fallback, C.RETIRED);
+    o.person = D.withoutRetired((people || fallback).slice(), C.RETIRED);
     o.pm.forEach(function (n) {
       if (o.person.indexOf(n) === -1) o.person.push(n); // PMs can map themselves in My Work
     });
