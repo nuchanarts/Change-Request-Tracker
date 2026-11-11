@@ -55,6 +55,15 @@ export default [
     languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: { ...globals.node } },
   },
   {
+    files: ['tests/integration/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      sourceType: 'script',
+      globals: { context_: 'readonly', Config: 'readonly', Domain: 'readonly', console: 'readonly' },
+    },
+    rules: { 'no-unused-vars': ['error', { varsIgnorePattern: '^(runIntegrationTests|finish_)$' }] },
+  },
+  {
     files: ['tests/e2e/**/*.js'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
