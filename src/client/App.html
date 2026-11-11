@@ -524,7 +524,7 @@
         if (state.user) state.user.name = name;
         render();
         api('Api_setMyName', name).then(function (res) {
-          if (!res.ok && res.code !== 'FORBIDDEN') UI.toast(res.message, 'error');
+          if (!res.ok && res.code !== 'FORBIDDEN' && res.code !== 'NOT_ALLOWED') UI.toast(res.message, 'error');
         });
       }
     });

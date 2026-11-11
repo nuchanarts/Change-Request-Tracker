@@ -55,6 +55,24 @@ function context_() {
   return { ok: true, ss: ss, repo: repo, email: Session.getActiveUser().getEmail() };
 }
 
+/** Sheet edit right + team allowlist (_app_allowed). @param {any} ctx */
+function editAccess_(ctx) {
+  var owner = '';
+  try {
+    owner = ctx.ss.getOwner().getEmail();
+  } catch (err) {
+    console.warn('getOwner failed (shared drive or no access)', err);
+  }
+  return ctx.repo.editAccess(ctx.email, owner);
+}
+
+/** Result to return when the caller may not write, or null when they may. @param {any} ctx */
+function denied_(ctx) {
+  var access = editAccess_(ctx);
+  if (access.canEdit) return null;
+  return Config.fail(access.reason === 'NOT_ALLOWED' ? 'NOT_ALLOWED' : 'FORBIDDEN');
+}
+
 /** Run fn with a context; any unexpected error is logged and returned as a Thai message. @param {(ctx:any)=>any} fn */
 function guard_(fn) {
   try {
@@ -74,7 +92,15 @@ function Api_bootstrap() {
     return Config.ok({
       loadedAt: Utilities.formatDate(new Date(), Config.TZ, 'd/M/yyyy HH:mm'),
       today: today_(),
-      user: { email: ctx.email, name: ctx.repo.getUserName(ctx.email), canEdit: ctx.repo.canEdit(ctx.email) },
+      user: (function () {
+        var access = editAccess_(ctx);
+        return {
+          email: ctx.email,
+          name: ctx.repo.getUserName(ctx.email),
+          canEdit: access.canEdit,
+          editReason: access.reason,
+        };
+      })(),
       schema: { ok: data.missing.length === 0, missing: data.missing },
       options: ctx.repo.options(data.rows),
       rows: data.rows,
@@ -86,7 +112,8 @@ function Api_bootstrap() {
 /** @param {any} input */
 function Api_createRequest(input) {
   return guard_(function (ctx) {
-    if (!ctx.repo.canEdit(ctx.email)) return Config.fail('FORBIDDEN');
+    var denied = denied_(ctx);
+    if (denied) return denied;
     var options = ctx.repo.options();
     var v = Domain.validateCreate(input || {}, options);
     if (!v.ok) return Config.fail('VALIDATION', { fields: v.errors });
@@ -97,7 +124,8 @@ function Api_createRequest(input) {
 /** @param {{rowNumber:number, seq:number, changes:any}} req */
 function Api_updateRequest(req) {
   return guard_(function (ctx) {
-    if (!ctx.repo.canEdit(ctx.email)) return Config.fail('FORBIDDEN');
+    var denied = denied_(ctx);
+    if (denied) return denied;
     var current = ctx.repo.readRow(Number(req && req.rowNumber));
     if (!current) return Config.fail('NOT_FOUND');
     var options = ctx.repo.options();
@@ -114,7 +142,8 @@ function Api_setMyName(name) {
     if (options.person.indexOf(String(name)) === -1) {
       return Config.fail('VALIDATION', { fields: { name: 'กรุณาเลือกชื่อจากรายการ' } });
     }
-    if (!ctx.repo.canEdit(ctx.email)) return Config.fail('FORBIDDEN');
+    var denied = denied_(ctx);
+    if (denied) return denied;
     return ctx.repo.setUserName(ctx.email, String(name));
   });
 }
@@ -152,7 +181,12 @@ function runProbes() {
   });
   try {
     report.editorsCheck =
-      'ok: ' + ctx.ss.getEditors().length + ' editors; canEdit(me)=' + ctx.repo.canEdit(ctx.email);
+      'ok: ' +
+      ctx.ss.getEditors().length +
+      ' editors; canEdit(me)=' +
+      ctx.repo.canEdit(ctx.email) +
+      '; editAccess=' +
+      JSON.stringify(editAccess_(ctx));
   } catch (err) {
     report.editorsCheck = 'getEditors threw: ' + err;
   }
