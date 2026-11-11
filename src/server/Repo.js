@@ -31,7 +31,11 @@ function makeRepo(deps) {
    * @param {any} v
    */
   function asText(v) {
-    return typeof v === 'string' && v !== '' ? "'" + v : v;
+    if (typeof v !== 'string' || v === '') return v;
+    // Only values Sheets would reinterpret get the apostrophe: digits/dates-only text (leading zeros,
+    // locale-parsed dates) and formula-like text. Normal text — especially dropdown values — stays plain,
+    // otherwise the sheet's coloured dropdown chips stop matching (production 2026-11-11).
+    return /^[=+\-@]/.test(v) || /^[\d\s.,/:-]+$/.test(v) ? "'" + v : v;
   }
 
   function mainSheet() {
@@ -424,6 +428,81 @@ function makeRepo(deps) {
     return result;
   }
 
+  // ------------------------------------------------------------------ repair dropdown chips (one-off, admin)
+
+  /**
+   * Rewrite option cells that earlier app versions wrote with a leading apostrophe, so the sheet's
+   * dropdown chips show their colours again. Uses _app_log to find cells the app wrote; finds the row by
+   * ลำดับ (the sheet may have been sorted) and only rewrites when the cell still shows the logged value.
+   * @param {string} adminEmail @param {string} ownerEmail
+   */
+  function repairQuotedOptions(adminEmail, ownerEmail) {
+    if (!isAdmin(adminEmail, ownerEmail)) return C.fail('NOT_ADMIN');
+    return withLock(function () {
+      var logSheet = ss.getSheetByName(C.SHEETS.log);
+      if (!logSheet) return C.ok({ repaired: 0, skipped: 0 });
+      var optionHeaders = {};
+      D.COLUMNS.forEach(function (/** @type {any} */ c) {
+        if (['option', 'status', 'person', 'freeOption', 'freePerson'].indexOf(c.type) !== -1)
+          optionHeaders[c.header] = c.key;
+      });
+      var sh = mainSheet();
+      var display = sh.getDataRange().getDisplayValues();
+      var map = mapHeaders(display[0]);
+      /** @type {Object<string, number>} */
+      var rowBySeq = {};
+      for (var i = 1; i < display.length; i++) {
+        var sq = toInt(display[i][map.index.seq]);
+        if (sq !== null) rowBySeq[sq] = rowBySeq[sq] ? -1 : i + 1; // -1 = duplicate ลำดับ, never touch
+      }
+      var latest = {}; // last logged value per (ลำดับ, column)
+      logSheet
+        .getDataRange()
+        .getDisplayValues()
+        .slice(1)
+        .forEach(function (/** @type {any[]} */ r) {
+          var action = clean(r[2]);
+          var key = optionHeaders[clean(r[5])];
+          var sq2 = toInt(r[4]);
+          if ((action === 'UPDATE' || action === 'CREATE') && key && sq2 !== null)
+            latest[sq2 + '|' + key] = clean(r[7]);
+        });
+      var repaired = 0;
+      var skipped = 0;
+      Object.keys(latest).forEach(function (k) {
+        var parts = k.split('|');
+        var row = rowBySeq[parts[0]];
+        var colIdx = map.index[parts[1]];
+        var value = latest[k];
+        if (
+          !row ||
+          row < 0 ||
+          colIdx === undefined ||
+          clean(display[row - 1][colIdx]) !== value ||
+          value === ''
+        ) {
+          skipped++;
+          return;
+        }
+        sh.getRange(row, colIdx + 1).setValue(value);
+        repaired++;
+      });
+      writeLog([
+        [
+          deps.nowText(),
+          clean(adminEmail).toLowerCase(),
+          'REPAIR_CHIPS',
+          '',
+          '',
+          '',
+          '',
+          'repaired ' + repaired + ', skipped ' + skipped,
+        ],
+      ]);
+      return C.ok({ repaired: repaired, skipped: skipped });
+    });
+  }
+
   // ------------------------------------------------------------------ team list (_app_allowed)
 
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -667,6 +746,7 @@ function makeRepo(deps) {
     listAccess: listAccess,
     requestAccess: requestAccess,
     saveAccess: saveAccess,
+    repairQuotedOptions: repairQuotedOptions,
   };
 }
 

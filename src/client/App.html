@@ -584,6 +584,15 @@
         });
       },
       'reload-access': function () { state.access = null; render(); },
+      'repair-chips': function (el) {
+        el.disabled = true;
+        el.textContent = 'กำลังซ่อม…';
+        api('Api_repairChips').then(function (res) {
+          if (!res.ok) UI.toast(res.message, 'error');
+          else UI.toast('ซ่อมแล้ว ' + res.data.repaired + ' ช่อง (ข้าม ' + res.data.skipped + ' ช่องที่มีคนแก้ต่อแล้ว)');
+          render();
+        });
+      },
       'access-set': function (el) {
         var input = { email: el.getAttribute('data-email') };
         input[el.getAttribute('data-field')] = el.getAttribute('data-value');

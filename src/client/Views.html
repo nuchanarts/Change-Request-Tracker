@@ -468,6 +468,9 @@
               '<button class="btn small danger" data-action="access-set" data-email="' + esc(m.email) + '" data-field="status" data-value="' + esc(a.states.suspended) + '">ปฏิเสธ</button></div></div>';
           }).join('') + '</section>';
       }
+      html += '<section class="panel repair-panel" aria-labelledby="ar-h"><div class="panel-head"><h2 id="ar-h">ซ่อมสีของ dropdown ในชีต</h2></div>' +
+        '<p class="muted">แอปเวอร์ชันก่อน v1.6.0 ใส่เครื่องหมาย &#39; หน้าค่าที่บันทึก ทำให้ chip สีในชีตไม่ขึ้น กดปุ่มนี้เพื่อเขียนค่าเดิมกลับแบบไม่มี &#39; (เฉพาะช่องที่แอปเคยบันทึกและยังไม่มีใครแก้ต่อ)</p>' +
+        '<button class="btn primary" data-action="repair-chips">' + UI.withIcon('reload', 'ซ่อมสี dropdown') + '</button></section>';
       html += '<section class="panel" aria-labelledby="aa-h"><div class="panel-head"><h2 id="aa-h">เพิ่มคนเข้าทีม</h2></div>' +
         '<form id="access-add" class="access-add">' +
         UI.input({ name: 'acc-email', label: 'อีเมล Gmail', type: 'email', required: true, placeholder: 'name@gmail.com' }) +

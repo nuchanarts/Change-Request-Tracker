@@ -213,7 +213,8 @@ describe('update (constitution V)', () => {
     const res = repo.update(req(), 'editor@x.com');
     expect(res).toEqual({ ok: true, data: { rowNumber: 3, seq: 2, written: ['developer'] } });
     // text is sent with a leading apostrophe so Sheets keeps it as typed (see repo.review.test.js)
-    expect(main.writes).toEqual([{ row: 3, col: col('นักพัฒนา'), value: "'กิ่ง" }]);
+    // plain text: no apostrophe for normal values, so dropdown chips keep their colours (2026-11-11)
+    expect(main.writes).toEqual([{ row: 3, col: col('นักพัฒนา'), value: 'กิ่ง' }]);
     const log = ss.getSheetByName(Config.SHEETS.log);
     expect(log.cells[1]).toEqual([
       '11/11/2026 10:00:00',
