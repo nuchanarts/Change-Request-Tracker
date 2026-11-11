@@ -1,7 +1,10 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 2.1.0 → 2.1.1 (PATCH: clarify that a static GitHub Pages entry page that only links to the
+Version change: 2.1.1 → 3.0.0 (MAJOR: Data Contract status workflow reordered and two statuses added,
+"0.จัดทำ Taiga" and "dev ขอ Sourecode อจ."; closed statuses ordered 0.ยกเลิก / 0.ใช้งานได้อยู่แล้ว /
+0.แก้ไขเรียบร้อย. Approved by the PM (sheet owner side) on 2026-11-11 as required by Governance.)
+Previous: 2.1.0 → 2.1.1 (PATCH: clarify that a static GitHub Pages entry page that only links to the
 Apps Script URL is allowed under Principle VIII; it holds no data or logic.)
 Previous: 2.0.0 → 2.1.0
 Bump rationale: MINOR. Principle VIII changed from "container-bound" to "standalone project
@@ -239,7 +242,9 @@ Follow-up TODOs: none.
 | พัฒนาเสร็จ | วันที่ | | |
 
 **ลำดับขั้นตอนของสถานะ** (ใช้เรียงในกราฟและ dropdown):
-`0.รอแจ้งทีมพัฒนา` → `รอทีมพัฒนา` → `กำลังพัฒนา` → `0.จัดทำไฟล์แก้ไข` → `รอ compile` → `รอ Complie ต้องแจ้งอจ.` → `กำลังทดสอบ` → `ส่งกลับนักพัฒนาแก้ไข` → `รอ PM ตรวจสอบ Taiga` → **ปิดงาน:** `0.แก้ไขเรียบร้อย` / `0.ใช้งานได้อยู่แล้ว` / `0.ยกเลิก`
+`0.จัดทำไฟล์แก้ไข` → `0.จัดทำ Taiga` → `รอ PM ตรวจสอบ Taiga` → `0.รอแจ้งทีมพัฒนา` → `dev ขอ Sourecode อจ.` → `รอทีมพัฒนา` → `กำลังพัฒนา` → `ส่งกลับนักพัฒนาแก้ไข` → `กำลังทดสอบ` → `รอ compile` → `รอ Complie ต้องแจ้งอจ.` → **ปิดงาน:** `0.ยกเลิก` / `0.ใช้งานได้อยู่แล้ว` / `0.แก้ไขเรียบร้อย`
+
+(ลำดับนี้ PM อนุมัติเมื่อ 2026-11-11 และเพิ่มสถานะใหม่ 2 ค่า: `0.จัดทำ Taiga`, `dev ขอ Sourecode อจ.` ตามตัวสะกดในชีต รายการใหม่ยังเริ่มที่ `0.รอแจ้งทีมพัฒนา`)
 
 ---
 
@@ -287,4 +292,4 @@ Follow-up TODOs: none.
 - ทุก plan และทุก review ต้องตรวจว่าเป็นไปตาม constitution นี้ ความซับซ้อนที่ไม่มีเหตุผลรองรับจะทำให้รวมงานไม่ได้
 - คำแนะนำสำหรับ agent อยู่ใน `CLAUDE.md` และต้องสอดคล้องกับเอกสารนี้เสมอ
 
-**Version**: 2.1.1 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-11
+**Version**: 3.0.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-11

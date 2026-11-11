@@ -49,21 +49,26 @@ var Domain = (function () {
   var DONE = '0.แก้ไขเรียบร้อย';
   var CANCELLED = '0.ยกเลิก';
   var CLOSED = [DONE, '0.ใช้งานได้อยู่แล้ว', CANCELLED];
+  // Order approved by the PM on 2026-11-11 (constitution v3.0.0 Data Contract). Spellings are kept exactly
+  // as used in the sheet, including "Sourecode" and "Complie" (constitution III).
   var WORKFLOW = [
+    '0.จัดทำไฟล์แก้ไข',
+    '0.จัดทำ Taiga',
+    'รอ PM ตรวจสอบ Taiga',
     '0.รอแจ้งทีมพัฒนา',
+    'dev ขอ Sourecode อจ.',
     'รอทีมพัฒนา',
     'กำลังพัฒนา',
-    '0.จัดทำไฟล์แก้ไข',
+    'ส่งกลับนักพัฒนาแก้ไข',
+    'กำลังทดสอบ',
     'รอ compile',
     'รอ Complie ต้องแจ้งอจ.',
-    'กำลังทดสอบ',
-    'ส่งกลับนักพัฒนาแก้ไข',
-    'รอ PM ตรวจสอบ Taiga',
-    DONE,
-    '0.ใช้งานได้อยู่แล้ว',
     CANCELLED,
+    '0.ใช้งานได้อยู่แล้ว',
+    DONE,
   ];
-  var DEFAULT_STATUS = WORKFLOW[0];
+  // New requests still start here (Data Contract default), even though it is not the first step.
+  var DEFAULT_STATUS = '0.รอแจ้งทีมพัฒนา';
   var URGENCY = ['ด่วนที่สุด', 'ด่วน', 'ปกติ'];
   var UNASSIGNED = 'ยังไม่มอบหมาย';
   var NO_PM = 'ไม่ระบุ PM';
@@ -243,10 +248,13 @@ var Domain = (function () {
   /** Suggested next step for quick actions; null for closed or unknown statuses. @param {any} status */
   function nextStatus(status) {
     var s = clean(status);
-    if (s === '') return WORKFLOW[0];
+    if (s === '') return DEFAULT_STATUS;
     if (!isOpen(s)) return null;
     var i = WORKFLOW.indexOf(s);
-    return i === -1 ? null : WORKFLOW[i + 1];
+    if (i === -1) return null;
+    var next = WORKFLOW[i + 1];
+    // after the last working step the item is finished (never "next" into 0.ยกเลิก)
+    return isOpen(next) ? next : DONE;
   }
 
   // ---------------------------------------------------------------- rows
