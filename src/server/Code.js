@@ -245,3 +245,90 @@ function runProbes() {
   console.log(JSON.stringify(report, null, 2));
   return report;
 }
+
+// ------------------------------------------------------------------ history, restore, LINE digest (2026-11-11)
+
+/** Display name for a log entry: team-list name, else the part before @ (emails are not shown to viewers). @param {any} ctx */
+function whoNamer_(ctx) {
+  /** @type {Object<string,string>} */
+  var names = {};
+  (ctx.repo.listAccess() || []).forEach(function (/** @type {any} */ m) {
+    if (m.name) names[String(m.email).toLowerCase()] = m.name;
+  });
+  return function (/** @type {string} */ email) {
+    var e = String(email || '').toLowerCase();
+    return names[e] || e.split('@')[0] || '–';
+  };
+}
+
+/** Change history of one item for its detail page (anyone signed in). @param {number} seq */
+function Api_itemHistory(seq) {
+  return guard_(function (ctx) {
+    var name = whoNamer_(ctx);
+    return Config.ok(
+      ctx.repo.history(Number(seq)).map(function (e) {
+        return { time: e.time, who: name(e.who), action: e.action, column: e.column, from: e.from, to: e.to };
+      }),
+    );
+  });
+}
+
+/** Deleted items that can be restored (admins only). */
+function Api_listDeleted() {
+  return guard_(function (ctx) {
+    if (!ctx.repo.isAdmin(ctx.email, owner_(ctx))) return Config.fail('NOT_ADMIN');
+    var name = whoNamer_(ctx);
+    return Config.ok(
+      ctx.repo.listDeleted().map(function (/** @type {any} */ d) {
+        return Object.assign({}, d, { who: name(d.who) });
+      }),
+    );
+  });
+}
+
+/** Restore one deleted item from its _app_log snapshot (admins only). @param {number} logRow */
+function Api_restoreRequest(logRow) {
+  return guard_(function (ctx) {
+    if (!ctx.repo.isAdmin(ctx.email, owner_(ctx))) return Config.fail('NOT_ADMIN');
+    var denied = denied_(ctx);
+    if (denied) return denied;
+    return ctx.repo.restore(Number(logRow), ctx.email);
+  });
+}
+
+/** Build this week's digest messages from the sheet. @param {any} ctx */
+function digestMessages_(ctx) {
+  var t = today_();
+  var rows = ctx.repo.readAll().rows.map(function (/** @type {any} */ r) {
+    return Domain.enrich(r, t);
+  });
+  return { today: t, messages: Domain.buildDigest(rows, t, { appUrl: Config.APP_URL }) };
+}
+
+/**
+ * Time-driven job (set up once in the Apps Script editor: Triggers → weeklyDigest → Week timer → Monday, 8–9am).
+ * Queues the Monday digest in _app_notify; แมวส้ม sends it to LINE. Safe to run twice: one digest per week.
+ */
+function weeklyDigest() {
+  var res = guard_(function (ctx) {
+    var d = digestMessages_(ctx);
+    var week = Domain.weekRange(d.today).from;
+    return ctx.repo.enqueueNotify(
+      'digest:' + week.y + '-' + week.m + '-' + week.d,
+      'สรุปรายสัปดาห์',
+      d.messages,
+    );
+  });
+  console.log('weeklyDigest', JSON.stringify(res));
+  return res;
+}
+
+/** Admin button: queue the digest now (to try แมวส้ม without waiting for Monday). */
+function Api_queueDigestNow() {
+  return guard_(function (ctx) {
+    if (!ctx.repo.isAdmin(ctx.email, owner_(ctx))) return Config.fail('NOT_ADMIN');
+    var d = digestMessages_(ctx);
+    var stamp = Utilities.formatDate(new Date(), Config.TZ, 'yyyy-MM-dd HH:mm:ss');
+    return ctx.repo.enqueueNotify('digest-now:' + stamp, 'สรุป (กดส่งเอง)', d.messages);
+  });
+}

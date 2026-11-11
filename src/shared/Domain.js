@@ -853,6 +853,140 @@ var Domain = (function () {
     return 'ลำดับ ' + (r.seq === null ? '-' : r.seq);
   }
 
+  var DIGEST_MAX_CHARS = 4500; // LINE text message limit is 5,000 characters
+  var DIGEST_PER_LIST = 5;
+
+  /**
+   * Monday digest text for LINE (แมวส้ม sends it; user request 2026-11-11). Team totals, then each developer
+   * with open work: overdue (days late) and due this week, capped per list. Split into messages of at most
+   * DIGEST_MAX_CHARS, only between developers.
+   * @param {any[]} rows enriched rows @param {SheetDate} today @param {{appUrl?: string}} opts
+   * @returns {string[]}
+   */
+  function buildDigest(rows, today, opts) {
+    opts = opts || {};
+    var week = weekRange(today);
+    var short = function (/** @type {any} */ dt) {
+      return THAI_MONTHS[dt.m - 1] + ' ' + String(dt.y + 543).slice(-2);
+    };
+    var label =
+      week.from.m === week.to.m
+        ? week.from.d + '–' + week.to.d + ' ' + short(week.to)
+        : formatThai(week.from) + ' – ' + formatThai(week.to);
+    var open = rows.filter(function (r) {
+      return r.isOpen;
+    });
+    var head = ['📋 สรุปงานประจำสัปดาห์ ' + label];
+    if (!open.length) {
+      head.push('ไม่มีงานค้าง เยี่ยมมาก 🎉');
+      return [head.join('\n')];
+    }
+    var overdueAll = open.filter(function (r) {
+      return r.isOverdue;
+    }).length;
+    var unassigned = open.filter(function (r) {
+      return !r.developer;
+    }).length;
+    head.push(
+      'งานค้าง ' +
+        open.length +
+        ' งาน · เกินกำหนด ' +
+        overdueAll +
+        ' งาน' +
+        (unassigned ? ' · ยังไม่มอบหมาย ' + unassigned + ' งาน' : ''),
+    );
+
+    var item = function (/** @type {any} */ r, /** @type {string} */ tail) {
+      var text = clean(r.detail);
+      if (text.length > 40) text = text.slice(0, 39) + '…';
+      return ' • #' + r.seq + ' ' + text + ' (' + tail + ')';
+    };
+    var list = function (
+      /** @type {string} */ title,
+      /** @type {any[]} */ items,
+      /** @type {(r:any)=>string} */ tail,
+    ) {
+      if (!items.length) return [];
+      var lines = [title].concat(
+        items.slice(0, DIGEST_PER_LIST).map(function (r) {
+          return item(r, tail(r));
+        }),
+      );
+      if (items.length > DIGEST_PER_LIST)
+        lines.push(' … และอีก ' + (items.length - DIGEST_PER_LIST) + ' งาน');
+      return lines;
+    };
+    var byDev = groupBy(
+      open.filter(function (r) {
+        return r.developer;
+      }),
+      function (r) {
+        return r.developer;
+      },
+    );
+    var blocks = Object.keys(byDev)
+      .map(function (name) {
+        var mine = byDev[name];
+        var over = mine
+          .filter(function (r) {
+            return r.isOverdue;
+          })
+          .sort(pressing);
+        var thisWeek = mine
+          .filter(function (r) {
+            return !r.isOverdue && r.effectiveDue && inRange(r.effectiveDue, week);
+          })
+          .sort(pressing);
+        return { name: name, open: mine.length, over: over, thisWeek: thisWeek };
+      })
+      .filter(function (b) {
+        return b.over.length || b.thisWeek.length;
+      })
+      .sort(function (a, b) {
+        return (
+          b.over.length - a.over.length || b.thisWeek.length - a.thisWeek.length || (a.name < b.name ? -1 : 1)
+        );
+      })
+      .map(function (b) {
+        return [
+          '',
+          '👩‍💻 ' +
+            b.name +
+            ' — ค้าง ' +
+            b.open +
+            ' งาน' +
+            (b.over.length ? ' (เกิน ' + b.over.length + ')' : ''),
+        ]
+          .concat(
+            list('🔥 เกินกำหนด', b.over, function (r) {
+              return 'เกิน ' + r.overdueDays + ' วัน';
+            }),
+          )
+          .concat(
+            list('📅 สัปดาห์นี้', b.thisWeek, function (r) {
+              return formatThai(r.effectiveDue);
+            }),
+          )
+          .join('\n');
+      });
+    var foot = opts.appUrl ? '\nดูรายละเอียด: ' + opts.appUrl : '';
+
+    var msgs = [];
+    var cur = head.join('\n');
+    blocks.forEach(function (b) {
+      if ((cur + '\n' + b).length > DIGEST_MAX_CHARS) {
+        msgs.push(cur);
+        cur = b.replace(/^\n/, '');
+      } else cur += '\n' + b;
+    });
+    if ((cur + '\n' + foot).length > DIGEST_MAX_CHARS) {
+      msgs.push(cur);
+      cur = foot.trim();
+    } else cur += foot ? '\n' + foot : '';
+    if (cur) msgs.push(cur);
+    return msgs;
+  }
+
   /** "9–15 พ.ย. 2569" for a range inside one month, else two Thai dates. */
   function thaiRange(/** @type {{from:SheetDate,to:SheetDate}} */ rg) {
     if (rg.from.m === rg.to.m && rg.from.y === rg.to.y) {
@@ -1135,6 +1269,8 @@ var Domain = (function () {
     computeMetrics: computeMetrics,
     pmBreakdown: pmBreakdown,
     unassignedQueue: unassignedQueue,
+    buildDigest: buildDigest,
+    DIGEST_MAX_CHARS: DIGEST_MAX_CHARS,
     collectLinks: collectLinks,
     weekPlan: weekPlan,
     stageOf: stageOf,

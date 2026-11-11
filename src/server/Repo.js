@@ -435,6 +435,166 @@ function makeRepo(deps) {
     });
   }
 
+  // ------------------------------------------------------------------ log readers: history, deleted items, restore
+
+  /** _app_log as display rows (header excluded); [] when there is no log yet. */
+  function logRows() {
+    var sh = ss.getSheetByName(C.SHEETS.log);
+    if (!sh) return [];
+    return sh.getDataRange().getDisplayValues().slice(1);
+  }
+
+  /**
+   * Change history of one ลำดับ, newest first (the big DELETE snapshot is not returned).
+   * @param {number} seq @returns {Array<{time:string, who:string, action:string, column:string, from:string, to:string}>}
+   */
+  function history(seq) {
+    var want = Number(seq);
+    var out = [];
+    var rows = logRows();
+    for (var i = rows.length - 1; i >= 0 && out.length < C.HISTORY_LIMIT; i--) {
+      var r = rows[i];
+      if (toInt(r[4]) !== want) continue;
+      var whole = r[2] === 'DELETE' || r[2] === 'RESTORE';
+      out.push({
+        time: r[0],
+        who: r[1],
+        action: r[2],
+        column: r[5],
+        from: whole ? '' : r[6],
+        to: whole ? '' : r[7],
+      });
+    }
+    return out;
+  }
+
+  /** Current ลำดับ values in the main sheet (as a set). */
+  function seqSet() {
+    var display = mainSheet().getDataRange().getDisplayValues();
+    var map = mapHeaders(display[0] || []);
+    /** @type {Object<string, boolean>} */
+    var seen = {};
+    for (var i = 1; i < display.length; i++) {
+      var s = toInt(display[i][map.index.seq]);
+      if (s !== null) seen[s] = true;
+    }
+    return seen;
+  }
+
+  /** Parse a DELETE entry's JSON snapshot; null when it is not one. @param {any[]} r */
+  function deletedSnapshot(r) {
+    if (!r || r[2] !== 'DELETE') return null;
+    try {
+      var saved = JSON.parse(r[6]);
+      return saved && typeof saved === 'object' ? saved : null;
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  /** Deleted items whose ลำดับ is not back in the sheet, newest first (admins restore from here). */
+  function listDeleted() {
+    var present = seqSet();
+    var rows = logRows();
+    var out = [];
+    for (var i = rows.length - 1; i >= 0; i--) {
+      var saved = deletedSnapshot(rows[i]);
+      var seq = toInt(rows[i][4]);
+      if (!saved || seq === null || present[seq]) continue;
+      present[seq] = true; // only the latest delete of a ลำดับ
+      out.push({
+        logRow: i + 2,
+        time: rows[i][0],
+        who: rows[i][1],
+        seq: seq,
+        detail: clean(saved[D.COLUMN_BY_KEY.detail.header]),
+        status: clean(saved[D.COLUMN_BY_KEY.status.header]),
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Put a deleted row back at the bottom from its _app_log snapshot (admins only, checked in Code.js).
+   * Same ลำดับ; refused if that ลำดับ is in use. Values go through the same text/date rules as create.
+   * @param {number} logRow row number in _app_log @param {string} email
+   */
+  function restore(logRow, email) {
+    return withLock(function () {
+      var logSh = ss.getSheetByName(C.SHEETS.log);
+      var n = Number(logRow);
+      if (!logSh || !(n >= 2 && n <= logSh.getLastRow())) return C.fail('NOT_DELETED');
+      var entry = logSh.getRange(n, 1, 1, C.LOG_HEADERS.length).getDisplayValues()[0];
+      var saved = deletedSnapshot(entry);
+      var seq = toInt(entry[4]);
+      if (!saved || seq === null) return C.fail('NOT_DELETED');
+      if (seqSet()[seq]) return C.fail('SEQ_TAKEN');
+
+      var sh = mainSheet();
+      var range = sh.getDataRange();
+      var display = range.getDisplayValues();
+      var map = mapHeaders(display[0]);
+      if (map.missing.length) return C.fail('SCHEMA', { missing: map.missing }, map.missing.join(', '));
+      var dateColumns = detectDateColumns(range.getValues(), map.index);
+      /** @type {Object<string, string>} header → column key */
+      var keyOf = {};
+      D.COLUMNS.forEach(function (/** @type {any} */ c) {
+        keyOf[c.header] = c.key;
+      });
+      var line = display[0].map(function (/** @type {string} */ h) {
+        var v = saved[clean(h)];
+        if (v === undefined || clean(v) === '') return '';
+        var key = keyOf[clean(h)];
+        if (key === 'seq') return seq;
+        if (!key) return asText(String(v)); // a column the app does not manage: keep the text as it was shown
+        var c = D.COLUMN_BY_KEY[key];
+        if ((c.type === 'number' || c.type === 'int') && isNaN(Number(clean(v)))) return asText(clean(v));
+        return toCellValue(key, v, '', !!dateColumns[key]);
+      });
+      var rowNumber = sh.getLastRow() + 1;
+      sh.appendRow(line);
+      writeLog([
+        [deps.nowText(), email, 'RESTORE', rowNumber, seq, '(ทั้งแถว)', '', 'กู้คืนจาก _app_log แถว ' + n],
+      ]);
+      if (deps.cache) deps.cache.remove(C.CACHE_KEYS.options);
+      return C.ok({ rowNumber: rowNumber, seq: seq });
+    });
+  }
+
+  // ------------------------------------------------------------------ notification queue (read by แมวส้ม)
+
+  /**
+   * Queue messages for แมวส้ม to send to LINE. One row per message; a key is only queued once
+   * (so a re-run of the Monday job does not send the digest twice).
+   * @param {string} key e.g. "digest:2026-11-16" @param {string} type @param {string[]} messages
+   */
+  function enqueueNotify(key, type, messages) {
+    return withLock(function () {
+      var sh = ensureSheet(C.SHEETS.notify, C.NOTIFY_HEADERS);
+      var ids = sh
+        .getDataRange()
+        .getDisplayValues()
+        .slice(1)
+        .map(function (/** @type {any[]} */ r) {
+          return String(r[0]);
+        });
+      var prefix = key + '#';
+      if (
+        ids.some(function (id) {
+          return id.indexOf(prefix) === 0;
+        })
+      )
+        return C.ok({ added: 0 });
+      var now = deps.nowText();
+      var rows = messages.map(function (m, i) {
+        return [prefix + (i + 1), now, type, m, C.NOTIFY_STATES.pending, '', ''].map(asText);
+      });
+      if (rows.length)
+        sh.getRange(sh.getLastRow() + 1, 1, rows.length, C.NOTIFY_HEADERS.length).setValues(rows);
+      return C.ok({ added: rows.length });
+    });
+  }
+
   // ------------------------------------------------------------------ users & permissions
 
   /** @param {string} email */
@@ -825,6 +985,10 @@ function makeRepo(deps) {
     create: create,
     update: update,
     remove: remove,
+    history: history,
+    listDeleted: listDeleted,
+    restore: restore,
+    enqueueNotify: enqueueNotify,
     getUserName: getUserName,
     setUserName: setUserName,
     canEdit: canEdit,

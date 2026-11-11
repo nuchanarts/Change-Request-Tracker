@@ -44,7 +44,7 @@ export default [
       'no-unused-vars': [
         'error',
         {
-          varsIgnorePattern: '^(doGet|include|Api_|run|Domain|Config|makeRepo|Auth)',
+          varsIgnorePattern: '^(doGet|include|Api_|run|weeklyDigest|Domain|Config|makeRepo|Auth)',
           argsIgnorePattern: '^_',
           caughtErrorsIgnorePattern: '^_',
         },

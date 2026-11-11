@@ -738,4 +738,14 @@
   /* My Work: pick a status */
   .qs-form { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .qs-form select { font: inherit; font-size: 14px; min-height: 34px; max-width: 220px; border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; background: var(--surface); }
+  /* item history */
+  .hist-panel { margin-top: 14px; }
+  .hist-panel summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 6px; }
+  .hist-panel summary::-webkit-details-marker { display: none; }
+  .hist { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+  .hist li { display: grid; grid-template-columns: 150px 120px minmax(0, 1fr); gap: 8px; font-size: 14px; padding: 6px 0; border-top: 1px solid var(--line); }
+  @media (max-width: 640px) { .hist li { grid-template-columns: 1fr; gap: 2px; } }
+  .hist-time { color: var(--muted); }
+  .hist-from { text-decoration: line-through; color: var(--muted); }
+  .hist-to { color: var(--accent); font-weight: 600; }
 </style>
