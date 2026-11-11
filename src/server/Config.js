@@ -20,6 +20,9 @@ var Config = (function () {
     VALIDATION: 'กรุณาตรวจสอบข้อมูลที่กรอกอีกครั้ง',
     CONFIG: 'ยังไม่ได้ตั้งค่า SPREADSHEET_ID ใน Script Properties ของแอป กรุณาแจ้งผู้ดูแลระบบ',
     NO_ACCESS: 'บัญชีนี้ไม่มีสิทธิ์เปิดชีตข้อมูล กรุณาขอสิทธิ์จาก PM เจ้าของชีต แล้วเปิดแอปใหม่',
+    SEQ_TAKEN:
+      'เลขลำดับของรายการนี้ถูกใช้โดยรายการอื่นในชีตแล้ว จึงกู้คืนไม่ได้ (หรือกู้คืนไปแล้ว) กรุณาโหลดข้อมูลใหม่',
+    NOT_DELETED: 'ไม่พบบันทึกการลบนี้ใน _app_log กรุณาโหลดรายการใหม่',
     ERROR: 'เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่ หากยังพบปัญหาให้แจ้งผู้ดูแลระบบ',
   };
 
@@ -43,7 +46,12 @@ var Config = (function () {
       log: '_app_log',
       users: '_app_users',
       allowed: '_app_allowed',
+      notify: '_app_notify', // queue that แมวส้ม reads and sends to LINE (2026-11-11)
     },
+    NOTIFY_HEADERS: ['id', 'สร้างเมื่อ', 'ประเภท', 'ข้อความ', 'สถานะ', 'ส่งเมื่อ', 'หมายเหตุ'],
+    NOTIFY_STATES: { pending: 'รอส่ง', sent: 'ส่งแล้ว', failed: 'ส่งไม่สำเร็จ' },
+    APP_URL: 'https://nuchanarts.github.io/Change-Request-Tracker/',
+    HISTORY_LIMIT: 100,
     LOG_HEADERS: ['เวลา', 'ผู้ใช้', 'การกระทำ', 'เลขแถว', 'ลำดับ', 'คอลัมน์', 'ค่าเดิม', 'ค่าใหม่'],
     USERS_HEADERS: ['email', 'ชื่อ', 'อัปเดตเมื่อ'],
     ALLOWED_HEADERS: ['email', 'ชื่อ', 'หมายเหตุ', 'บทบาท', 'สถานะ'],
