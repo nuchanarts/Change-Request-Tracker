@@ -151,7 +151,12 @@ function Api_requestAccess(input) {
 function Api_listAccess() {
   return guard_(function (ctx) {
     if (!ctx.repo.isAdmin(ctx.email, owner_(ctx))) return Config.fail('NOT_ADMIN');
-    return Config.ok({ members: ctx.repo.listAccess(), owner: owner_(ctx) });
+    return Config.ok({
+      members: ctx.repo.listAccess(),
+      owner: owner_(ctx),
+      roles: [Config.ROLE.admin, Config.ROLE.editor],
+      states: Config.ACCESS,
+    });
   });
 }
 
