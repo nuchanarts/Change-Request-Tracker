@@ -151,6 +151,29 @@ var Domain = (function () {
     return dt.d + ' ' + THAI_MONTHS[dt.m - 1] + ' ' + String(dt.y + 543).slice(-2);
   }
 
+  var THAI_DAYS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+  var THAI_MONTHS_LONG = [
+    'มกราคม',
+    'กุมภาพันธ์',
+    'มีนาคม',
+    'เมษายน',
+    'พฤษภาคม',
+    'มิถุนายน',
+    'กรกฎาคม',
+    'สิงหาคม',
+    'กันยายน',
+    'ตุลาคม',
+    'พฤศจิกายน',
+    'ธันวาคม',
+  ];
+
+  /** Full Thai date, e.g. "วันพุธที่ 11 พฤศจิกายน 2569". @param {SheetDate|null} dt */
+  function formatThaiLong(dt) {
+    if (!dt) return '';
+    var dow = new Date(Date.UTC(dt.y, dt.m - 1, dt.d)).getUTCDay();
+    return 'วัน' + THAI_DAYS[dow] + 'ที่ ' + dt.d + ' ' + THAI_MONTHS_LONG[dt.m - 1] + ' ' + (dt.y + 543);
+  }
+
   /** @param {string} iso yyyy-mm-dd @returns {SheetDate|null} */
   function fromIso(iso) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(clean(iso));
@@ -636,6 +659,7 @@ var Domain = (function () {
     parseDate: parseDate,
     formatDate: formatDate,
     formatThai: formatThai,
+    formatThaiLong: formatThaiLong,
     fromIso: fromIso,
     toIso: toIso,
     daysBetween: daysBetween,

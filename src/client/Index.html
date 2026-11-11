@@ -13,10 +13,16 @@
     <a class="sr-only" href="#main">ข้ามไปที่เนื้อหา</a>
     <header class="topbar">
       <div class="topbar-inner">
-        <div class="brand">
-          <strong>ติดตามรายการขอแก้ไขโปรแกรม</strong>
-          <span id="sheet-name">EHP / NHIP / INV</span>
-        </div>
+        <a class="brand-row" href="#/monitor" aria-label="ภาพรวม (หน้าแรก)" style="text-decoration: none; color: inherit">
+          <svg class="logo" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+            <rect width="32" height="32" rx="9" fill="currentColor" />
+            <path d="M8 10l5 6-5 6M14.5 10l5 6-5 6M21 10l5 6-5 6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span class="brand">
+            <strong>ติดตามรายการขอแก้ไขโปรแกรม</strong>
+            <span><span id="sheet-name">EHP / NHIP / INV</span> <span class="ver" data-app-version title="เวอร์ชันของแอป">v__APP_VERSION__</span></span>
+          </span>
+        </a>
         <nav class="nav" aria-label="เมนูหลัก">
           <a href="#/monitor" data-route="monitor">ภาพรวม</a>
           <a href="#/kanban" data-route="kanban">บอร์ดงาน</a>
@@ -28,7 +34,13 @@
       </div>
     </header>
     <main id="main" tabindex="-1" aria-live="polite">
-      <div class="loading"><div class="spinner" aria-hidden="true"></div>กำลังโหลดข้อมูลจากชีต…</div>
+      <div class="loading">
+        <svg class="logo pulse" viewBox="0 0 32 32" aria-hidden="true" focusable="false" style="width: 56px; height: 56px; display: block; margin: 0 auto 16px">
+          <rect width="32" height="32" rx="9" fill="currentColor" />
+          <path d="M8 10l5 6-5 6M14.5 10l5 6-5 6M21 10l5 6-5 6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        กำลังเตรียมภาพรวมงานจากชีต…
+      </div>
     </main>
     <div class="toast-host" id="toasts" role="status" aria-live="polite"></div>
     <dialog id="dialog"></dialog>

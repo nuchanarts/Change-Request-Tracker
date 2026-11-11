@@ -188,9 +188,40 @@
       else html = Views.monitor(state);
       if (state.tourStep !== null) html += Views.tour(state.tourStep);
       main.innerHTML = html;
+      if (r.name === 'monitor' && !state.introPlayed) playIntro(main);
     }
 
-    function go(hash) {
+    /**
+     * The one orchestrated entrance (first Monitor view of a page load): hero rises, pipeline grows,
+     * headline numbers count up. Skipped for reduced motion and for automated browsers (tests read numbers).
+     */
+    function playIntro(main) {
+      state.introPlayed = true;
+      var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced || navigator.webdriver) return;
+      main.classList.add('intro');
+      setTimeout(function () { main.classList.remove('intro'); }, 2200);
+      var els = main.querySelectorAll('.hero .stat .value');
+      var targets = Array.prototype.map.call(els, function (el) { return Number(el.textContent.replace(/[^\d]/g, '')) || 0; });
+      var start = null;
+      var DURATION = 1100;
+      function frame(t) {
+        if (start === null) start = t;
+        var p = Math.min(1, (t - start) / DURATION);
+        var eased = 1 - Math.pow(1 - p, 3);
+        els.forEach(function (el, i) {
+          if (el.isConnected) el.textContent = Math.round(targets[i] * eased).toLocaleString('th-TH');
+        });
+        if (p < 1) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+
+    // Pages visited in this session, for the in-app "← กลับ" button (the browser back button also works).
+    var navStack = [];
+
+    function go(hash, opts) {
+      if (hash !== currentHash && !(opts && opts.back)) navStack.push(currentHash);
       if (gasHistory) {
         if (hash !== currentHash) gasHistory.push(null, null, hash.slice(1));
         return showRoute(hash);
@@ -199,13 +230,32 @@
       else location.hash = hash; // hashchange → showRoute
     }
 
+    /** Where "กลับ" goes when the page was opened directly (no history in this session). */
+    function parentOf(r) {
+      if (r.name === 'items' && r.id) return '#/items';
+      if (r.name === 'items' && state.drill) return '#/monitor';
+      return '#/monitor';
+    }
+
+    function back() {
+      var target = navStack.pop() || parentOf(route());
+      if (target === '#/monitor') state.drill = null; // leaving a drill-down for its source
+      go(target, { back: true });
+    }
+
+    /** Keep navStack in step when the browser's own back/forward is used. */
+    function onExternalNav(hash) {
+      if (navStack.length && navStack[navStack.length - 1] === hash) navStack.pop();
+      showRoute(hash);
+    }
+
     function resetForm() {
       state.formErrors = state.formWarnings = state.formDraft = state.formAlert = null;
     }
 
     if (gasHistory) {
       gasHistory.setChangeHandler(function (e) {
-        showRoute('#' + ((e && e.location && e.location.hash) || '/monitor'));
+        onExternalNav('#' + ((e && e.location && e.location.hash) || '/monitor'));
       });
       if (google.script.url) {
         google.script.url.getLocation(function (loc) {
@@ -214,7 +264,7 @@
       }
     } else {
       window.addEventListener('hashchange', function () {
-        showRoute(location.hash);
+        if (location.hash !== currentHash) onExternalNav(location.hash);
       });
     }
 
@@ -412,6 +462,7 @@
         input.value = todaySheet();
         input.dispatchEvent(new Event('change', { bubbles: true }));
       },
+      back: back,
       'tour-start': startTour,
       'tour-next': function () {
         if (state.tourStep >= Views.TOUR_STEPS - 1) return endTour();
