@@ -393,8 +393,8 @@ function makeRepo(deps) {
 
   /**
    * Edit permission follows the sheet's own permission (R8). Named editors/viewers are answered from
-   * the sharing list. Anyone else (group or link sharing) is probed once by adding and removing a hidden
-   * developer-metadata key, which only editors can do; the answer is cached per user for 6 hours.
+   * the sharing list. Anyone else (group or link sharing) is checked with Range.canEdit() (no write), or,
+   * if that is unavailable, a developer-metadata probe; the answer is cached per user for 1 hour.
    * @param {string} email
    */
   function canEdit(email) {
@@ -416,18 +416,46 @@ function makeRepo(deps) {
     // runs AS the caller (executeAs USER_ACCESSING); otherwise fail closed (security review 2026-11-11).
     var runningAs = deps.effectiveEmail ? clean(deps.effectiveEmail()).toLowerCase() : '';
     if (runningAs !== e) return false;
-    var key = 'canEdit:' + e;
+    var key = C.EDIT_CACHE_PREFIX + e; // v2 key: ignores answers cached by the buggy v1 probe
     var cached = deps.userCache ? deps.userCache.get(key) : null;
     if (cached !== null) return cached === '1';
-    var result;
-    try {
-      ss.addDeveloperMetadata(C.EDIT_PROBE_KEY).remove();
-      result = true;
-    } catch (_err) {
-      result = false; // the probe is refused without edit access
-    }
+    var result = rangeCanEdit();
+    if (result === null) result = metadataProbe();
     if (deps.userCache) deps.userCache.put(key, result ? '1' : '0', C.EDIT_PROBE_CACHE_SECONDS);
     return result;
+  }
+
+  /** Ask Sheets directly whether the effective user can edit the main sheet (no write). null = unsupported. */
+  function rangeCanEdit() {
+    try {
+      return mainSheet().getRange(1, 1).canEdit() === true;
+    } catch (err) {
+      console.warn('canEdit: Range.canEdit() unavailable, using metadata probe', err);
+      return null;
+    }
+  }
+
+  /**
+   * Fallback: only editors can add developer metadata. Note addDeveloperMetadata() returns the
+   * Spreadsheet, so the key is removed through a finder (this also cleans keys left by the old probe).
+   */
+  function metadataProbe() {
+    try {
+      ss.addDeveloperMetadata(C.EDIT_PROBE_KEY);
+    } catch (_err) {
+      return false; // refused without edit access
+    }
+    try {
+      ss.createDeveloperMetadataFinder()
+        .withKey(C.EDIT_PROBE_KEY)
+        .find()
+        .forEach(function (/** @type {any} */ md) {
+          md.remove();
+        });
+    } catch (err) {
+      console.warn('canEdit: could not remove probe metadata', err);
+    }
+    return true;
   }
 
   return {
