@@ -28,9 +28,10 @@ test.describe('US2 Add request', () => {
   test('status dropdown is in workflow order with numbered steps', async ({ page }) => {
     await open(page, '/#/new');
     const labels = await page.locator('#f-status option').allTextContents();
-    expect(labels[0]).toBe('1) 0.รอแจ้งทีมพัฒนา');
-    expect(labels[8]).toBe('9) รอ PM ตรวจสอบ Taiga');
-    expect(labels.slice(9)).toEqual(['0.แก้ไขเรียบร้อย', '0.ใช้งานได้อยู่แล้ว', '0.ยกเลิก']);
+    expect(labels[0]).toBe('1) 0.จัดทำไฟล์แก้ไข');
+    expect(labels[4]).toBe('5) dev ขอ Sourecode อจ.');
+    expect(labels[10]).toBe('11) รอ Complie ต้องแจ้งอจ.');
+    expect(labels.slice(11)).toEqual(['0.ยกเลิก', '0.ใช้งานได้อยู่แล้ว', '0.แก้ไขเรียบร้อย']);
     await expect(page.locator('#f-status')).toHaveValue('0.รอแจ้งทีมพัฒนา');
   });
 

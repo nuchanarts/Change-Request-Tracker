@@ -120,7 +120,7 @@ describe('options (constitution III)', () => {
     expect(o.platform).toEqual(['EHP', 'NHIP', 'INV', 'EHP Pharmacy']);
     expect(o.system).toEqual(['Dispensary', 'เวชระเบียน']);
     expect(o.urgency).toEqual(['ด่วนที่สุด', 'ด่วน', 'ปกติ']);
-    expect(o.status[0]).toBe('0.รอแจ้งทีมพัฒนา');
+    expect(o.status[0]).toBe('0.จัดทำไฟล์แก้ไข'); // workflow order (PM-approved 2026-11-11)
     expect(o.person).toEqual(['นุชนารถ (แก๊ส)', 'เอิร์น', 'กิ่ง']);
     expect(o.pm).toEqual(o.person);
   });

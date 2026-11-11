@@ -24,14 +24,33 @@ describe('status semantics (constitution IV)', () => {
     expect(D.isOpen('  0.ยกเลิก ')).toBe(false);
   });
 
-  it('exposes the workflow in the contract order', () => {
-    expect(D.WORKFLOW[0]).toBe('0.รอแจ้งทีมพัฒนา');
-    expect(D.WORKFLOW).toContain('รอ Complie ต้องแจ้งอจ.');
-    expect(D.WORKFLOW.slice(-3)).toEqual(['0.แก้ไขเรียบร้อย', '0.ใช้งานได้อยู่แล้ว', '0.ยกเลิก']);
+  it('exposes the workflow in the PM-approved order (2026-11-11), spellings kept exactly', () => {
+    expect(D.WORKFLOW).toEqual([
+      '0.จัดทำไฟล์แก้ไข',
+      '0.จัดทำ Taiga',
+      'รอ PM ตรวจสอบ Taiga',
+      '0.รอแจ้งทีมพัฒนา',
+      'dev ขอ Sourecode อจ.',
+      'รอทีมพัฒนา',
+      'กำลังพัฒนา',
+      'ส่งกลับนักพัฒนาแก้ไข',
+      'กำลังทดสอบ',
+      'รอ compile',
+      'รอ Complie ต้องแจ้งอจ.',
+      '0.ยกเลิก',
+      '0.ใช้งานได้อยู่แล้ว',
+      '0.แก้ไขเรียบร้อย',
+    ]);
+  });
+
+  it('new statuses are open; new items still start at 0.รอแจ้งทีมพัฒนา', () => {
+    expect(D.isOpen('0.จัดทำ Taiga')).toBe(true);
+    expect(D.isOpen('dev ขอ Sourecode อจ.')).toBe(true);
+    expect(D.DEFAULT_STATUS).toBe('0.รอแจ้งทีมพัฒนา');
   });
 
   it('statusRank puts unknown statuses after the workflow', () => {
-    expect(D.statusRank('รอทีมพัฒนา')).toBe(1);
+    expect(D.statusRank('รอทีมพัฒนา')).toBe(5);
     expect(D.statusRank('อะไรก็ไม่รู้')).toBeGreaterThan(D.WORKFLOW.length - 1);
   });
 });

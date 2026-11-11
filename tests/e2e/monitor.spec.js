@@ -15,7 +15,7 @@ test.describe('US1 Monitor', () => {
 
   test('pipeline shows every open workflow step and highlights the bottleneck', async ({ page }) => {
     await open(page);
-    await expect(page.locator('.stage')).toHaveCount(9);
+    await expect(page.locator('.stage')).toHaveCount(11);
     await expect(page.locator('.stage.bottleneck')).toHaveCount(1);
   });
 

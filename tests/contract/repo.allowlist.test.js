@@ -16,7 +16,8 @@ const build = ({ allowed = null, probeAllowed = true } = {}) => {
   main = new FakeSheet(Config.SHEETS.main, [HEADERS.slice()]);
   main.rangeCanEdit = false; // like the real link-shared sheet
   const sheets = [main];
-  if (allowed) sheets.push(new FakeSheet(Config.SHEETS.allowed, [Config.ALLOWED_HEADERS.slice(), ...allowed]));
+  if (allowed)
+    sheets.push(new FakeSheet(Config.SHEETS.allowed, [Config.ALLOWED_HEADERS.slice(), ...allowed]));
   ss = new FakeSpreadsheet(sheets, { editors: [], probeAllowed });
   repo = makeRepo({
     ss,
@@ -43,13 +44,19 @@ describe('editAccess', () => {
   it('blocks a sheet editor who is not on the team list', () => {
     build({ allowed: [['someone@x.com', '', '']] });
     effective = 'outsider@gmail.com';
-    expect(repo.editAccess('outsider@gmail.com', 'owner@x.com')).toEqual({ canEdit: false, reason: 'NOT_ALLOWED' });
+    expect(repo.editAccess('outsider@gmail.com', 'owner@x.com')).toEqual({
+      canEdit: false,
+      reason: 'NOT_ALLOWED',
+    });
   });
 
   it('blocks people who cannot edit the sheet at all, even if listed', () => {
     build({ allowed: [['viewer@x.com', '', '']], probeAllowed: false });
     effective = 'viewer@x.com';
-    expect(repo.editAccess('viewer@x.com', 'owner@x.com')).toEqual({ canEdit: false, reason: 'SHEET_VIEW_ONLY' });
+    expect(repo.editAccess('viewer@x.com', 'owner@x.com')).toEqual({
+      canEdit: false,
+      reason: 'SHEET_VIEW_ONLY',
+    });
   });
 
   it('first sheet editor creates the list with the owner and themselves, and it is logged', () => {
@@ -65,7 +72,12 @@ describe('editAccess', () => {
   });
 
   it('ignores blank rows and stray spaces in the list', () => {
-    build({ allowed: [['', '', ''], ['  pm@x.com  ', 'PM', '']] });
+    build({
+      allowed: [
+        ['', '', ''],
+        ['  pm@x.com  ', 'PM', ''],
+      ],
+    });
     effective = 'pm@x.com';
     expect(repo.editAccess('pm@x.com', '').canEdit).toBe(true);
   });

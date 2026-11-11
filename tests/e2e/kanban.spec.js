@@ -6,8 +6,11 @@ test.describe('US8 Kanban board', () => {
     await open(page, '/#/kanban');
     await expect(page.locator('.kcol[data-status="0.รอแจ้งทีมพัฒนา"]')).toHaveCount(1);
     await expect(page.locator('.kcol.closed')).toHaveCount(1);
-    await expect(page.locator('.kcol[data-status]').filter({ hasNot: page.locator('.other') })).toHaveCount(
-      11,
+    // 11 working steps (PM-approved order) + closed this week, plus the "other" column when needed
+    await expect(page.locator('.kcol:not(.other):not(.closed)')).toHaveCount(11);
+    await expect(page.locator('.kcol:not(.other)').first()).toHaveAttribute(
+      'data-status',
+      '0.จัดทำไฟล์แก้ไข',
     );
     await expect(page.locator('.kcol.bottleneck')).toHaveCount(1);
   });
@@ -30,7 +33,8 @@ test.describe('US8 Kanban board', () => {
     await open(page, '/#/kanban');
     await page.setViewportSize({ width: 1920, height: 1000 });
     await page.locator('.kcol.closed').scrollIntoViewIfNeeded();
-    const card = page.locator('.kcol[data-status="รอ PM ตรวจสอบ Taiga"] .kcard[draggable="true"]').first();
+    // the last working step sits next to the closed column, so the drag does not scroll the board
+    const card = page.locator('.kcol[data-status="รอ Complie ต้องแจ้งอจ."] .kcard[draggable="true"]').first();
     const id = await card.getAttribute('data-id');
     await card.dragTo(page.locator('.kcol.closed'));
     await expect(page.locator('.toast')).toContainText('บันทึกการแก้ไขแล้ว (สถานะ, วันที่เสร็จ)');

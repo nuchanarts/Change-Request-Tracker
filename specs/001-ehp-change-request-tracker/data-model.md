@@ -112,9 +112,10 @@ MyWorkGroups   = { overdue[], today[], within7[], later[], noDue[] }  // sorted 
 
 ```text
 CLOSED   = { '0.แก้ไขเรียบร้อย', '0.ใช้งานได้อยู่แล้ว', '0.ยกเลิก' }        // exact set membership, never startsWith('0.')
-WORKFLOW = [ '0.รอแจ้งทีมพัฒนา', 'รอทีมพัฒนา', 'กำลังพัฒนา', '0.จัดทำไฟล์แก้ไข', 'รอ compile',
-             'รอ Complie ต้องแจ้งอจ.', 'กำลังทดสอบ', 'ส่งกลับนักพัฒนาแก้ไข', 'รอ PM ตรวจสอบ Taiga',
-             '0.แก้ไขเรียบร้อย', '0.ใช้งานได้อยู่แล้ว', '0.ยกเลิก' ]
+WORKFLOW = [ '0.จัดทำไฟล์แก้ไข', '0.จัดทำ Taiga', 'รอ PM ตรวจสอบ Taiga', '0.รอแจ้งทีมพัฒนา',
+             'dev ขอ Sourecode อจ.', 'รอทีมพัฒนา', 'กำลังพัฒนา', 'ส่งกลับนักพัฒนาแก้ไข', 'กำลังทดสอบ',
+             'รอ compile', 'รอ Complie ต้องแจ้งอจ.', '0.ยกเลิก', '0.ใช้งานได้อยู่แล้ว', '0.แก้ไขเรียบร้อย' ]   // PM-approved 2026-11-11
+DEFAULT_STATUS = '0.รอแจ้งทีมพัฒนา'   // new items; nextStatus(last working step) = '0.แก้ไขเรียบร้อย'
 isOpen(status)  = !CLOSED.has(trim(status))           // '' → open
 ```
 
