@@ -1,6 +1,6 @@
 {
   "name": "bgs-ehp-change-request-tracker",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "description": "Google Apps Script web app to record and monitor EHP/NHIP/INV change requests",
   "license": "UNLICENSED",
@@ -21,7 +21,8 @@
     "push:prod": "node scripts/build.mjs && node scripts/check-clasp-target.mjs .clasp.prod.json --prod && clasp -P .clasp.prod.json push --force",
     "clasp:create-prod": "node scripts/build.mjs && clasp create --type standalone --title \"EHP Change Request Tracker\" --rootDir dist && node -e \"require('fs').renameSync('.clasp.json','.clasp.prod.json')\"",
     "deploy:prod": "clasp -P .clasp.prod.json create-deployment",
-    "deployments:prod": "clasp -P .clasp.prod.json list-deployments"
+    "deployments:prod": "clasp -P .clasp.prod.json list-deployments",
+    "build:pages": "node scripts/build-pages.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

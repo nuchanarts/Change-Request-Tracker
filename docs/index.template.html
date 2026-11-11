@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ติดตามรายการขอแก้ไขโปรแกรม</title>
+    <meta name="description" content="ทางเข้าแอปติดตามรายการขอแก้ไขโปรแกรม EHP / NHIP / INV (ทำงานบน Google Apps Script)" />
+    <meta name="robots" content="noindex" />
+    <!--
+      GENERATED from docs/index.template.html by `npm run build:pages` — edit the template, not index.html.
+      Entry page only (GitHub Pages). It holds no data and no app logic: the app and all data stay on
+      Google Apps Script / Google Sheets (constitution VIII). Update APP_URL if the deployment changes.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230f766e'/%3E%3Cpath d='M8 10l5 6-5 6M14.5 10l5 6-5 6M21 10l5 6-5 6' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+    <style>
+      :root {
+        --ink: #1c2b2f;
+        --muted: #55686d;
+        --accent: #0f766e;
+        --accent-soft: #d8efec;
+        --focus: #1d4ed8;
+      }
+      * { box-sizing: border-box; }
+      html, body { min-height: 100%; }
+      body {
+        margin: 0; color: var(--ink);
+        background: linear-gradient(135deg, #e6f6f2 0%, #f1f8ff 55%, #fff8ec 100%);
+        font: 400 16px/1.6 'IBM Plex Sans Thai', 'Sarabun', 'Noto Sans Thai', system-ui, sans-serif;
+        display: grid; place-items: center; padding: 24px 16px; overflow-x: hidden; min-height: 100vh;
+      }
+      .wrap {
+        width: 100%; max-width: 1080px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+        gap: 32px; align-items: center;
+      }
+      .brand { display: flex; align-items: center; gap: 10px; color: var(--accent); font-weight: 600; }
+      .brand svg { width: 40px; height: 40px; }
+      .ver { font-size: 12px; color: var(--muted); background: #fff; border-radius: 999px; padding: 0 8px; font-weight: 400; }
+      h1 { font-size: clamp(28px, 4.6vw, 44px); line-height: 1.2; margin: 18px 0 10px; font-weight: 600; }
+      .lead { color: var(--muted); font-size: 17px; max-width: 46ch; margin: 0; }
+      ul.points { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 12px; }
+      ul.points li { display: flex; align-items: center; gap: 12px; }
+      .pi { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; }
+      .pi svg { width: 22px; height: 22px; }
+      .pi.a { background: #d8efec; color: #0f766e; }
+      .pi.b { background: #e4f0ff; color: #1d5fb8; }
+      .pi.c { background: #fff1d6; color: #9a5b00; }
+      .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 30px; }
+      .go {
+        display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 600; font-size: 17px;
+        background: var(--accent); color: #fff; padding: 12px 28px; border-radius: 999px; min-height: 48px;
+        box-shadow: 0 8px 20px rgba(15, 118, 110, 0.28);
+      }
+      .go:hover { filter: brightness(1.06); }
+      :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+      .status { color: var(--muted); font-size: 14px; margin: 0; }
+      .bar { height: 4px; width: 160px; background: rgba(15, 118, 110, 0.12); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+      .bar span { display: block; height: 100%; width: 0; background: var(--accent); animation: fill 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+      .note { margin-top: 26px; font-size: 13.5px; color: var(--muted); background: rgba(255, 255, 255, 0.7); border-radius: 12px; padding: 10px 14px; max-width: 52ch; }
+      .art .illus { width: 100%; height: auto; display: block; }
+      .rise { animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+      .rise.d2 { animation-delay: 0.15s; }
+      /* illustration motion (same as the app) */
+      .illus .il-float { animation: il-float 4.5s ease-in-out infinite; }
+      .illus .il-float-slow { animation: il-float 6.5s ease-in-out infinite; }
+      .illus .il-move { animation: il-move 7s cubic-bezier(0.45, 0, 0.2, 1) infinite; }
+      .illus .il-bar { transform-box: fill-box; transform-origin: bottom; animation: il-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0s); }
+      .illus .il-pop { transform-box: fill-box; transform-origin: center; animation: il-pop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) 0.6s both; }
+      @keyframes il-float { 50% { transform: translateY(-6px); } }
+      @keyframes il-move {
+        0%, 22% { transform: translate(0, 0); opacity: 1; }
+        42%, 78% { transform: translate(106px, -48px); opacity: 1; }
+        92% { transform: translate(106px, -48px); opacity: 0; }
+        100% { transform: translate(0, 0); opacity: 0; }
+      }
+      @keyframes il-grow { from { transform: scaleY(0); } }
+      @keyframes il-pop { from { transform: scale(0); } }
+      @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+      @keyframes fill { to { width: 100%; } }
+      @media (max-width: 820px) {
+        .wrap { grid-template-columns: 1fr; gap: 8px; }
+        .art { order: -1; max-width: 420px; margin: 0 auto; }
+        h1 { margin-top: 8px; }
+      }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; } .bar span { width: 100%; } }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <main class="rise">
+        <div class="brand">
+          <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+            <rect width="32" height="32" rx="9" fill="currentColor" />
+            <path d="M8 10l5 6-5 6M14.5 10l5 6-5 6M21 10l5 6-5 6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          BGS Monitor <span class="ver">v__APP_VERSION__</span>
+        </div>
+        <h1>ติดตามรายการขอแก้ไขโปรแกรม</h1>
+        <p class="lead">EHP / NHIP / INV ในที่เดียว เห็นงานค้าง งานเกินกำหนด และงานของตัวเองได้ทันที</p>
+        <ul class="points">
+          <li>
+            <span class="pi a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19h16M7 16V9M12 16V5M17 16v-4" /></svg></span>
+            ภาพรวมงานและขั้นตอนที่งานกองอยู่ อัปเดตจากชีตทันที
+          </li>
+          <li>
+            <span class="pi b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.5" /><rect x="10" y="4" width="5" height="11" rx="1.5" /><rect x="17" y="4" width="4" height="7" rx="1.5" /></svg></span>
+            บอร์ดงานเลื่อนการ์ดเปลี่ยนสถานะได้ในคลิกเดียว
+          </li>
+          <li>
+            <span class="pi c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg></span>
+            งานของฉัน เรียงตามวันกำหนด ไม่พลาดงานเกินกำหนด
+          </li>
+        </ul>
+        <div class="actions">
+          <a class="go" id="go" href="https://script.google.com/macros/s/AKfycbz_ElEdO0SWkeYFwl92D4yKOFupRmlFjKNuFvUIoUje7Y02yjL3wdSKMvdi0Vk8lA8V/exec">เปิดแอป</a>
+          <div>
+            <p class="status" id="status" role="status" aria-live="polite">กำลังพาเข้าแอป…</p>
+            <div class="bar" aria-hidden="true"><span></span></div>
+          </div>
+        </div>
+        <p class="note">
+          ล็อกอินด้วยบัญชี Gmail ทุกคนดูข้อมูลได้ ส่วนการเพิ่มและแก้ไขต้องมีอีเมลในรายชื่อทีม<br />
+          ครั้งแรกถ้าเห็น "Google ยังไม่ได้ยืนยันแอปนี้" ให้กด <strong>ขั้นสูง</strong> แล้ว <strong>ไปที่ EHP Change Request Tracker</strong> และกด <strong>อนุญาต</strong>
+        </p>
+      </main>
+      <div class="art rise d2"><!-- ILLUSTRATION --></div>
+    </div>
+    <script>
+      (function () {
+        'use strict';
+        // The real app (Google Apps Script web app). Keep in sync with the production deployment.
+        var APP_URL = 'https://script.google.com/macros/s/AKfycbz_ElEdO0SWkeYFwl92D4yKOFupRmlFjKNuFvUIoUje7Y02yjL3wdSKMvdi0Vk8lA8V/exec';
+        // Carry a deep link through, e.g. …github.io/Change-Request-Tracker/#/kanban → app #/kanban
+        var target = APP_URL + (location.hash && location.hash.indexOf('#/') === 0 ? location.hash : '');
+        document.getElementById('go').href = target;
+        var stay = /[?&]stay=1/.test(location.search); // ?stay=1 shows this page without redirecting
+        if (stay) {
+          document.getElementById('status').textContent = 'กดปุ่มเพื่อเข้าใช้งาน';
+          return;
+        }
+        var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        setTimeout(function () {
+          location.replace(target);
+        }, reduced ? 0 : 2600);
+      })();
+    </script>
+  </body>
+</html>

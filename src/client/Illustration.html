@@ -1,0 +1,65 @@
+<svg class="illus" viewBox="0 0 480 340" role="img" aria-label="ภาพประกอบ: บอร์ดงานที่การ์ดเลื่อนไปตามขั้นตอน กราฟความคืบหน้า และปฏิทินที่ติ๊กงานเสร็จ" focusable="false">
+  <defs>
+    <filter id="il-shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0f3d3a" flood-opacity="0.10" />
+    </filter>
+  </defs>
+  <!-- soft background shapes -->
+  <circle cx="300" cy="170" r="150" fill="#dff4ef" />
+  <circle cx="120" cy="250" r="70" fill="#e4f0ff" />
+  <circle cx="420" cy="60" r="34" fill="#fff1d6" />
+  <circle class="il-float-slow" cx="70" cy="70" r="10" fill="#ffd166" />
+  <circle class="il-float" cx="455" cy="230" r="7" fill="#b9a7f0" />
+  <circle class="il-float-slow" cx="230" cy="20" r="6" fill="#7fd1c4" />
+
+  <!-- kanban board -->
+  <g filter="url(#il-shadow)">
+    <rect x="70" y="70" width="290" height="200" rx="18" fill="#ffffff" />
+  </g>
+  <rect x="90" y="90" width="78" height="10" rx="5" fill="#cfe7ff" />
+  <rect x="196" y="90" width="78" height="10" rx="5" fill="#c9efe8" />
+  <rect x="302" y="90" width="42" height="10" rx="5" fill="#d7f2df" />
+  <line x1="182" y1="112" x2="182" y2="250" stroke="#eef3f2" stroke-width="2" />
+  <line x1="288" y1="112" x2="288" y2="250" stroke="#eef3f2" stroke-width="2" />
+  <!-- column 1 cards -->
+  <rect x="90" y="116" width="78" height="38" rx="8" fill="#f2f7ff" />
+  <rect x="98" y="126" width="46" height="6" rx="3" fill="#9cc6f5" />
+  <rect x="98" y="138" width="30" height="6" rx="3" fill="#cfe2f7" />
+  <rect x="90" y="164" width="78" height="38" rx="8" fill="#f2f7ff" />
+  <rect x="98" y="174" width="52" height="6" rx="3" fill="#9cc6f5" />
+  <rect x="98" y="186" width="24" height="6" rx="3" fill="#cfe2f7" />
+  <!-- column 2 cards -->
+  <rect x="196" y="116" width="78" height="38" rx="8" fill="#eefaf7" />
+  <rect x="204" y="126" width="50" height="6" rx="3" fill="#5bbfaf" />
+  <rect x="204" y="138" width="34" height="6" rx="3" fill="#bfe7df" />
+  <!-- column 3 done -->
+  <rect x="302" y="116" width="42" height="38" rx="8" fill="#effaf2" />
+  <path d="M313 135l6 6 12-12" fill="none" stroke="#2f9e5b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- the moving card: column 1 → column 2 → column 3 -->
+  <g class="il-move">
+    <rect x="90" y="212" width="78" height="38" rx="8" fill="#0f766e" />
+    <rect x="98" y="222" width="48" height="6" rx="3" fill="#ffffff" opacity="0.9" />
+    <rect x="98" y="234" width="28" height="6" rx="3" fill="#ffffff" opacity="0.55" />
+  </g>
+
+  <!-- progress chart card -->
+  <g class="il-float" filter="url(#il-shadow)">
+    <rect x="300" y="200" width="140" height="104" rx="16" fill="#ffffff" />
+    <rect x="318" y="218" width="54" height="8" rx="4" fill="#e6defa" />
+    <rect class="il-bar" x="320" y="250" width="16" height="40" rx="4" fill="#b9a7f0" style="--d: 0.1s" />
+    <rect class="il-bar" x="344" y="236" width="16" height="54" rx="4" fill="#7fd1c4" style="--d: 0.25s" />
+    <rect class="il-bar" x="368" y="258" width="16" height="32" rx="4" fill="#ffb38a" style="--d: 0.4s" />
+    <rect class="il-bar" x="392" y="228" width="16" height="62" rx="4" fill="#0f766e" style="--d: 0.55s" />
+  </g>
+
+  <!-- calendar with check -->
+  <g class="il-float-slow" filter="url(#il-shadow)">
+    <rect x="22" y="132" width="88" height="88" rx="16" fill="#ffffff" />
+    <rect x="22" y="132" width="88" height="24" rx="12" fill="#ffd166" />
+    <rect x="22" y="146" width="88" height="10" fill="#ffd166" />
+    <circle cx="44" cy="132" r="4" fill="#ffffff" />
+    <circle cx="88" cy="132" r="4" fill="#ffffff" />
+    <circle class="il-pop" cx="66" cy="188" r="20" fill="#2f9e5b" />
+    <path class="il-pop" d="M56 188l7 7 13-14" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+</svg>
