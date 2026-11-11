@@ -446,6 +446,72 @@ var Domain = (function () {
     });
   }
 
+  /** Stage groups used by the board colours and the My Work filter. */
+  var STAGE_LABELS = {
+    prep: 'เตรียมงาน',
+    dev: 'กำลังพัฒนา',
+    back: 'ส่งกลับแก้',
+    test: 'ทดสอบ / compile',
+    done: 'ปิดแล้ว',
+    other: 'อื่นๆ',
+  };
+  var STAGE_OF = {
+    'dev ขอ Sourecode อจ.': 'dev',
+    รอทีมพัฒนา: 'dev',
+    กำลังพัฒนา: 'dev',
+    ส่งกลับนักพัฒนาแก้ไข: 'back',
+    กำลังทดสอบ: 'test',
+    'รอ compile': 'test',
+    'รอ Complie ต้องแจ้งอจ.': 'test',
+  };
+
+  /** @param {string} status */
+  function stageOf(status) {
+    var s = clean(status);
+    if (WORKFLOW.indexOf(s) === -1) return 'other';
+    if (!isOpen(s)) return 'done';
+    return STAGE_OF[s] || 'prep';
+  }
+
+  /**
+   * My Work quick filters. Closed items are kept (they feed "ปิดได้สัปดาห์นี้") unless platform/text exclude them.
+   * @param {any[]} rows enriched rows @param {{platform?:string, stage?:string, q?:string}} f
+   */
+  function filterMyWork(rows, f) {
+    f = f || {};
+    var out = rows.filter(function (r) {
+      if (f.platform && r.platform !== f.platform) return false;
+      if (f.stage && r.isOpen && stageOf(r.status) !== f.stage) return false;
+      return true;
+    });
+    return f.q && clean(f.q) ? search(out, f.q) : out;
+  }
+
+  /**
+   * Open items with no developer, in the order a dev lead should assign them: overdue (most days late)
+   * first, then urgency, then nearest due date; items without a due date last.
+   * @param {any[]} rows enriched rows @param {SheetDate} today
+   */
+  function unassignedQueue(rows, today) {
+    void today; // enriched rows already carry isOverdue / overdueDays for "today"
+    return rows
+      .filter(function (r) {
+        return r.isOpen && !r.developer;
+      })
+      .sort(function (a, b) {
+        if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+        if (a.isOverdue && a.overdueDays !== b.overdueDays) return b.overdueDays - a.overdueDays;
+        var u = urgencyRank(a.urgency) - urgencyRank(b.urgency);
+        if (u) return u;
+        if (!a.effectiveDue !== !b.effectiveDue) return a.effectiveDue ? -1 : 1;
+        if (a.effectiveDue && b.effectiveDue) {
+          var c = compareDate(a.effectiveDue, b.effectiveDue);
+          if (c) return c;
+        }
+        return (a.seq || 0) - (b.seq || 0);
+      });
+  }
+
   var OTHER_PM = 'อื่นๆ (ไม่อยู่ในรายชื่อ PM)';
 
   /**
@@ -1022,6 +1088,10 @@ var Domain = (function () {
     applyFilters: applyFilters,
     computeMetrics: computeMetrics,
     pmBreakdown: pmBreakdown,
+    unassignedQueue: unassignedQueue,
+    stageOf: stageOf,
+    STAGE_LABELS: STAGE_LABELS,
+    filterMyWork: filterMyWork,
     splitPm: splitPm,
     joinPm: joinPm,
     PM_SEP: PM_SEP,

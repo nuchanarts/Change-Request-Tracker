@@ -425,21 +425,73 @@
     // ------------------------------------------------------------------ My Work (US4)
 
 
+    // ------------------------------------------------------------------ Assign (dev lead, 2026-11-11)
+
+    /** Open items without a developer, one row each with a name box + "มอบหมาย"; workload on the side. */
+    function assign(state) {
+      var queue = D.unassignedQueue(state.rows, state.today);
+      var load = D.computeMetrics(state.rows, state.today).byDeveloper.filter(function (p) { return p.name !== D.UNASSIGNED; });
+      var html = '<div class="page-head"><h1>มอบหมายงาน</h1><span class="muted spacer">งานค้างที่ยังไม่มีนักพัฒนา ' + queue.length + ' งาน เรียงจากงานที่ควรมอบหมายก่อน</span>' +
+        '<button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button></div>';
+      if (!state.user.canEdit) {
+        return html + UI.emptyState('บัญชีนี้มีสิทธิ์ดูอย่างเดียว', 'ขอสิทธิ์แก้ไขจากผู้ดูแลก่อน จึงจะมอบหมายงานได้', '');
+      }
+      var list = queue.length
+        ? '<ol class="as-list">' + queue.map(function (r) {
+            var fid = 'as-dev-' + r.id;
+            return '<li><form class="as-row' + (r.isOverdue ? ' over' : '') + '" data-id="' + esc(r.id) + '">' +
+              '<div class="as-info"><div class="as-top"><span class="kseq num">#' + esc(r.seq === null ? '–' : r.seq) + '</span><span class="kplat">' + esc(r.platform) + '</span>' +
+              '<span class="muted">' + esc(r.system) + '</span>' + (D.urgencyRank(r.urgency) < 2 ? UI.urgency(r.urgency) : '') + '<span>' + UI.due(r, state.today) + '</span></div>' +
+              '<a href="#/items/' + encodeURIComponent(r.id) + '" class="as-title">' + esc(r.detail) + '</a>' +
+              '<div class="as-sub muted">' + UI.statusBadge(r.status) + ' PM: ' + esc(r.pm || '–') + '</div></div>' +
+              '<div class="as-pick"><label for="' + esc(fid) + '" class="sr-only">นักพัฒนาสำหรับรายการ #' + esc(r.seq) + '</label>' +
+              '<input id="' + esc(fid) + '" name="developer" list="as-devs" autocomplete="off" placeholder="พิมพ์หรือเลือกชื่อ" required>' +
+              '<button type="submit" class="btn primary small">มอบหมาย</button></div></form></li>';
+          }).join('') + '</ol>'
+        : UI.emptyState('มอบหมายครบทุกงานแล้ว 🎉', 'ไม่มีงานค้างที่ยังไม่ระบุนักพัฒนา', '<a class="btn" href="#/kanban">ไปที่บอร์ดงาน</a>');
+      var side = '<aside class="panel as-load" aria-labelledby="as-load-h"><h2 id="as-load-h">งานค้างของนักพัฒนา</h2>' +
+        '<p class="muted">ใช้ดูภาระงานก่อนแบ่งงาน กดชื่อเพื่อใส่ในช่องที่เลือกไว้ล่าสุด</p>' +
+        (load.length ? '<ul>' + load.map(function (p) {
+          return '<li><button type="button" class="as-dev" data-action="as-fill" data-name="' + esc(p.name) + '"><span>' + esc(p.name) + '</span>' +
+            '<span class="num">' + p.open + ' งาน' + (p.overdue ? ' · <span class="due-over">เกิน ' + p.overdue + '</span>' : '') + '</span></button></li>';
+        }).join('') + '</ul>' : '<p class="muted">ยังไม่มีข้อมูล</p>') + '</aside>';
+      var devs = (state.options.developer || []).map(function (n) { return '<option value="' + esc(n) + '"></option>'; }).join('');
+      return html + '<datalist id="as-devs">' + devs + '</datalist><div class="as-layout"><section aria-label="งานที่ยังไม่มีนักพัฒนา">' + list + '</section>' + side + '</div>';
+    }
+
     function myWork(state) {
       var name = state.myName();
-      var html = '<div class="page-head"><h1>งานของฉัน</h1>' + (name ? '<span class="muted">' + esc(name) + '</span> <button class="linklike" data-action="change-name">เปลี่ยนชื่อ</button>' : '') + '</div>';
+      var people = (state.options.person || []).slice();
+      if (name && people.indexOf(name) === -1) people.unshift(name);
+      var html = '<div class="page-head"><h1>งานของฉัน</h1></div>';
       if (!name || state.choosingName) {
-        return html + '<section class="panel" style="max-width:520px"><h2>คุณคือใครในรายชื่อ?</h2><p class="muted" style="margin:4px 0 12px">เลือกชื่อของคุณครั้งเดียว ระบบจะจำไว้และแสดงเฉพาะงานของคุณ</p>' +
-          '<form id="name-form" class="form-grid">' + UI.select({ name: 'myname', label: 'ชื่อของฉัน', options: state.options.person, value: name, required: true }) +
-          '<div class="actions" style="display:flex;align-items:flex-end"><button class="btn primary" type="submit">ใช้ชื่อนี้</button></div></form></section>';
+        // one click: tap your own name (user request 2026-11-11)
+        return html + '<section class="panel mw-who"><h2>คุณคือใคร?</h2><p class="muted">กดที่ชื่อของคุณครั้งเดียว ระบบจะจำไว้และแสดงเฉพาะงานของคุณ</p>' +
+          '<div class="mw-names">' + people.map(function (n) {
+            return '<button type="button" class="mw-name' + (n === name ? ' on' : '') + '" data-action="pick-name" data-name="' + esc(n) + '"><span class="kavatar" aria-hidden="true">' + esc(initials(n)) + '</span>' + esc(n) + '</button>';
+          }).join('') + '</div></section>';
       }
       var role = state.myTab;
-      var g = D.groupMyWeek(state.rows, name, role, state.today);
+      var mf = state.mwFilter;
+      var mine = D.filterMyWork(state.rows, mf);
+      var g = D.groupMyWeek(mine, name, role, state.today);
+      var chip = function (key, value, label) {
+        return '<button type="button" class="mw-chip" data-action="mw-filter" data-key="' + key + '" data-value="' + esc(value) + '" aria-pressed="' + ((mf[key] || '') === value) + '">' + esc(label) + '</button>';
+      };
+      var active = !!(mf.platform || mf.stage || mf.q);
+      html += '<div class="mw-bar" role="search" aria-label="กรองงานของฉัน">' +
+        '<div class="mw-bar-who"><label for="mw-who">ดูงานของ</label><select id="mw-who" data-action-change="mw-who">' +
+        people.map(function (n) { return '<option value="' + esc(n) + '"' + (n === name ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="mw-bar-row" role="group" aria-label="แพลตฟอร์ม">' + chip('platform', '', 'ทุกแพลตฟอร์ม') + (state.options.platform || []).map(function (p) { return chip('platform', p, p); }).join('') + '</div>' +
+        '<div class="mw-bar-row" role="group" aria-label="ขั้นงาน">' + chip('stage', '', 'ทุกขั้น') + ['prep', 'dev', 'back', 'test'].map(function (k) { return chip('stage', k, D.STAGE_LABELS[k]); }).join('') + '</div>' +
+        '<div class="mw-bar-q"><label for="mw-q" class="sr-only">ค้นหาในงานของฉัน</label><input id="mw-q" type="search" placeholder="ค้นหาเลขลำดับ หรือคำในงานของฉัน" value="' + esc(mf.q || '') + '">' +
+        (active ? '<button type="button" class="btn small" data-action="mw-clear">ล้างตัวกรอง</button>' : '') + '</div></div>';
       var week = D.weekRange(state.today);
       var next = { from: D.addDays(week.from, 7), to: D.addDays(week.to, 7) };
       html += '<div class="tabs" role="tablist"><button role="tab" data-action="tab" data-tab="developer" aria-selected="' + (role === 'developer') + '">งานพัฒนาของฉัน</button>' +
         '<button role="tab" data-action="tab" data-tab="pm" aria-selected="' + (role === 'pm') + '">งานที่ฉันดูแล (PM)</button></div>';
       if (!g.openTotal && !g.doneThisWeek.length) {
+        if (active) return html + UI.emptyState('ไม่พบงานตามตัวกรอง', 'ลองเลือก "ทุกแพลตฟอร์ม" หรือ "ทุกขั้น" หรือล้างคำค้นหา', '<button type="button" class="btn" data-action="mw-clear">ล้างตัวกรอง</button>');
         return html + UI.emptyState('ยังไม่มีงานค้าง', role === 'developer' ? 'งานที่มีชื่อคุณในช่อง "นักพัฒนา" จะมาแสดงที่นี่' : 'งานที่มีชื่อคุณในช่อง "PM รับผิดชอบ" จะมาแสดงที่นี่');
       }
       // Summary strip: what needs attention this week, at a glance
@@ -632,11 +684,7 @@
     function stageGroup(c) {
       if (c.closed) return 'done';
       if (c.other) return 'other';
-      var s = c.status;
-      if (s === 'ส่งกลับนักพัฒนาแก้ไข') return 'back';
-      if (s === 'กำลังทดสอบ' || s === 'รอ compile' || s === 'รอ Complie ต้องแจ้งอจ.') return 'test';
-      if (s === 'กำลังพัฒนา' || s === 'รอทีมพัฒนา' || s === 'dev ขอ Sourecode อจ.') return 'dev';
-      return 'prep';
+      return D.stageOf(c.status);
     }
 
     function initials(name) {
@@ -691,6 +739,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>

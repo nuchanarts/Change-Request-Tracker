@@ -34,6 +34,7 @@
       itemsPage: 0,
       sort: { key: 'due', dir: 1 },
       myTab: store(KEYS.tab) || 'developer',
+      mwFilter: store('ehp.mwfilter.v1') || {},
       kanbanCollapsed: store('ehp.kcollapsed.v1') || {},
       choosingName: false,
       formErrors: null,
@@ -70,6 +71,25 @@
       saveCols(order);
     }
     state.moveCol = moveCol;
+
+    /** Remember who "me" is (browser + server, best effort) and show their work. */
+    function setMyName(name) {
+      if (!name) return;
+      store(KEYS.name, name);
+      state.choosingName = false;
+      if (state.user) state.user.name = name;
+      render();
+      api('Api_setMyName', name).then(function (res) {
+        if (!res.ok && res.code !== 'FORBIDDEN' && res.code !== 'NOT_ALLOWED') UI.toast(res.message, 'error');
+      });
+    }
+
+    function setMwFilter(key, value) {
+      state.mwFilter[key] = value;
+      if (!value) delete state.mwFilter[key];
+      store('ehp.mwfilter.v1', state.mwFilter);
+      render();
+    }
 
     state.myName = function () {
       return (state.user && state.user.name) || store(KEYS.name) || '';
@@ -156,6 +176,11 @@
         document.getElementById('sheet-name').textContent = b.spreadsheetName;
         document.getElementById('nav-add').hidden = !(b.user.canEdit && b.schema.ok);
         document.getElementById('nav-access').hidden = !b.user.isAdmin;
+        // dev lead menu: editors only, with the number of open items that still need a developer
+        var unassigned = D.unassignedQueue(rows, state.today).length;
+        document.getElementById('nav-assign').hidden = !(b.user.canEdit && b.schema.ok);
+        document.getElementById('nav-assign-count').textContent = unassigned ? String(unassigned) : '';
+        document.getElementById('nav-assign').setAttribute('aria-label', 'มอบหมายงาน (ยังไม่มีนักพัฒนา ' + unassigned + ' งาน)');
         var menu = document.getElementById('user-menu');
         menu.hidden = !b.user.email;
         document.getElementById('user-email').textContent = b.user.email || '';
@@ -215,6 +240,7 @@
       else if (r.name === 'new') html = Views.form(state, 'new', null);
       else if (r.name === 'my-work') html = Views.myWork(state);
       else if (r.name === 'kanban') html = Views.kanban(state);
+      else if (r.name === 'assign') html = Views.assign(state);
       else if (r.name === 'access') {
         if (state.user.isAdmin && !state.access && !state.accessLoading) loadAccess();
         html = Views.access(state);
@@ -566,6 +592,9 @@
       },
       tab: function (el) { state.myTab = el.getAttribute('data-tab'); store(KEYS.tab, state.myTab); render(); },
       'change-name': function () { state.choosingName = true; render(); },
+      'pick-name': function (el) { setMyName(el.getAttribute('data-name')); },
+      'mw-filter': function (el) { setMwFilter(el.getAttribute('data-key'), el.getAttribute('data-value')); },
+      'mw-clear': function () { state.mwFilter = {}; store('ehp.mwfilter.v1', {}); render(); },
       'quick-status': function (el) {
         el.disabled = true;
         el.textContent = 'กำลังบันทึก…';
@@ -600,6 +629,12 @@
         closeCalendar();
       },
       back: back,
+      'as-fill': function (el) {
+        var input = (lastAssignInput && document.contains(lastAssignInput) && lastAssignInput) || document.querySelector('.as-row input[name="developer"]');
+        if (!input) return;
+        input.value = el.getAttribute('data-name');
+        input.focus();
+      },
       'cols-toggle': function () { state.colsOpen = !state.colsOpen; render(); },
       'cols-move': function (el) {
         var key = el.getAttribute('data-key');
@@ -707,6 +742,7 @@
 
     document.addEventListener('change', function (ev) {
       var form = ev.target.form;
+      if (ev.target.id === 'mw-who') return setMyName(ev.target.value);
       if (ev.target.classList && ev.target.classList.contains('access-select')) {
         var input = { email: ev.target.getAttribute('data-email') };
         input[ev.target.getAttribute('data-field')] = ev.target.value;
@@ -733,6 +769,17 @@
 
     var searchTimer = null;
     document.addEventListener('input', function (ev) {
+      if (ev.target.id === 'mw-q') {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () {
+          var pos = ev.target.selectionStart;
+          setMwFilter('q', ev.target.value);
+          var q = document.getElementById('mw-q');
+          q.focus();
+          q.setSelectionRange(pos, pos);
+        }, 150);
+        return;
+      }
       if (ev.target.id !== 'q') return;
       clearTimeout(searchTimer);
       searchTimer = setTimeout(function () {
@@ -746,9 +793,26 @@
       }, 150);
     });
 
+    var lastAssignInput = null;
+    document.addEventListener('focusin', function (ev) {
+      if (ev.target.matches && ev.target.matches('.as-row input[name="developer"]')) lastAssignInput = ev.target;
+    });
+
     document.addEventListener('submit', function (ev) {
       var form = ev.target;
-      if (form.id === 'item-form') {
+      if (form.classList && form.classList.contains('as-row')) {
+        ev.preventDefault();
+        var row = state.byId[form.getAttribute('data-id')];
+        var name = D.clean(form.elements.developer.value);
+        if (!row || !name) return UI.toast('กรุณาพิมพ์หรือเลือกชื่อนักพัฒนา', 'error');
+        // same safe update path as the form: lock, ลำดับ + conflict check, changed cell only, logged
+        saveChanges(row, { developer: { from: row.raw.developer, to: name } }, form.querySelector('button[type="submit"]')).then(function (ok) {
+          if (!ok) return;
+          UI.toast('มอบหมาย #' + row.seq + ' ให้ ' + name + ' แล้ว');
+          var next = document.querySelector('.as-row input[name="developer"]');
+          if (next) next.focus();
+        });
+      } else if (form.id === 'item-form') {
         ev.preventDefault();
         submitForm(form);
       } else if (form.id === 'access-add') {
@@ -758,17 +822,6 @@
         saveAccess({ email: email, name: form.elements['acc-name'].value, role: form.elements['acc-role'].value, status: state.access.states.allowed });
       } else if (form.id === 'export-form') {
         ev.preventDefault();
-      } else if (form.id === 'name-form') {
-        ev.preventDefault();
-        var name = form.elements.myname.value;
-        if (!name) return UI.toast('กรุณาเลือกชื่อของคุณ', 'error');
-        store(KEYS.name, name);
-        state.choosingName = false;
-        if (state.user) state.user.name = name;
-        render();
-        api('Api_setMyName', name).then(function (res) {
-          if (!res.ok && res.code !== 'FORBIDDEN' && res.code !== 'NOT_ALLOWED') UI.toast(res.message, 'error');
-        });
       }
     });
 

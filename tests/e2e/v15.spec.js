@@ -4,12 +4,15 @@ import { open } from './helpers.js';
 test.describe('Navigation order, Taiga link, access admin (2026-11-11)', () => {
   test('top menu is in the requested order with Taiga and admin links', async ({ page }) => {
     await open(page);
-    const names = await page.locator('.nav a:visible').allTextContents();
+    const names = (await page.locator('.nav a:visible').allTextContents()).map((t) =>
+      t.replace(/\d+/g, '').trim(),
+    );
     expect(names).toEqual([
       'ภาพรวม',
       'เพิ่มรายการ',
       'บอร์ดงาน',
       'งานของฉัน',
+      'มอบหมายงาน',
       'รายการทั้งหมด',
       'วิธีใช้งาน',
       'จัดการสิทธิ์',

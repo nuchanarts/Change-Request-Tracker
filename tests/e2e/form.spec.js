@@ -124,12 +124,40 @@ test.describe('US3 Safe edit', () => {
 });
 
 test.describe('US4 My Work', () => {
-  test('choose my name then see grouped work', async ({ page }) => {
+  test('tap my name once, then see grouped work', async ({ page }) => {
     await open(page, '/#/my-work');
-    await page.selectOption('#f-myname', 'นักพัฒนา แดง');
-    await page.getByRole('button', { name: 'ใช้ชื่อนี้' }).click();
-    await expect(page.locator('.page-head')).toContainText('นักพัฒนา แดง');
+    await page.getByRole('button', { name: 'นักพัฒนา แดง' }).click();
+    await expect(page.locator('#mw-who')).toHaveValue('นักพัฒนา แดง');
     await expect(page.locator('.work').first()).toBeVisible();
+  });
+
+  test('quick filters: switch person, platform and stage chips, search; remembered; clear', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.setItem('ehp.myname.v1', JSON.stringify('นักพัฒนา แดง')));
+    await open(page, '/#/my-work');
+    const count = async () => page.locator('.work').count();
+    const all = await count();
+    await page.getByRole('button', { name: 'EHP', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'EHP', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    const ehp = await count();
+    expect(ehp).toBeLessThan(all);
+    for (const c of await page.locator('.work .sub, .work').allTextContents()) expect(c).toContain('EHP');
+    await page.getByRole('button', { name: 'ส่งกลับแก้' }).click();
+    expect(await count()).toBeLessThanOrEqual(ehp);
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'ส่งกลับแก้' })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'ล้างตัวกรอง' }).first().click();
+    expect(await count()).toBe(all);
+    const seq = (await page.locator('.work').first().textContent()).match(/#(\d+)/)[1];
+    await page.fill('#mw-q', seq);
+    await expect(page.locator('.work')).toHaveCount(1);
+    await page.fill('#mw-q', '');
+    await page.selectOption('#mw-who', 'นักพัฒนา ฟ้า');
+    await expect(page.locator('#mw-who')).toHaveValue('นักพัฒนา ฟ้า');
   });
 });
 
@@ -166,4 +194,31 @@ test('PM: several can be picked and are saved as "A, B" in one cell (2026-11-11)
   await expect(page.locator('.toast')).toContainText('บันทึกรายการใหม่แล้ว');
   const row = await page.evaluate(() => window.__mockSheet.rows.find((r) => r.detail === 'ทดสอบ PM หลายคน'));
   expect(row.pm).toBe(names.join(', '));
+});
+
+test.describe('Assign page for the dev lead (2026-11-11)', () => {
+  test('lists open items without a developer and assigns one through the safe update path', async ({
+    page,
+  }) => {
+    await open(page, '/#/assign');
+    await expect(page.locator('#nav-assign')).toBeVisible();
+    const before = Number(await page.locator('#nav-assign-count').textContent());
+    expect(before).toBeGreaterThan(0);
+    await expect(page.locator('.as-row')).toHaveCount(before);
+    const first = page.locator('.as-row').first();
+    const id = await first.getAttribute('data-id');
+    await page.locator('.as-dev').first().click(); // fills the first box from the workload list
+    const name = await first.locator('input[name="developer"]').inputValue();
+    expect(name).not.toBe('');
+    await first.getByRole('button', { name: 'มอบหมาย' }).click();
+    await expect(page.locator('.toast', { hasText: 'มอบหมาย #' + id })).toBeVisible();
+    await expect(page.locator('#nav-assign-count')).toHaveText(String(before - 1));
+    const row = await page.evaluate((s) => window.__mockSheet.rows.find((r) => r.seq === s), id);
+    expect(row.developer).toBe(name);
+  });
+
+  test('viewers do not see the assign menu', async ({ page }) => {
+    await open(page, '/?viewer=1#/monitor');
+    await expect(page.locator('#nav-assign')).toBeHidden();
+  });
 });
