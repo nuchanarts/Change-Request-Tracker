@@ -17,8 +17,8 @@
         UI.select({ name: 'pm', label: 'PM', options: o.pm, value: f.pm, emptyLabel: 'ทั้งหมด' }) +
         UI.select({ name: 'developer', label: 'นักพัฒนา', options: devs, value: f.developer, emptyLabel: 'ทั้งหมด' }) +
         UI.select({ name: 'urgency', label: 'ความเร่งด่วน', options: o.urgency, value: f.urgency, emptyLabel: 'ทั้งหมด' }) +
-        UI.input({ name: 'from', label: 'กำหนดส่งตั้งแต่', value: f.from, placeholder: 'วว/ดด/ปปปป', inputmode: 'numeric' }) +
-        UI.input({ name: 'to', label: 'ถึง', value: f.to, placeholder: 'วว/ดด/ปปปป', inputmode: 'numeric' }) +
+        UI.dateField({ name: 'from', label: 'กำหนดส่งตั้งแต่', value: f.from }) +
+        UI.dateField({ name: 'to', label: 'ถึง', value: f.to }) +
         '<div class="actions"><button type="button" class="btn small" data-action="clear-filters">ล้างตัวกรอง</button></div>' +
         '</form>'
       );
@@ -114,7 +114,11 @@
         '<div class="hero-text"><p class="hero-hello">' + (name ? 'สวัสดี คุณ<strong>' + esc(name) + '</strong>' : 'สวัสดี') + '<span class="hero-date">' + esc(D.formatThaiLong(state.today)) + '</span></p>' +
         '<h1 id="hero-h">ภาพรวมงานขอแก้ไขโปรแกรม</h1>' +
         (count ? '<p class="hero-sub">' + esc(todaySentence(m)) + '</p>' : '') +
-        '<div class="hero-actions">' + myWorkChip(state) +
+        '<div class="hero-actions">' +
+        (state.user.canEdit && state.schema.ok
+          ? '<a class="hero-add" href="#/new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>เพิ่มรายการขอแก้ไข</a>'
+          : '') +
+        myWorkChip(state) +
         '<button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button>' +
         '<span class="hero-meta">' + esc(filterSummary(state)) + ', ข้อมูล ณ ' + esc(state.loadedAt) + '</span></div></div>' +
         '<div class="hero-art">' + UI.illustration() + '</div>' +
@@ -296,6 +300,9 @@
       }
       if (col.type === 'person') return UI.select(Object.assign(o, { options: key === 'pm' ? opts.pm : opts.developer, emptyLabel: key === 'developer' ? '— ยังไม่มอบหมาย —' : undefined }));
       if (col.type === 'freeOption') return UI.combobox(Object.assign(o, { options: opts.system }));
+      if (col.type === 'freePerson') {
+        return UI.combobox(Object.assign(o, { options: opts.developer, placeholder: 'เลือกจากรายการ หรือพิมพ์ชื่อใหม่', hint: 'ถ้าไม่มีชื่อในรายการ พิมพ์ชื่อใหม่ได้เลย' }));
+      }
       if (col.type === 'date') return UI.dateField(o);
       if (col.type === 'number') return UI.input(Object.assign(o, { inputmode: 'decimal' }));
       if (key === 'detail') return UI.textarea(Object.assign(o, { wide: true, hint: 'อธิบายสิ่งที่ต้องการให้แก้ไข ให้คนอื่นอ่านแล้วเข้าใจ' }));

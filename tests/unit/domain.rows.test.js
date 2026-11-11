@@ -89,8 +89,9 @@ describe('detectIssues (FR-031)', () => {
     expect(codes({ ...base, system: 'ระบบใหม่', developer: '' })).toEqual([]);
   });
 
-  it('flags unknown people in PM / developer', () => {
-    expect(codes({ ...base, developer: 'ใครไม่รู้' })).toEqual(['OPTION_INVALID:developer']);
+  it('flags an unknown PM, but not a typed-in developer name (developer is free text, user request 2026-11-11)', () => {
+    expect(codes({ ...base, pm: 'ใครไม่รู้' })).toEqual(['OPTION_INVALID:pm']);
+    expect(codes({ ...base, developer: 'นักพัฒนาใหม่' })).toEqual([]);
   });
 
   it('flags unparseable and Buddhist-era dates', () => {

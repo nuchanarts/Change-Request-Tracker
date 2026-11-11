@@ -25,7 +25,7 @@ var Domain = (function () {
     { key: 'pm', header: 'PM รับผิดชอบ', type: 'person', required: true },
     { key: 'ticket', header: 'ข้อมูลลิงค์ Taiga หรือ MANTIS', type: 'text' },
     { key: 'dueDate', header: 'วันที่ต้องได้', type: 'date', required: true },
-    { key: 'developer', header: 'นักพัฒนา', type: 'person' },
+    { key: 'developer', header: 'นักพัฒนา', type: 'freePerson' }, // pick or type a new name (2026-11-11)
     { key: 'postponedDate', header: 'วันที่เลื่อน', type: 'date' },
     { key: 'doneDate', header: 'วันที่เสร็จ', type: 'date' },
     { key: 'deployDate', header: 'วันที่ Deploy', type: 'date' },
@@ -320,7 +320,7 @@ var Domain = (function () {
    */
   function detectIssues(r, options, seqCounts) {
     var out = [];
-    OPTION_KEYS.concat(PERSON_KEYS).forEach(function (key) {
+    OPTION_KEYS.concat(['pm']).forEach(function (key) {
       var list = optionList(options, key);
       if (r[key] !== '' && list.length && list.indexOf(r[key]) === -1) {
         out.push(
@@ -580,8 +580,13 @@ var Domain = (function () {
       if (list.indexOf(v) === -1) return 'กรุณาเลือก "' + col.header + '" จากรายการ';
     } else if (col.type === 'status') {
       if (WORKFLOW.indexOf(v) === -1) return 'กรุณาเลือกสถานะจากรายการ';
-    } else if (col.type === 'freeOption') {
-      if (optionList(options, key).indexOf(v) === -1) warnings[key] = 'เป็นระบบงานใหม่ที่ยังไม่มีในรายการ';
+    } else if (col.type === 'freeOption' || col.type === 'freePerson') {
+      if (optionList(options, key).indexOf(v) === -1) {
+        warnings[key] =
+          col.type === 'freePerson'
+            ? 'เป็นชื่อนักพัฒนาใหม่ที่ยังไม่มีในรายการ'
+            : 'เป็นระบบงานใหม่ที่ยังไม่มีในรายการ';
+      }
     } else if (col.type === 'date') {
       var p = parseDate(v);
       if (!p.date || p.issue)
@@ -668,6 +673,7 @@ var Domain = (function () {
     formatDate: formatDate,
     formatThai: formatThai,
     formatThaiLong: formatThaiLong,
+    THAI_MONTHS_LONG: THAI_MONTHS_LONG,
     fromIso: fromIso,
     toIso: toIso,
     daysBetween: daysBetween,

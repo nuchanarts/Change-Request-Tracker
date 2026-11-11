@@ -395,6 +395,31 @@
       return saveChanges(row, changes, null);
     }
 
+    // ------------------------------------------------------------------ calendar popover (date fields)
+
+    var cal = null; // { target, y, m, opener }
+
+    function drawCalendar() {
+      document.querySelectorAll('.cal').forEach(function (c) { c.remove(); });
+      var input = document.getElementById(cal.target);
+      if (!input) return (cal = null);
+      var typed = D.parseDate(input.value);
+      var host = input.closest('.field');
+      host.insertAdjacentHTML('beforeend', UI.calendar(cal.target, cal.y, cal.m, typed.issue ? null : typed.date, state.today));
+      var pick = host.querySelector('.cal [aria-pressed="true"]') || host.querySelector('.cal .today') || host.querySelector('.cal .cal-day');
+      if (pick) pick.focus();
+    }
+
+    function closeCalendar() {
+      document.querySelectorAll('.cal').forEach(function (c) { c.remove(); });
+      if (cal && cal.opener && document.body.contains(cal.opener)) cal.opener.focus();
+      cal = null;
+    }
+
+    document.addEventListener('click', function (ev) {
+      if (cal && !ev.target.closest('.cal') && !ev.target.closest('[data-action="cal-open"]')) closeCalendar();
+    }, true);
+
     function focusFirstError() {
       var el = document.querySelector('[aria-invalid="true"]');
       if (el) el.focus();
@@ -457,10 +482,29 @@
         el.disabled = true;
         moveStatus(el.getAttribute('data-id'), el.getAttribute('data-to'));
       },
-      'date-today': function (el) {
-        var input = document.getElementById(el.getAttribute('data-target'));
-        input.value = todaySheet();
+      'cal-open': function (el) {
+        var id = el.getAttribute('data-target');
+        if (cal && cal.target === id) return closeCalendar();
+        var typed = D.parseDate(document.getElementById(id).value);
+        var base = typed.date && !typed.issue ? typed.date : state.today;
+        cal = { target: id, y: base.y, m: base.m, opener: el };
+        drawCalendar();
+      },
+      'cal-nav': function (el) {
+        var n = cal.m + Number(el.getAttribute('data-dir'));
+        cal.y += n < 1 ? -1 : n > 12 ? 1 : 0;
+        cal.m = ((n + 11) % 12) + 1;
+        drawCalendar();
+      },
+      'cal-pick': function (el) {
+        var input = document.getElementById(cal.target);
+        input.value = el.getAttribute('data-date');
         input.dispatchEvent(new Event('change', { bubbles: true }));
+        closeCalendar();
+        input.focus();
+      },
+      'cal-close': function () {
+        closeCalendar();
       },
       back: back,
       'tour-start': startTour,
@@ -557,6 +601,10 @@
     });
 
     document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && cal) {
+        ev.preventDefault();
+        return closeCalendar();
+      }
       if (ev.key === 'Escape' && state.tourStep !== null) endTour();
       if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('tr[data-action]')) {
         ev.preventDefault();

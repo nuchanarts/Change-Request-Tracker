@@ -236,9 +236,12 @@ function makeRepo(deps) {
     o.system = fromValidation('system') || distinct(rows, ['system']);
     var people = peopleFromSheet();
     var fallback = distinct(rows, ['pm', 'developer']);
-    o.pm = fromValidation('pm') || people || fallback;
+    o.pm = C.PM_LIST.slice(); // fixed by the PM (overrides validation / รายชื่อ)
     o.developer = fromValidation('developer') || people || fallback;
-    o.person = people || fallback;
+    o.person = (people || fallback).slice();
+    o.pm.forEach(function (n) {
+      if (o.person.indexOf(n) === -1) o.person.push(n); // PMs can map themselves in My Work
+    });
     if (deps.cache) deps.cache.put(C.CACHE_KEYS.options, JSON.stringify(o), C.CACHE_SECONDS);
     return o;
   }
@@ -421,30 +424,93 @@ function makeRepo(deps) {
     return result;
   }
 
-  /** Emails on the team list (lower-case), or null when the _app_allowed sheet does not exist yet. */
-  function allowedEmails() {
+  // ------------------------------------------------------------------ team list (_app_allowed)
+
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  /**
+   * The team list sheet, upgraded in place to the 5-column layout (email, ชื่อ, หมายเหตุ, บทบาท, สถานะ).
+   * Rows from the old 3-column list become active admins (they were the people trusted to set it up).
+   * Returns null when the sheet does not exist yet.
+   */
+  function allowedSheet() {
     var sh = ss.getSheetByName(C.SHEETS.allowed);
+    if (!sh) return null;
+    var width = C.ALLOWED_HEADERS.length;
+    var header = sh.getRange(1, 1, 1, width).getDisplayValues()[0].map(clean);
+    if (header[3] !== C.ALLOWED_HEADERS[3] || header[4] !== C.ALLOWED_HEADERS[4]) {
+      sh.getRange(1, 4, 1, 2).setValues([[asText(C.ALLOWED_HEADERS[3]), asText(C.ALLOWED_HEADERS[4])]]);
+      var last = sh.getLastRow();
+      if (last >= 2) {
+        var rows = sh.getRange(2, 1, last - 1, width).getDisplayValues();
+        var fill = rows.map(function (r) {
+          return clean(r[0])
+            ? [asText(clean(r[3]) || C.ROLE.admin), asText(clean(r[4]) || C.ACCESS.allowed)]
+            : [clean(r[3]), clean(r[4])];
+        });
+        sh.getRange(2, 4, fill.length, 2).setValues(fill);
+      }
+      writeLog([
+        [deps.nowText(), '', 'ACCESS_MIGRATE', '', '', C.SHEETS.allowed, '', 'เพิ่มคอลัมน์ บทบาท/สถานะ'],
+      ]);
+    }
+    return sh;
+  }
+
+  /** @returns {Array<{row:number,email:string,name:string,note:string,role:string,status:string}>|null} */
+  function members() {
+    var sh = allowedSheet();
     if (!sh) return null;
     var data = sh.getDataRange().getDisplayValues();
     var out = [];
     for (var i = 1; i < data.length; i++) {
       var em = clean(data[i][0]).toLowerCase();
-      if (em) out.push(em);
+      if (!em) continue;
+      out.push({
+        row: i + 1,
+        email: em,
+        name: clean(data[i][1]),
+        note: clean(data[i][2]),
+        role: clean(data[i][3]) || C.ROLE.editor,
+        status: clean(data[i][4]) || C.ACCESS.allowed,
+      });
     }
     return out;
   }
 
+  /** @param {Array<any>|null} list @param {string} e */
+  function findMember(list, e) {
+    return (list || []).filter(function (m) {
+      return m.email === e;
+    })[0];
+  }
+
+  /** @param {string} email @param {string} ownerEmail */
+  function isAdmin(email, ownerEmail) {
+    var e = clean(email).toLowerCase();
+    if (e && e === clean(ownerEmail).toLowerCase()) return true;
+    var m = findMember(members(), e);
+    return !!(m && m.role === C.ROLE.admin && m.status === C.ACCESS.allowed);
+  }
+
+  /** Public view of the list for the admin screen. */
+  function listAccess() {
+    return (members() || []).map(function (m) {
+      return { email: m.email, name: m.name, note: m.note, role: m.role, status: m.status };
+    });
+  }
+
   /**
-   * Who may add/edit through the app (user decision 2026-11-11): must be able to edit the sheet AND be on
-   * the team list in _app_allowed. If the list does not exist yet, the first sheet editor creates it with
-   * the sheet owner and themselves (visible, not hidden, so the PM can manage it); this is logged.
+   * Who may add/edit through the app: must be able to edit the sheet AND be an allowed member of the
+   * team list. If the list does not exist yet, the first sheet editor creates it with the sheet owner and
+   * themselves as admins (visible sheet so the PM can manage it); this is logged.
    * @param {string} email @param {string} ownerEmail
-   * @returns {{canEdit: boolean, reason: 'OK'|'SHEET_VIEW_ONLY'|'NOT_ALLOWED'}}
+   * @returns {{canEdit: boolean, reason: 'OK'|'SHEET_VIEW_ONLY'|'NOT_ALLOWED'|'PENDING'}}
    */
   function editAccess(email, ownerEmail) {
     var e = clean(email).toLowerCase();
     if (!canEdit(e)) return { canEdit: false, reason: 'SHEET_VIEW_ONLY' };
-    var list = allowedEmails();
+    var list = members();
     if (list === null) {
       var seeds = [clean(ownerEmail).toLowerCase(), e].filter(function (x, i, a) {
         return x && a.indexOf(x) === i;
@@ -452,14 +518,106 @@ function makeRepo(deps) {
       var sh = ss.insertSheet(C.SHEETS.allowed);
       sh.appendRow(C.ALLOWED_HEADERS.map(asText));
       seeds.forEach(function (s) {
-        sh.appendRow([asText(s), '', asText('เพิ่มอัตโนมัติตอนตั้งค่าครั้งแรก')]);
+        sh.appendRow([s, '', 'เพิ่มอัตโนมัติตอนตั้งค่าครั้งแรก', C.ROLE.admin, C.ACCESS.allowed].map(asText));
       });
       writeLog([[deps.nowText(), e, 'ALLOW_INIT', '', '', C.SHEETS.allowed, '', seeds.join(', ')]]);
-      list = seeds;
+      return { canEdit: true, reason: 'OK' };
     }
-    return list.indexOf(e) !== -1
-      ? { canEdit: true, reason: 'OK' }
-      : { canEdit: false, reason: 'NOT_ALLOWED' };
+    var m = findMember(list, e);
+    if (m && m.status === C.ACCESS.allowed) return { canEdit: true, reason: 'OK' };
+    if (m && m.status === C.ACCESS.pending) return { canEdit: false, reason: 'PENDING' };
+    return { canEdit: false, reason: 'NOT_ALLOWED' };
+  }
+
+  /** A signed-in person asks to be added; stored as a pending editor. @param {string} email @param {string} name @param {string} note */
+  function requestAccess(email, name, note) {
+    var e = clean(email).toLowerCase();
+    if (!EMAIL_RE.test(e)) return C.fail('VALIDATION', { fields: { email: 'อีเมลไม่ถูกต้อง' } });
+    return withLock(function () {
+      var m = findMember(members(), e);
+      if (m) return C.ok({ status: m.status });
+      var sh = allowedSheet() || ensureVisibleAllowedSheet();
+      sh.appendRow([e, clean(name), clean(note), C.ROLE.editor, C.ACCESS.pending].map(asText));
+      writeLog([[deps.nowText(), e, 'ACCESS_REQUEST', '', '', C.SHEETS.allowed, '', C.ACCESS.pending]]);
+      return C.ok({ status: C.ACCESS.pending });
+    });
+  }
+
+  function ensureVisibleAllowedSheet() {
+    var sh = ss.insertSheet(C.SHEETS.allowed);
+    sh.appendRow(C.ALLOWED_HEADERS.map(asText));
+    return sh;
+  }
+
+  /**
+   * Admins add people or change name/note/role/status. Rows are never deleted (suspend instead), and the
+   * last active admin cannot be demoted or suspended (the sheet owner always counts as an admin).
+   * @param {string} adminEmail @param {string} ownerEmail
+   * @param {{email:string, name?:string, note?:string, role?:string, status?:string}} input
+   */
+  function saveAccess(adminEmail, ownerEmail, input) {
+    var admin = clean(adminEmail).toLowerCase();
+    if (!isAdmin(admin, ownerEmail)) return C.fail('NOT_ADMIN');
+    var e = clean(input && input.email).toLowerCase();
+    var roles = [C.ROLE.admin, C.ROLE.editor];
+    var states = [C.ACCESS.allowed, C.ACCESS.pending, C.ACCESS.suspended];
+    /** @type {Object<string,string>} */
+    var errors = {};
+    if (!EMAIL_RE.test(e)) errors.email = 'อีเมลไม่ถูกต้อง';
+    if (input.role !== undefined && roles.indexOf(input.role) === -1) errors.role = 'บทบาทไม่ถูกต้อง';
+    if (input.status !== undefined && states.indexOf(input.status) === -1) errors.status = 'สถานะไม่ถูกต้อง';
+    if (Object.keys(errors).length) return C.fail('VALIDATION', { fields: errors });
+    return withLock(function () {
+      var sh = allowedSheet() || ensureVisibleAllowedSheet();
+      var list = members() || [];
+      var m = findMember(list, e);
+      var next = {
+        name: input.name !== undefined ? clean(input.name) : m ? m.name : '',
+        note: input.note !== undefined ? clean(input.note) : m ? m.note : '',
+        role: input.role !== undefined ? input.role : m ? m.role : C.ROLE.editor,
+        status: input.status !== undefined ? input.status : m ? m.status : C.ACCESS.allowed,
+      };
+      var owner = clean(ownerEmail).toLowerCase();
+      var stillAdmin = next.role === C.ROLE.admin && next.status === C.ACCESS.allowed;
+      if (m && m.role === C.ROLE.admin && m.status === C.ACCESS.allowed && !stillAdmin) {
+        var others = list.filter(function (x) {
+          return x.email !== e && x.role === C.ROLE.admin && x.status === C.ACCESS.allowed;
+        });
+        if (!others.length && !(owner && owner !== e)) return C.fail('LAST_ADMIN');
+      }
+      var now = deps.nowText();
+      if (m) {
+        var before = [m.name, m.note, m.role, m.status].join(' | ');
+        sh.getRange(m.row, 2, 1, 4).setValues([[next.name, next.note, next.role, next.status].map(asText)]);
+        writeLog([
+          [
+            now,
+            admin,
+            'ACCESS_UPDATE',
+            '',
+            '',
+            e,
+            before,
+            [next.name, next.note, next.role, next.status].join(' | '),
+          ],
+        ]);
+      } else {
+        sh.appendRow([e, next.name, next.note, next.role, next.status].map(asText));
+        writeLog([
+          [
+            now,
+            admin,
+            'ACCESS_ADD',
+            '',
+            '',
+            e,
+            '',
+            [next.name, next.note, next.role, next.status].join(' | '),
+          ],
+        ]);
+      }
+      return C.ok({ email: e, name: next.name, note: next.note, role: next.role, status: next.status });
+    });
   }
 
   /** Ask Sheets directly whether the effective user can edit the main sheet (no write). null = unsupported. */
@@ -505,6 +663,10 @@ function makeRepo(deps) {
     setUserName: setUserName,
     canEdit: canEdit,
     editAccess: editAccess,
+    isAdmin: isAdmin,
+    listAccess: listAccess,
+    requestAccess: requestAccess,
+    saveAccess: saveAccess,
   };
 }
 

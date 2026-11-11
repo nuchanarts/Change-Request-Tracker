@@ -15,6 +15,8 @@ var Config = (function () {
       'บัญชีของคุณมีสิทธิ์ดูอย่างเดียว จึงเพิ่มหรือแก้ไขรายการไม่ได้ หากต้องการสิทธิ์แก้ไข กรุณาติดต่อ PM เจ้าของชีต',
     NOT_ALLOWED:
       'บัญชีนี้ยังไม่อยู่ในรายชื่อทีมที่แก้ไขได้ จึงดูข้อมูลได้อย่างเดียว กรุณาให้ PM เพิ่มอีเมลของคุณในชีต _app_allowed',
+    NOT_ADMIN: 'เฉพาะผู้ดูแลเท่านั้นที่จัดการสิทธิ์ได้',
+    LAST_ADMIN: 'ต้องมีผู้ดูแลอย่างน้อย 1 คนที่ยังใช้งานได้ จึงลดสิทธิ์หรือระงับคนนี้ไม่ได้',
     VALIDATION: 'กรุณาตรวจสอบข้อมูลที่กรอกอีกครั้ง',
     CONFIG: 'ยังไม่ได้ตั้งค่า SPREADSHEET_ID ใน Script Properties ของแอป กรุณาแจ้งผู้ดูแลระบบ',
     NO_ACCESS: 'บัญชีนี้ไม่มีสิทธิ์เปิดชีตข้อมูล กรุณาขอสิทธิ์จาก PM เจ้าของชีต แล้วเปิดแอปใหม่',
@@ -44,7 +46,9 @@ var Config = (function () {
     },
     LOG_HEADERS: ['เวลา', 'ผู้ใช้', 'การกระทำ', 'เลขแถว', 'ลำดับ', 'คอลัมน์', 'ค่าเดิม', 'ค่าใหม่'],
     USERS_HEADERS: ['email', 'ชื่อ', 'อัปเดตเมื่อ'],
-    ALLOWED_HEADERS: ['email', 'ชื่อ', 'หมายเหตุ'],
+    ALLOWED_HEADERS: ['email', 'ชื่อ', 'หมายเหตุ', 'บทบาท', 'สถานะ'],
+    ROLE: { admin: 'ผู้ดูแล', editor: 'ผู้แก้ไข' },
+    ACCESS: { allowed: 'อนุญาต', pending: 'รออนุมัติ', suspended: 'ระงับ' },
     USER_NAME_LABEL: 'ชื่อผู้ใช้',
     PEOPLE_HEADERS: ['ชื่อ', 'ชื่อ-สกุล', 'ชื่อ - สกุล', 'ชื่อเล่น', 'รายชื่อ', 'Name', 'name'],
     /** Values documented in the constitution's Data Contract (used when a column has no Data Validation). */
@@ -62,6 +66,8 @@ var Config = (function () {
       ],
       urgency: ['ด่วนที่สุด', 'ด่วน', 'ปกติ'],
     },
+    /** PM list set by the PM on 2026-11-11: the only choices for "PM รับผิดชอบ", in this order. */
+    PM_LIST: ['นุชนารถ (แก๊ส)', 'วนิดา (แพท)', 'ทิพวรรณ (พี่ส้ม)', 'กษิดิ์เดช (พี่ป้อง)'],
     LOCK_MS: 10000,
     CACHE_SECONDS: 300,
     CACHE_KEYS: { options: 'options:v1' },

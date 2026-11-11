@@ -303,11 +303,44 @@
   .tip:hover .tip-body, .tip:focus .tip-body { display: block; }
 
   /* ---------- form */
-  .form { display: grid; gap: var(--s-5); max-width: 920px; }
-  .form fieldset { border: 1px solid var(--line); border-radius: var(--r-m); background: var(--surface); padding: var(--s-4); margin: 0; }
+  /* Form: on wide screens the three groups sit side by side so the whole form fits without much scrolling */
+  .form { display: grid; gap: var(--s-4); grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+  .form .form-actions { grid-column: 1 / -1; }
+  @media (max-width: 1280px) { .form { grid-template-columns: repeat(2, minmax(0, 1fr)); } .form fieldset:first-of-type { grid-column: 1 / -1; } }
+  @media (max-width: 760px) { .form { grid-template-columns: 1fr; } }
+  .form fieldset { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: var(--s-3) var(--s-4) var(--s-4); margin: 0; min-width: 0; }
   .form legend { font-weight: 600; padding: 0 var(--s-2); }
-  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s-4); }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--s-3); }
   .form-grid .wide { grid-column: 1 / -1; }
+  .form textarea { min-height: 72px; }
+  .form .field .hint { font-size: 12.5px; }
+
+  /* Date field + calendar popover */
+  .field { position: relative; }
+  .date-row { display: flex; gap: 6px; }
+  .cal-btn { padding: 0 10px; flex: none; }
+  .cal {
+    position: absolute; z-index: 40; top: 100%; left: 0; margin-top: 6px; width: min(300px, 92vw);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: var(--s-3);
+    box-shadow: 0 12px 32px rgba(15, 61, 58, 0.16);
+  }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); margin-bottom: var(--s-2); }
+  .cal-title { display: flex; flex-direction: column; align-items: center; line-height: 1.3; }
+  .cal-title span { font-size: 12px; color: var(--muted); }
+  .cal-nav { font: inherit; font-size: 20px; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; color: var(--ink); }
+  .cal-nav:hover { background: var(--surface-2); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+  .cal-wd { font-size: 12px; color: var(--muted); padding: 4px 0; }
+  .cal-day { font: inherit; font-size: 14px; height: 36px; border-radius: 10px; border: 0; background: transparent; color: var(--ink); cursor: pointer; }
+  .cal-day:hover { background: var(--accent-soft); }
+  .cal-day.today { box-shadow: inset 0 0 0 2px var(--accent); font-weight: 600; }
+  .cal-day[aria-pressed='true'] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .cal-foot { display: flex; gap: var(--s-2); justify-content: space-between; margin-top: var(--s-2); }
+
+  /* Big "add" call to action on the first page */
+  .hero-add { display: inline-flex; align-items: center; gap: 8px; background: #c2410c; color: #fff; text-decoration: none; font-weight: 600; font-size: 16px; padding: 10px 22px; border-radius: 999px; box-shadow: 0 8px 18px rgba(194, 65, 12, 0.3); }
+  .hero-add:hover { filter: brightness(1.05); }
+  .hero-add svg { width: 20px; height: 20px; }
   .form-actions { display: flex; gap: var(--s-3); flex-wrap: wrap; align-items: center; position: sticky; bottom: 0; background: var(--paper); padding: var(--s-3) 0; border-top: 1px solid var(--line); }
   .form-actions .spacer { margin-left: auto; }
 
