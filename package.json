@@ -1,6 +1,6 @@
 {
   "name": "bgs-ehp-change-request-tracker",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "private": true,
   "description": "Google Apps Script web app to record and monitor EHP/NHIP/INV change requests",
   "license": "UNLICENSED",

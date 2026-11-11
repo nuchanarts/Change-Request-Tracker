@@ -236,3 +236,36 @@ test.describe('Assign page for the dev lead (2026-11-11)', () => {
     await expect(page.locator('#nav-assign')).toBeHidden();
   });
 });
+
+test.describe('After saving an edit, return to the page it was opened from (2026-11-11)', () => {
+  test('from the list: back to the list at the same scroll position', async ({ page }) => {
+    await open(page, '/#/items');
+    const row = page.locator('tbody tr').nth(20);
+    await row.scrollIntoViewIfNeeded();
+    const y = await page.evaluate(() => window.scrollY);
+    await row.locator('.detail-cell a').click();
+    await expect(page).toHaveURL(/#\/items\/.+/);
+    await page.fill('#f-devHours', '7');
+    await page.getByRole('button', { name: 'บันทึกการแก้ไข' }).click();
+    await expect(page.locator('.toast').first()).toContainText('บันทึกการแก้ไขแล้ว');
+    await expect(page).toHaveURL(/#\/items$/);
+    expect(Math.abs((await page.evaluate(() => window.scrollY)) - y)).toBeLessThan(80);
+  });
+
+  test('from the board: back to the board', async ({ page }) => {
+    await open(page, '/#/kanban');
+    await page.locator('.kcard .ktitle').first().click();
+    await page.fill('#f-devHours', '3');
+    await page.getByRole('button', { name: 'บันทึกการแก้ไข' }).click();
+    await expect(page).toHaveURL(/#\/kanban$/);
+    await expect(page.locator('.board')).toBeVisible();
+  });
+
+  test('a failed save stays on the form', async ({ page }) => {
+    await open(page, '/#/items');
+    await page.locator('tbody tr .detail-cell a').first().click();
+    await page.fill('#f-dueDate', 'ไม่ใช่วันที่');
+    await page.getByRole('button', { name: 'บันทึกการแก้ไข' }).click();
+    await expect(page).toHaveURL(/#\/items\/.+/);
+  });
+});
