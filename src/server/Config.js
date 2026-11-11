@@ -72,7 +72,7 @@ var Config = (function () {
     RETIRED: ['แฮ่ม'],
     LOCK_MS: 10000,
     CACHE_SECONDS: 300,
-    CACHE_KEYS: { options: 'options:v2' },
+    CACHE_KEYS: { options: 'options:v3' },
     EDIT_PROBE_KEY: 'bgs_app_edit_probe',
     EDIT_PROBE_CACHE_SECONDS: 21600,
     EDIT_CACHE_PREFIX: 'canEdit:v3:',

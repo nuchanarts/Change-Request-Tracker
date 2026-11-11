@@ -275,13 +275,17 @@ function makeRepo(deps) {
     });
     o.system = fromValidation('system') || distinct(rows, ['system']);
     var people = peopleFromSheet();
-    var fallback = distinct(rows, ['pm', 'developer']);
     o.pm = C.PM_LIST.slice(); // fixed by the PM (overrides validation / รายชื่อ)
-    o.developer = D.withoutRetired(fromValidation('developer') || people || fallback, C.RETIRED);
-    o.person = D.withoutRetired((people || fallback).slice(), C.RETIRED);
-    o.pm.forEach(function (n) {
-      if (o.person.indexOf(n) === -1) o.person.push(n); // PMs can map themselves in My Work
-    });
+    o.developer = D.withoutRetired(
+      fromValidation('developer') || people || distinct(rows, ['developer']),
+      C.RETIRED,
+    );
+    // "ชื่อของฉัน" picker: the four PMs, then developers (user request 2026-11-11)
+    o.person = o.pm.concat(
+      o.developer.filter(function (n) {
+        return o.pm.indexOf(n) === -1;
+      }),
+    );
     if (deps.cache) deps.cache.put(C.CACHE_KEYS.options, JSON.stringify(o), C.CACHE_SECONDS);
     return o;
   }

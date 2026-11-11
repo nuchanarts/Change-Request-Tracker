@@ -828,6 +828,18 @@
 
     document.addEventListener('submit', function (ev) {
       var form = ev.target;
+      if (form.classList && form.classList.contains('qs-form')) {
+        ev.preventDefault();
+        var qsRow = state.byId[form.getAttribute('data-id')];
+        var to = form.elements.to.value;
+        if (!qsRow) return;
+        if (to === qsRow.status) return UI.toast('สถานะนี้เป็นสถานะปัจจุบันอยู่แล้ว');
+        var qsBtn = form.querySelector('button[type="submit"]');
+        qsBtn.disabled = true;
+        qsBtn.textContent = 'กำลังบันทึก…';
+        moveStatus(qsRow.id, to); // same safe path: lock, ลำดับ + conflict check, done date for แก้ไขเรียบร้อย
+        return;
+      }
       if (form.classList && form.classList.contains('as-row')) {
         ev.preventDefault();
         var row = state.byId[form.getAttribute('data-id')];

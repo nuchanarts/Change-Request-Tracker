@@ -121,14 +121,14 @@ describe('options (constitution III)', () => {
     expect(o.system).toEqual(['Dispensary', 'เวชระเบียน']);
     expect(o.urgency).toEqual(['ด่วนที่สุด', 'ด่วน', 'ปกติ']);
     expect(o.status[0]).toBe('0.จัดทำไฟล์แก้ไข'); // workflow order (PM-approved 2026-11-11)
-    // รายชื่อ first, then any PM not already listed
+    // "ชื่อของฉัน": only the four PMs, then the developers (user request 2026-11-11)
     expect(o.person).toEqual([
       'นุชนารถ (แก๊ส)',
-      'เอิร์น',
-      'กิ่ง',
       'วนิดา (แพท)',
       'ทิพวรรณ (พี่ส้ม)',
       'กษิดิ์เดช (พี่ป้อง)',
+      'เอิร์น',
+      'กิ่ง',
     ]);
     // PM list set by the PM (2026-11-11), always these four in this order
     expect(o.pm).toEqual(['นุชนารถ (แก๊ส)', 'วนิดา (แพท)', 'ทิพวรรณ (พี่ส้ม)', 'กษิดิ์เดช (พี่ป้อง)']);
@@ -147,9 +147,14 @@ describe('options (constitution III)', () => {
 
   it('falls back to distinct names when รายชื่อ is missing', () => {
     delete ss.sheets[Config.SHEETS.people];
-    expect(repo.options(repo.readAll().rows).person).toEqual(
-      ['เอิร์น', 'นุชนารถ (แก๊ส)'].sort().concat(['วนิดา (แพท)', 'ทิพวรรณ (พี่ส้ม)', 'กษิดิ์เดช (พี่ป้อง)']),
-    );
+    // developers come from the นักพัฒนา column only, so PM names are not repeated as developers
+    expect(repo.options(repo.readAll().rows).person).toEqual([
+      'นุชนารถ (แก๊ส)',
+      'วนิดา (แพท)',
+      'ทิพวรรณ (พี่ส้ม)',
+      'กษิดิ์เดช (พี่ป้อง)',
+      'เอิร์น',
+    ]);
   });
 });
 

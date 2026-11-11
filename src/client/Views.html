@@ -210,7 +210,7 @@
       }).join('') + '</div>';
       var week = m.closedThisWeek.count;
       var cheer = '<div class="od-cheer">' + onTimeRing(m.openCount, m.overdueCount) +
-        '<div><strong>ช่วยกันเคลียร์ให้เหลือศูนย์!</strong><p>เกินกำหนด <b class="hot num">' + list.length + '</b> งาน' +
+        '<div><p>เกินกำหนด <b class="hot num">' + list.length + '</b> งาน' +
         (week ? ' · สัปดาห์นี้ปิดไปแล้ว <b class="good num">' + week + '</b> งาน 💪' : ' · เริ่มปิดงานแรกของสัปดาห์กันเลย') + '</p>' + chart + '</div></div>';
       var body = '<ol class="od-list">' + list.slice(0, 12).map(function (r) {
         return '<li class="' + severity(r.overdueDays) + '"><div class="od-days num">' + r.overdueDays + '<small>วัน</small></div><div>' +
@@ -571,8 +571,14 @@
       var next = D.nextStatus(r.status);
       var actions = '<a class="btn small" href="#/items/' + encodeURIComponent(r.id) + '">เปิด</a>';
       var seqOk = r.seq !== null && !r.issues.some(function (x) { return x.code === 'SEQ_DUPLICATE'; });
-      if (state.user.canEdit && next && seqOk) {
-        actions += '<button class="btn small primary" data-action="quick-status" data-id="' + esc(r.id) + '" data-to="' + esc(next) + '">เปลี่ยนเป็น ' + esc(D.statusLabel(next)) + '</button>';
+      if (state.user.canEdit && seqOk) {
+        // pick any status (user request 2026-11-11); the next workflow step is pre-selected so one click still works
+        var pick = next || r.status;
+        var opt = function (s, label) { return '<option value="' + esc(s) + '"' + (s === pick ? ' selected' : '') + '>' + esc(label) + (s === r.status ? ' (ปัจจุบัน)' : '') + '</option>'; };
+        actions += '<form class="qs-form" data-id="' + esc(r.id) + '"><label class="sr-only" for="qs-' + esc(r.id) + '">เปลี่ยนสถานะ #' + esc(r.seq) + '</label>' +
+          '<select id="qs-' + esc(r.id) + '" name="to">' + UI.statusGroups().map(function (g) {
+            return '<optgroup label="' + esc(g.label) + '">' + g.options.map(function (o) { return opt(o.value, o.label); }).join('') + '</optgroup>';
+          }).join('') + '</select><button type="submit" class="btn small primary">เปลี่ยนสถานะ</button></form>';
       }
       return '<article class="work' + (r.isOverdue ? ' over' : '') + '"><div><a href="#/items/' + encodeURIComponent(r.id) + '" style="color:inherit">' + esc(r.detail) + '</a>' +
         '<div class="meta"><span>#' + esc(r.seq === null ? '–' : r.seq) + '</span><span>' + esc(r.platform) + ' / ' + esc(r.system) + '</span>' +
