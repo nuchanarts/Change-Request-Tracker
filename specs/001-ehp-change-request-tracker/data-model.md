@@ -149,3 +149,16 @@ isOpen(status)  = !CLOSED.has(trim(status))           // '' → open
 | `STATUS_UNKNOWN` | The status is not in `WORKFLOW` and is not empty |
 
 Values are trimmed for comparison only. Writes always use the exact option string (III).
+
+### 1.5 `_app_allowed` (team list: who may add or edit; added 2026-11-11, v1.2.0)
+
+| Column | Type | Notes |
+|---|---|---|
+| email | text | one Gmail/Google account per row (case-insensitive) |
+| ชื่อ | text | optional |
+| หมายเหตุ | text | optional |
+
+- **Everyone** who signs in with Google can **view**. Only emails on this list **and** with edit rights on the sheet can add or edit (`Repo.editAccess`). Others see a view-only banner that tells them to ask the PM.
+- The sheet is **visible** (not hidden), so the PM manages it directly in Google Sheets.
+- If the sheet does not exist yet, the first sheet editor who opens the app creates it with the sheet owner and themselves, and logs `ALLOW_INIT` in `_app_log`.
+- All changes through the app are logged in `_app_log` with the editor's email.

@@ -13,6 +13,8 @@ var Config = (function () {
     SCHEMA: 'ไม่พบคอลัมน์ที่จำเป็นในชีต ระบบจึงปิดการบันทึกไว้ก่อน: ',
     FORBIDDEN:
       'บัญชีของคุณมีสิทธิ์ดูอย่างเดียว จึงเพิ่มหรือแก้ไขรายการไม่ได้ หากต้องการสิทธิ์แก้ไข กรุณาติดต่อ PM เจ้าของชีต',
+    NOT_ALLOWED:
+      'บัญชีนี้ยังไม่อยู่ในรายชื่อทีมที่แก้ไขได้ จึงดูข้อมูลได้อย่างเดียว กรุณาให้ PM เพิ่มอีเมลของคุณในชีต _app_allowed',
     VALIDATION: 'กรุณาตรวจสอบข้อมูลที่กรอกอีกครั้ง',
     CONFIG: 'ยังไม่ได้ตั้งค่า SPREADSHEET_ID ใน Script Properties ของแอป กรุณาแจ้งผู้ดูแลระบบ',
     NO_ACCESS: 'บัญชีนี้ไม่มีสิทธิ์เปิดชีตข้อมูล กรุณาขอสิทธิ์จาก PM เจ้าของชีต แล้วเปิดแอปใหม่',
@@ -38,9 +40,11 @@ var Config = (function () {
       people: 'รายชื่อ',
       log: '_app_log',
       users: '_app_users',
+      allowed: '_app_allowed',
     },
     LOG_HEADERS: ['เวลา', 'ผู้ใช้', 'การกระทำ', 'เลขแถว', 'ลำดับ', 'คอลัมน์', 'ค่าเดิม', 'ค่าใหม่'],
     USERS_HEADERS: ['email', 'ชื่อ', 'อัปเดตเมื่อ'],
+    ALLOWED_HEADERS: ['email', 'ชื่อ', 'หมายเหตุ'],
     USER_NAME_LABEL: 'ชื่อผู้ใช้',
     PEOPLE_HEADERS: ['ชื่อ', 'ชื่อ-สกุล', 'ชื่อ - สกุล', 'ชื่อเล่น', 'รายชื่อ', 'Name', 'name'],
     /** Values documented in the constitution's Data Contract (used when a column has no Data Validation). */

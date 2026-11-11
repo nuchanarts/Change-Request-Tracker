@@ -421,6 +421,47 @@ function makeRepo(deps) {
     return result;
   }
 
+  /** Emails on the team list (lower-case), or null when the _app_allowed sheet does not exist yet. */
+  function allowedEmails() {
+    var sh = ss.getSheetByName(C.SHEETS.allowed);
+    if (!sh) return null;
+    var data = sh.getDataRange().getDisplayValues();
+    var out = [];
+    for (var i = 1; i < data.length; i++) {
+      var em = clean(data[i][0]).toLowerCase();
+      if (em) out.push(em);
+    }
+    return out;
+  }
+
+  /**
+   * Who may add/edit through the app (user decision 2026-11-11): must be able to edit the sheet AND be on
+   * the team list in _app_allowed. If the list does not exist yet, the first sheet editor creates it with
+   * the sheet owner and themselves (visible, not hidden, so the PM can manage it); this is logged.
+   * @param {string} email @param {string} ownerEmail
+   * @returns {{canEdit: boolean, reason: 'OK'|'SHEET_VIEW_ONLY'|'NOT_ALLOWED'}}
+   */
+  function editAccess(email, ownerEmail) {
+    var e = clean(email).toLowerCase();
+    if (!canEdit(e)) return { canEdit: false, reason: 'SHEET_VIEW_ONLY' };
+    var list = allowedEmails();
+    if (list === null) {
+      var seeds = [clean(ownerEmail).toLowerCase(), e].filter(function (x, i, a) {
+        return x && a.indexOf(x) === i;
+      });
+      var sh = ss.insertSheet(C.SHEETS.allowed);
+      sh.appendRow(C.ALLOWED_HEADERS.map(asText));
+      seeds.forEach(function (s) {
+        sh.appendRow([asText(s), '', asText('เพิ่มอัตโนมัติตอนตั้งค่าครั้งแรก')]);
+      });
+      writeLog([[deps.nowText(), e, 'ALLOW_INIT', '', '', C.SHEETS.allowed, '', seeds.join(', ')]]);
+      list = seeds;
+    }
+    return list.indexOf(e) !== -1
+      ? { canEdit: true, reason: 'OK' }
+      : { canEdit: false, reason: 'NOT_ALLOWED' };
+  }
+
   /** Ask Sheets directly whether the effective user can edit the main sheet (no write). null = unsupported. */
   function rangeCanEdit() {
     try {
@@ -463,6 +504,7 @@ function makeRepo(deps) {
     getUserName: getUserName,
     setUserName: setUserName,
     canEdit: canEdit,
+    editAccess: editAccess,
   };
 }
 

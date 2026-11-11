@@ -11,7 +11,13 @@
     return Object.assign({}, r);
   });
   var options = Object.assign({ status: D.WORKFLOW.slice() }, fx.options);
-  var user = { email: 'tester@example.com', name: null, canEdit: params.get('viewer') !== '1' };
+  var reason =
+    params.get('viewer') === '1'
+      ? 'SHEET_VIEW_ONLY'
+      : params.get('notallowed') === '1'
+        ? 'NOT_ALLOWED'
+        : 'OK';
+  var user = { email: 'tester@example.com', name: null, canEdit: reason === 'OK', editReason: reason };
   var latency = Number(params.get('latency') || 250);
   var MSG = {
     FORBIDDEN: 'บัญชีของคุณมีสิทธิ์ดูอย่างเดียว จึงเพิ่มหรือแก้ไขรายการไม่ได้',
