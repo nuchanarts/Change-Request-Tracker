@@ -17,3 +17,6 @@ test-results/
 playwright-report/
 .clasprc.json
 .clasp*.json
+test-results/
+playwright-report/
+.playwright-mcp/

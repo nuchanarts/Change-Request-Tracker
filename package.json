@@ -21,8 +21,10 @@
     "push:prod": "node scripts/build.mjs && node scripts/check-clasp-target.mjs .clasp.prod.json --prod && clasp -P .clasp.prod.json push --force"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^9.39.5",
     "@google/clasp": "^3.4.1",
+    "@playwright/test": "^1.65.0",
     "@types/google-apps-script": "^2.0.15",
     "@vitest/coverage-v8": "^3.2.7",
     "eslint": "^9.39.5",

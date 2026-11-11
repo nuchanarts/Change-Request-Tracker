@@ -1,0 +1,439 @@
+<script>
+  /* Views: pure render functions (state → HTML). Business rules come only from Domain (constitution XII). */
+  var Views = (function () {
+    'use strict';
+    var D = Domain;
+    var esc = UI.esc;
+
+    // ------------------------------------------------------------------ shared bits
+
+    function filterBar(state) {
+      var f = state.filters;
+      var o = state.options;
+      var devs = [D.UNASSIGNED].concat(o.developer || []);
+      return (
+        '<form class="filters" id="filters" aria-label="ตัวกรอง">' +
+        UI.select({ name: 'platform', label: 'แพลตฟอร์ม', options: o.platform, value: f.platform, emptyLabel: 'ทั้งหมด' }) +
+        UI.select({ name: 'pm', label: 'PM', options: o.pm, value: f.pm, emptyLabel: 'ทั้งหมด' }) +
+        UI.select({ name: 'developer', label: 'นักพัฒนา', options: devs, value: f.developer, emptyLabel: 'ทั้งหมด' }) +
+        UI.select({ name: 'urgency', label: 'ความเร่งด่วน', options: o.urgency, value: f.urgency, emptyLabel: 'ทั้งหมด' }) +
+        UI.input({ name: 'from', label: 'กำหนดส่งตั้งแต่', value: f.from, placeholder: 'วว/ดด/ปปปป', inputmode: 'numeric' }) +
+        UI.input({ name: 'to', label: 'ถึง', value: f.to, placeholder: 'วว/ดด/ปปปป', inputmode: 'numeric' }) +
+        '<div class="actions"><button type="button" class="btn small" data-action="clear-filters">ล้างตัวกรอง</button></div>' +
+        '</form>'
+      );
+    }
+
+    function filterSummary(state) {
+      var f = state.filters;
+      var parts = [];
+      ['platform', 'pm', 'developer', 'urgency'].forEach(function (k) {
+        if (f[k]) parts.push(f[k]);
+      });
+      var from = D.parseDate(f.from).date;
+      var to = D.parseDate(f.to).date;
+      if (from || to) parts.push('กำหนดส่ง ' + (from ? D.formatThai(from) : '…') + ' ถึง ' + (to ? D.formatThai(to) : '…'));
+      return parts.length ? 'กรองอยู่: ' + parts.join(', ') : 'ทุกรายการในชีต';
+    }
+
+    function drillButton(state, title, ids, inner, extraClass) {
+      var key = state.registerDrill(title, ids);
+      return '<button type="button" class="' + (extraClass || 'linklike') + '" data-action="drill" data-drill="' + key + '" aria-label="' + esc(title + ' ' + ids.length + ' รายการ') + '">' + inner + '</button>';
+    }
+
+    function readOnlyBanner(state) {
+      if (state.user.canEdit) return '';
+      return '<div class="banner warn">บัญชี ' + esc(state.user.email || '') + ' มีสิทธิ์ดูอย่างเดียว จึงดูข้อมูลได้แต่เพิ่มหรือแก้ไขไม่ได้</div>';
+    }
+
+    function schemaBanner(state) {
+      if (state.schema.ok) return '';
+      return '<div class="banner danger" role="alert">ไม่พบคอลัมน์ในชีต: ' + esc(state.schema.missing.join(', ')) + ' ระบบจึงปิดการเพิ่มและแก้ไขไว้ กรุณาตรวจสอบหัวคอลัมน์ในชีตหลัก</div>';
+    }
+
+    // ------------------------------------------------------------------ Monitor (US1)
+
+    function monitor(state) {
+      var rows = state.filteredRows();
+      var m = D.computeMetrics(rows, state.today);
+      var html = schemaBanner(state) + readOnlyBanner(state);
+      html += '<div class="page-head"><h1>ภาพรวมงานขอแก้ไขโปรแกรม</h1><span class="muted">' + esc(filterSummary(state)) +
+        '</span><span class="spacer muted">ข้อมูล ณ ' + esc(state.loadedAt) + '</span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button></div>';
+      html += filterBar(state);
+
+      if (!rows.length) {
+        return html + UI.emptyState('ไม่มีรายการตามตัวกรองนี้', 'ลองล้างตัวกรอง หรือเลือกช่วงวันที่ให้กว้างขึ้น', '<button class="btn" data-action="clear-filters">ล้างตัวกรอง</button>');
+      }
+
+      // Q1 + Q5: summary line
+      html += '<div class="summary">' +
+        stat(state, 'lead', 'open', m.openCount, 'งานค้าง', m.openIds, 'งานที่สถานะยังไม่ใช่ แก้ไขเรียบร้อย / ใช้งานได้อยู่แล้ว / ยกเลิก (รวมสถานะว่าง)') +
+        stat(state, 'danger', 'overdue', m.overdueCount, 'เกินกำหนด', m.overdueIds, 'งานค้างที่วันกำหนดผ่านไปแล้ว โดยใช้วันที่เลื่อนก่อน ถ้าไม่มีจึงใช้วันที่ต้องได้') +
+        stat(state, 'ok', 'closed-week', m.closedThisWeek.count, 'ปิดงานสัปดาห์นี้', m.closedThisWeek.ids, 'นับจากวันที่เสร็จ วันจันทร์ถึงวันอาทิตย์นี้') +
+        stat(state, '', 'closed-month', m.closedThisMonth.count, 'ปิดงานเดือนนี้', m.closedThisMonth.ids, 'นับจากวันที่เสร็จ ภายในเดือนนี้') +
+        '</div>';
+
+      // Q2: pipeline (the signature element)
+      html += pipeline(state, m);
+
+      // Q6 (left) + Q3/Q4 (right)
+      html += '<div class="grid-2"><div>' + overduePanel(state, m) + '</div><div>' + developerPanel(state, m) + pmPanel(state, m) + qualityPanel(state) + '</div></div>';
+      return html;
+    }
+
+    function stat(state, cls, metric, value, label, ids, tip) {
+      return '<div class="stat ' + cls + '" data-metric="' + metric + '">' +
+        drillButton(state, label, ids, '<span class="value num">' + value.toLocaleString('th-TH') + '</span>', 'stat-btn') +
+        '<span class="label">' + esc(label) + ' ' + UI.helpTip(tip) + '</span></div>';
+    }
+
+    function pipeline(state, m) {
+      var counts = {};
+      m.byStatus.forEach(function (s) { counts[s.value] = s; });
+      var open = D.WORKFLOW.filter(function (s) { return D.isOpen(s); });
+      var max = 0;
+      var maxStatus = null;
+      open.forEach(function (s) {
+        var c = counts[s] ? counts[s].count : 0;
+        if (c > max) { max = c; maxStatus = s; }
+      });
+      var stages = open.map(function (s) {
+        var c = counts[s] ? counts[s].count : 0;
+        var h = max ? Math.round((c / max) * 100) : 0;
+        var cls = 'stage' + (s === maxStatus && c > 0 ? ' bottleneck' : '') + (c === 0 ? ' zero' : '');
+        var key = state.registerDrill('สถานะ ' + s, counts[s] ? counts[s].ids : []);
+        return '<button type="button" class="' + cls + '" data-action="drill" data-drill="' + key + '" aria-label="' + esc(s + ' ' + c + ' รายการ') + '">' +
+          '<span class="fill" style="height:' + h + '%"></span><span class="count num">' + c + '</span><span class="name">' + esc(s) + '</span></button>';
+      }).join('');
+      var others = m.byStatus.filter(function (s) { return open.indexOf(s.value) === -1; });
+      var extra = others.length
+        ? '<div class="pipeline-extra">สถานะอื่นที่ยังเปิดอยู่: ' + others.map(function (s) {
+            return drillButton(state, 'สถานะ ' + s.status, s.ids, esc(s.status) + ' ' + s.count);
+          }).join(', ') + '</div>'
+        : '';
+      var head = maxStatus
+        ? 'งานกองอยู่ที่ "' + esc(maxStatus) + '" มากที่สุด (' + max + ' งาน)'
+        : 'ไม่มีงานค้าง';
+      return '<section class="pipeline" aria-labelledby="pl-h"><div class="pipeline-head"><h2 id="pl-h">งานค้างแต่ละขั้นตอน ' +
+        UI.helpTip('เรียงตามลำดับขั้นตอนจริง ขั้นที่ไฮไลต์คือขั้นที่มีงานรอมากที่สุด (คอขวด) กดที่ขั้นเพื่อดูรายการ') +
+        '</h2><span class="muted">' + head + '</span></div><div class="stages">' + stages + '</div>' + extra + '</section>';
+    }
+
+    function overduePanel(state, m) {
+      var list = m.overdueList;
+      var body;
+      if (!list.length) {
+        body = '<p class="muted">ไม่มีงานเกินกำหนด</p>';
+      } else {
+        body = '<ol class="od-list">' + list.slice(0, 12).map(function (r) {
+          return '<li><div class="od-days num">' + r.overdueDays + '<small>วัน</small></div><div>' +
+            '<a href="#/items/' + encodeURIComponent(r.id) + '">' + esc(r.detail) + '</a>' +
+            '<div class="meta"><span>#' + esc(r.seq === null ? '-' : r.seq) + '</span><span>' + esc(r.platform) + '</span><span>' + esc(r.system) + '</span><span>' + esc(r.developer || D.UNASSIGNED) + '</span>' +
+            UI.statusBadge(r.status) + '</div></div></li>';
+        }).join('') + '</ol>';
+        if (list.length > 12) body += '<p style="margin-top:8px">' + drillButton(state, 'งานเกินกำหนดทั้งหมด', m.overdueIds, 'ดูงานเกินกำหนดทั้งหมด ' + list.length + ' งาน') + '</p>';
+      }
+      return '<section class="panel" aria-labelledby="od-h"><div class="panel-head"><h2 id="od-h">งานเกินกำหนด</h2><span class="muted">เรียงจากเกินนานที่สุด</span></div>' + body + '</section>';
+    }
+
+    function peopleTable(state, rows, label, withOverdue) {
+      if (!rows.length) return '<p class="muted">ไม่มีงานค้าง</p>';
+      var max = rows.reduce(function (a, r) { return Math.max(a, r.open); }, 0);
+      return '<div class="table-wrap"><table><thead><tr><th>' + esc(label) + '</th><th class="n">งานค้าง</th>' + (withOverdue ? '<th class="n">เกินกำหนด</th>' : '') + '</tr></thead><tbody>' +
+        rows.map(function (p) {
+          var pct = max ? Math.round((p.open / max) * 100) : 0;
+          var od = p.open ? Math.round((p.overdue / p.open) * 100) : 0;
+          var fill = 'linear-gradient(90deg, var(--danger) ' + od + '%, var(--accent) ' + od + '%)';
+          return '<tr><td>' + esc(p.name) + '<div class="bar" aria-hidden="true"><span style="width:' + pct + '%;background:' + fill + '"></span></div></td>' +
+            '<td class="n">' + drillButton(state, label + ' ' + p.name + ' งานค้าง', p.ids, String(p.open)) + '</td>' +
+            (withOverdue ? '<td class="n">' + (p.overdue ? drillButton(state, label + ' ' + p.name + ' เกินกำหนด', p.overdueIds, '<span class="due-over">' + p.overdue + '</span>') : '<span class="muted">0</span>') + '</td>' : '') +
+            '</tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+
+    function developerPanel(state, m) {
+      return '<section class="panel" aria-labelledby="dev-h"><div class="panel-head"><h2 id="dev-h">นักพัฒนาแต่ละคน</h2><span class="muted">แถบแดง = ส่วนที่เกินกำหนด</span></div>' +
+        peopleTable(state, m.byDeveloper, 'นักพัฒนา', true) + '</section>';
+    }
+
+    function pmPanel(state, m) {
+      return '<section class="panel" aria-labelledby="pm-h"><div class="panel-head"><h2 id="pm-h">PM แต่ละคน</h2></div>' +
+        peopleTable(state, m.byPm, 'PM', true) + '</section>';
+    }
+
+    function qualityPanel(state) {
+      var bad = state.filteredRows().filter(function (r) { return r.issues.length; });
+      var body = !bad.length
+        ? '<p class="muted">ไม่พบข้อมูลที่ไม่ครบหรืออยู่ผิดช่อง</p>'
+        : '<p>' + drillButton(state, 'ข้อมูลไม่ครบ/ผิดช่อง', bad.map(function (r) { return r.id; }), '<strong class="num">' + bad.length + '</strong> รายการ') +
+          ' มีข้อมูลที่ต้องแก้ เช่น ค่าอยู่ผิดช่อง วันที่อ่านไม่ได้ หรือไม่มีวันกำหนด</p>' +
+          '<ul style="margin:8px 0 0;padding-left:1.2em">' + bad.slice(0, 5).map(function (r) {
+            return '<li><a href="#/items/' + encodeURIComponent(r.id) + '">#' + esc(r.seq === null ? 'แถว ' + r.rowNumber : r.seq) + '</a> ' + esc(r.issues[0].message) + (r.issues.length > 1 ? ' <span class="muted">(+' + (r.issues.length - 1) + ')</span>' : '') + '</li>';
+          }).join('') + '</ul>';
+      return '<section class="panel" aria-labelledby="dq-h" data-panel="quality"><div class="panel-head"><h2 id="dq-h">ข้อมูลไม่ครบ/ผิดช่อง ' +
+        UI.helpTip('รายการที่ค่าไม่อยู่ในตัวเลือก วันที่อ่านไม่ได้ ลำดับซ้ำ/ว่าง งานค้างไม่มีวันกำหนด หรือแก้ไขเรียบร้อยแต่ไม่มีวันที่เสร็จ PM ควรตามแก้') +
+        '</h2></div>' + body + '</section>';
+    }
+
+    // ------------------------------------------------------------------ Items (US5 + drill-down)
+
+    var PAGE = 50;
+    var STATES = [['open', 'งานค้าง'], ['overdue', 'เกินกำหนด'], ['closed', 'ปิดแล้ว'], ['all', 'ทั้งหมด']];
+
+    function items(state) {
+      var list = state.itemRows();
+      var total = list.length;
+      var pages = Math.max(1, Math.ceil(total / PAGE));
+      var page = Math.min(state.itemsPage, pages - 1);
+      var slice = list.slice(page * PAGE, page * PAGE + PAGE);
+      var html = schemaBanner(state) + '<div class="page-head"><h1>รายการทั้งหมด</h1><span class="muted">' + total.toLocaleString('th-TH') + ' รายการ</span>' +
+        '<span class="spacer"></span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button></div>';
+      if (state.drill) {
+        html += '<div class="drill" role="status"><span>กำลังดู: <strong>' + esc(state.drill.title) + '</strong> (' + state.drill.ids.length + ' รายการ)</span><button class="btn small" data-action="clear-drill">ดูรายการทั้งหมด</button></div>';
+      } else {
+        html += filterBar(state);
+      }
+      html += '<div class="toolbar"><label class="sr-only" for="q">ค้นหา</label><input type="search" id="q" placeholder="ค้นหา รายละเอียด ระบบงาน เลขลำดับ หรือเลข Taiga/MANTIS" value="' + esc(state.itemsQuery) + '" />';
+      if (!state.drill) {
+        html += '<div class="chips" role="group" aria-label="สถานะงาน">' + STATES.map(function (s) {
+          return '<button type="button" class="chip" data-action="items-state" data-value="' + s[0] + '" aria-pressed="' + (state.itemsState === s[0]) + '">' + s[1] + '</button>';
+        }).join('') + '</div>';
+      }
+      html += '</div>';
+      if (!total) {
+        return html + UI.emptyState('ไม่พบรายการ', state.itemsQuery ? 'ไม่มีรายการที่ตรงกับคำค้น "' + state.itemsQuery + '" ลองใช้คำอื่น' : 'ลองเปลี่ยนตัวกรองหรือสถานะงาน',
+          state.user.canEdit ? '<a class="btn primary" href="#/new">เพิ่มรายการใหม่</a>' : '');
+      }
+      var th = function (key, label, cls) {
+        var cur = state.sort.key === key;
+        return '<th class="' + (cls || '') + '" aria-sort="' + (cur ? (state.sort.dir > 0 ? 'ascending' : 'descending') : 'none') + '"><button data-action="sort" data-key="' + key + '">' + label + (cur ? (state.sort.dir > 0 ? ' ▲' : ' ▼') : '') + '</button></th>';
+      };
+      html += '<div class="table-wrap"><table class="responsive"><thead><tr>' + th('seq', 'ลำดับ') + '<th>รายละเอียด</th>' + th('status', 'สถานะ') + th('urgency', 'ความเร่งด่วน') +
+        th('developer', 'นักพัฒนา') + th('pm', 'PM') + th('due', 'กำหนดส่ง') + '</tr></thead><tbody>' +
+        slice.map(function (r) {
+          return '<tr class="clickable" data-action="open-item" data-id="' + esc(r.id) + '"><td class="num" data-hide-mobile>' + esc(r.seq === null ? '–' : r.seq) + '</td>' +
+            '<td class="detail-cell"><a href="#/items/' + encodeURIComponent(r.id) + '">' + esc(r.detail) + '</a><div class="sub">' +
+            '<span class="mobile-only">#' + esc(r.seq === null ? '–' : r.seq) + ' </span>' + esc(r.platform) + ' / ' + esc(r.system) + (r.ticket ? ' / ' + UI.ticket(r) : '') +
+            (r.issues.length ? ' <span class="flag">ข้อมูลไม่ครบ/ผิดช่อง</span>' : '') + '</div></td>' +
+            '<td>' + UI.statusBadge(r.status) + '</td><td data-hide-mobile>' + UI.urgency(r.urgency) + '</td><td>' + esc(r.developer || '–') + '</td><td data-hide-mobile>' + esc(r.pm) + '</td><td>' + UI.due(r, state.today) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+      if (pages > 1) {
+        html += '<nav class="pager" aria-label="หน้า"><button class="btn small" data-action="page" data-dir="-1"' + (page === 0 ? ' disabled' : '') + '>ก่อนหน้า</button><span class="muted">หน้า ' + (page + 1) + ' จาก ' + pages +
+          '</span><button class="btn small" data-action="page" data-dir="1"' + (page >= pages - 1 ? ' disabled' : '') + '>ถัดไป</button></nav>';
+      }
+      return html;
+    }
+
+    // ------------------------------------------------------------------ Form (US2 + US3)
+
+    var GROUPS = [
+      { legend: 'เรื่องที่ขอแก้ไข', keys: ['platform', 'issueType', 'urgency', 'system', 'detail', 'ticket'] },
+      { legend: 'ผู้รับผิดชอบและกำหนดส่ง', keys: ['pm', 'developer', 'dueDate', 'postponedDate', 'devQueue'] },
+      { legend: 'ความคืบหน้า', keys: ['status', 'devStart', 'devEnd', 'devHours', 'doneDate', 'deployDate'] },
+    ];
+    var TIPS = {
+      postponedDate: 'ถ้าใส่วันที่เลื่อน ระบบจะใช้วันนี้เป็นวันกำหนดแทนวันที่ต้องได้',
+      system: 'เลือกจากรายการ หรือพิมพ์ชื่อระบบงานใหม่ได้',
+      devQueue: 'ลำดับคิวงานของนักพัฒนา เลขน้อยทำก่อน',
+      doneDate: 'ต้องระบุเมื่อเปลี่ยนสถานะเป็น 0.แก้ไขเรียบร้อย',
+      ticket: 'ใส่เลข ticket หรือวางลิงก์ Taiga/MANTIS',
+    };
+
+    function formField(state, key, value, errors, warnings, readOnly) {
+      var col = D.COLUMN_BY_KEY[key];
+      var o = { name: key, label: col.header, value: value, required: !!col.required, error: errors[key], warn: warnings[key], tip: TIPS[key], disabled: readOnly, readonly: readOnly };
+      var opts = state.options;
+      if (col.type === 'option') return UI.select(Object.assign(o, { options: opts[key] }));
+      if (col.type === 'status') {
+        return UI.select(Object.assign(o, { options: D.WORKFLOW, groups: UI.statusGroups(), allowEmpty: false, hint: 'เรียงตามขั้นตอนงานจริง เลือกขั้นถัดไปเมื่องานคืบหน้า' }));
+      }
+      if (col.type === 'person') return UI.select(Object.assign(o, { options: key === 'pm' ? opts.pm : opts.developer, emptyLabel: key === 'developer' ? '— ยังไม่มอบหมาย —' : undefined }));
+      if (col.type === 'freeOption') return UI.combobox(Object.assign(o, { options: opts.system }));
+      if (col.type === 'date') return UI.dateField(o);
+      if (col.type === 'number') return UI.input(Object.assign(o, { inputmode: 'decimal' }));
+      if (key === 'detail') return UI.textarea(Object.assign(o, { wide: true, hint: 'อธิบายสิ่งที่ต้องการให้แก้ไข ให้คนอื่นอ่านแล้วเข้าใจ' }));
+      return UI.input(Object.assign(o, { wide: key === 'ticket' }));
+    }
+
+    function form(state, mode, row) {
+      var readOnly = !state.user.canEdit || !state.schema.ok;
+      var errs = state.formErrors || {};
+      var warns = state.formWarnings || {};
+      var values = state.formDraft || (row ? row.raw : defaults(state));
+      var title = mode === 'new' ? 'เพิ่มรายการขอแก้ไขใหม่' : 'รายการ #' + (row.seq === null ? '–' : row.seq);
+      var html = schemaBanner(state) + readOnlyBanner(state);
+      html += '<div class="page-head"><h1>' + esc(title) + '</h1>' + (row ? UI.statusBadge(row.status) + '<span class="muted">' + UI.due(row, state.today) + '</span>' : '<span class="muted">ช่องที่มี * ต้องกรอก</span>') + '</div>';
+      if (state.formAlert) html += '<div class="banner danger" role="alert">' + esc(state.formAlert.message) + (state.formAlert.reload ? ' <button class="btn small" data-action="reload-item">โหลดข้อมูลใหม่</button>' : '') + '</div>';
+      if (row && row.issues.length) {
+        html += '<div class="banner warn"><strong>ข้อมูลที่ควรแก้:</strong><ul style="margin:4px 0 0;padding-left:1.2em">' + row.issues.map(function (i) { return '<li>' + esc(i.message) + '</li>'; }).join('') + '</ul></div>';
+      }
+      html += '<form class="form" id="item-form" data-mode="' + mode + '" novalidate>';
+      GROUPS.forEach(function (g) {
+        html += '<fieldset><legend>' + esc(g.legend) + '</legend><div class="form-grid">' + g.keys.map(function (k) {
+          return formField(state, k, values[k], errs, warns, readOnly);
+        }).join('') + '</div></fieldset>';
+      });
+      html += '<div class="form-actions">';
+      if (!readOnly) html += '<button type="submit" class="btn primary" id="save-btn">' + (mode === 'new' ? 'บันทึกรายการใหม่' : 'บันทึกการแก้ไข') + '</button>';
+      html += '<a class="btn" href="' + (mode === 'new' ? '#/monitor' : '#/items') + '">' + (readOnly ? 'กลับ' : 'ยกเลิก') + '</a>';
+      if (row && !readOnly && row.isOpen) html += '<span class="spacer"></span><button type="button" class="btn danger" data-action="cancel-item">ยกเลิกรายการนี้</button>';
+      html += '</div></form>';
+      if (row) html += '<p class="muted" style="margin-top:12px;font-size:13px">แถวที่ ' + row.rowNumber + ' ในชีต ระบบจะบันทึกเฉพาะช่องที่คุณแก้ และเก็บประวัติไว้ในชีต _app_log</p>';
+      return html;
+    }
+
+    function defaults(state) {
+      var me = state.myName();
+      return {
+        status: D.DEFAULT_STATUS,
+        pm: me && state.options.pm.indexOf(me) !== -1 ? me : '',
+      };
+    }
+
+    // ------------------------------------------------------------------ My Work (US4)
+
+    var GROUP_LABELS = [['overdue', 'เกินกำหนด'], ['today', 'ครบกำหนดวันนี้'], ['within7', 'ภายใน 7 วัน'], ['later', 'ภายหลัง'], ['noDue', 'ไม่มีวันกำหนด']];
+
+    function myWork(state) {
+      var name = state.myName();
+      var html = '<div class="page-head"><h1>งานของฉัน</h1>' + (name ? '<span class="muted">' + esc(name) + '</span> <button class="linklike" data-action="change-name">เปลี่ยนชื่อ</button>' : '') + '</div>';
+      if (!name || state.choosingName) {
+        return html + '<section class="panel" style="max-width:520px"><h2>คุณคือใครในรายชื่อ?</h2><p class="muted" style="margin:4px 0 12px">เลือกชื่อของคุณครั้งเดียว ระบบจะจำไว้และแสดงเฉพาะงานของคุณ</p>' +
+          '<form id="name-form" class="form-grid">' + UI.select({ name: 'myname', label: 'ชื่อของฉัน', options: state.options.person, value: name, required: true }) +
+          '<div class="actions" style="display:flex;align-items:flex-end"><button class="btn primary" type="submit">ใช้ชื่อนี้</button></div></form></section>';
+      }
+      var role = state.myTab;
+      var g = D.groupMyWork(state.rows, name, role, state.today);
+      html += '<div class="tabs" role="tablist"><button role="tab" data-action="tab" data-tab="developer" aria-selected="' + (role === 'developer') + '">งานพัฒนาของฉัน</button>' +
+        '<button role="tab" data-action="tab" data-tab="pm" aria-selected="' + (role === 'pm') + '">งานที่ฉันดูแล (PM)</button></div>';
+      if (!g.total) {
+        return html + UI.emptyState('ยังไม่มีงานค้าง', role === 'developer' ? 'งานที่มีชื่อคุณในช่อง "นักพัฒนา" จะมาแสดงที่นี่' : 'งานที่มีชื่อคุณในช่อง "PM รับผิดชอบ" จะมาแสดงที่นี่');
+      }
+      GROUP_LABELS.forEach(function (gl) {
+        var list = g[gl[0]];
+        if (!list.length) return;
+        html += '<section class="group" aria-labelledby="g-' + gl[0] + '"><h2 id="g-' + gl[0] + '">' + gl[1] + ' <span class="count">' + list.length + ' งาน</span></h2>' +
+          list.map(function (r) { return workCard(state, r); }).join('') + '</section>';
+      });
+      return html;
+    }
+
+    function workCard(state, r) {
+      var next = D.nextStatus(r.status);
+      var actions = '<a class="btn small" href="#/items/' + encodeURIComponent(r.id) + '">เปิด</a>';
+      var seqOk = r.seq !== null && !r.issues.some(function (x) { return x.code === 'SEQ_DUPLICATE'; });
+      if (state.user.canEdit && next && seqOk) {
+        actions += '<button class="btn small primary" data-action="quick-status" data-id="' + esc(r.id) + '" data-to="' + esc(next) + '">เปลี่ยนเป็น ' + esc(next) + '</button>';
+      }
+      return '<article class="work' + (r.isOverdue ? ' over' : '') + '"><div><a href="#/items/' + encodeURIComponent(r.id) + '" style="color:inherit">' + esc(r.detail) + '</a>' +
+        '<div class="meta"><span>#' + esc(r.seq === null ? '–' : r.seq) + '</span><span>' + esc(r.platform) + ' / ' + esc(r.system) + '</span>' +
+        (r.devQueue !== null ? '<span>คิวที่ ' + r.devQueue + '</span>' : '') + '<span>' + UI.urgency(r.urgency) + '</span>' + UI.statusBadge(r.status) + '<span>' + UI.due(r, state.today) + '</span></div></div>' +
+        '<div class="actions">' + actions + '</div></article>';
+    }
+
+    // ------------------------------------------------------------------ Kanban (US8)
+
+    var KANBAN_LIMIT = 40;
+    var URG_RANK = { 'ด่วนที่สุด': 0, 'ด่วน': 1, 'ปกติ': 2 };
+
+    function kanban(state) {
+      var rows = state.filteredRows();
+      var open = D.WORKFLOW.filter(function (s) { return D.isOpen(s); });
+      var week = D.weekRange(state.today);
+      var cols = open.map(function (s) {
+        return { status: s, title: s, rows: rows.filter(function (r) { return r.isOpen && r.status === s; }) };
+      });
+      cols.push({
+        status: D.DONE,
+        title: 'ปิดงานสัปดาห์นี้',
+        closed: true,
+        rows: rows.filter(function (r) { return !r.isOpen && D.inRange(r.doneDate.date, week); }),
+      });
+      var max = Math.max.apply(null, cols.slice(0, -1).map(function (c) { return c.rows.length; }));
+      var html = readOnlyBanner(state) + '<div class="page-head"><h1>บอร์ดงาน</h1><span class="muted">' + esc(filterSummary(state)) + '</span><span class="spacer muted">' +
+        (state.user.canEdit ? 'ลากการ์ดไปคอลัมน์อื่น หรือกดปุ่ม ◀ ▶ เพื่อเปลี่ยนสถานะ' : 'ดูอย่างเดียว') +
+        '</span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button></div>' + filterBar(state);
+      html += '<div class="board" role="list" aria-label="บอร์ดงานตามสถานะ">' + cols.map(function (c, i) {
+        var sorted = c.rows.slice().sort(function (a, b) {
+          return (b.isOverdue - a.isOverdue) || ((URG_RANK[a.urgency] === undefined ? 3 : URG_RANK[a.urgency]) - (URG_RANK[b.urgency] === undefined ? 3 : URG_RANK[b.urgency])) ||
+            ((a.effectiveDue ? D.compareDate(a.effectiveDue, b.effectiveDue || { y: 9999, m: 1, d: 1 }) : 1));
+        });
+        var more = sorted.length - KANBAN_LIMIT;
+        var cls = 'kcol' + (c.closed ? ' closed' : '') + (!c.closed && c.rows.length === max && max > 0 ? ' bottleneck' : '');
+        return '<section class="' + cls + '" role="listitem" data-status="' + esc(c.status) + '" aria-label="' + esc(c.title + ' ' + c.rows.length + ' งาน') + '">' +
+          '<header class="kcol-head"><h2>' + (c.closed ? '' : '<span class="kstep">' + (i + 1) + '</span>') + esc(c.title) + '</h2><span class="kcount num">' + c.rows.length + '</span></header>' +
+          '<div class="kcards">' + (sorted.length ? sorted.slice(0, KANBAN_LIMIT).map(function (r) { return kcard(state, r, open); }).join('') : '<p class="kempty">ไม่มีงาน</p>') +
+          (more > 0 ? '<p class="kmore">' + drillButton(state, c.title, c.rows.map(function (r) { return r.id; }), 'ดูทั้งหมด ' + c.rows.length + ' งาน') + '</p>' : '') +
+          '</div></section>';
+      }).join('') + '</div>';
+      return html;
+    }
+
+    function kcard(state, r, open) {
+      var seqOk = r.seq !== null && !r.issues.some(function (x) { return x.code === 'SEQ_DUPLICATE'; });
+      var canMove = state.user.canEdit && state.schema.ok && seqOk && r.isOpen;
+      var i = open.indexOf(r.status);
+      var prev = i > 0 ? open[i - 1] : null;
+      var next = i >= 0 ? D.nextStatus(r.status) : null;
+      var btns = '';
+      if (canMove) {
+        btns = '<div class="kmove">' +
+          (prev ? '<button class="btn small" data-action="kmove" data-id="' + esc(r.id) + '" data-to="' + esc(prev) + '" aria-label="ย้าย #' + esc(r.seq) + ' กลับไป ' + esc(prev) + '" title="กลับไป ' + esc(prev) + '">◀</button>' : '<span></span>') +
+          (next ? '<button class="btn small" data-action="kmove" data-id="' + esc(r.id) + '" data-to="' + esc(next) + '" aria-label="ย้าย #' + esc(r.seq) + ' ไป ' + esc(next) + '" title="ไป ' + esc(next) + '">▶</button>' : '') +
+          '</div>';
+      }
+      return '<article class="kcard' + (r.isOverdue ? ' over' : '') + '"' + (canMove ? ' draggable="true"' : '') + ' data-id="' + esc(r.id) + '">' +
+        '<a href="#/items/' + encodeURIComponent(r.id) + '" class="ktitle">' + esc(r.detail) + '</a>' +
+        '<div class="meta"><span>#' + esc(r.seq === null ? '–' : r.seq) + '</span><span>' + esc(r.platform) + '</span>' + (r.urgency !== 'ปกติ' ? '<span>' + UI.urgency(r.urgency) + '</span>' : '') + '</div>' +
+        '<div class="meta"><span>' + esc(r.developer || D.UNASSIGNED) + '</span><span>' + UI.due(r, state.today) + '</span></div>' + btns + '</article>';
+    }
+
+    // ------------------------------------------------------------------ Help (US7)
+
+    function help() {
+      return '<div class="help"><div class="page-head"><h1>วิธีใช้งาน</h1><button class="btn small" data-action="tour-start">ดูทัวร์แนะนำอีกครั้ง</button></div>' +
+        '<section><h2>ดูภาพรวมงาน</h2><ol><li>เปิดเมนู "ภาพรวม" ตัวเลขด้านบนคืองานค้าง งานเกินกำหนด และงานที่ปิดได้ในสัปดาห์และเดือนนี้</li>' +
+        '<li>แถบ "งานค้างแต่ละขั้นตอน" เรียงตามลำดับงานจริง ขั้นที่ไฮไลต์คือขั้นที่มีงานรอมากที่สุด</li>' +
+        '<li>กดที่ตัวเลขใดก็ได้ เพื่อดูรายการที่อยู่เบื้องหลังตัวเลขนั้น</li><li>ใช้ตัวกรองแพลตฟอร์ม PM นักพัฒนา ความเร่งด่วน และช่วงกำหนดส่ง ตัวเลขทุกตัวจะคำนวณใหม่ทันที</li>' +
+        '<li>กด "โหลดข้อมูลใหม่" เพื่อดึงข้อมูลล่าสุดจากชีต</li></ol></section>' +
+        '<section><h2>ดูงานของฉัน</h2><ol><li>เปิดเมนู "งานของฉัน" ครั้งแรกให้เลือกชื่อของคุณจากรายชื่อ</li><li>แท็บ "งานพัฒนาของฉัน" แสดงงานที่คุณเป็นนักพัฒนา แท็บ "งานที่ฉันดูแล (PM)" แสดงงานที่คุณเป็น PM</li>' +
+        '<li>กดปุ่ม "เปลี่ยนเป็น …" เพื่อเลื่อนงานไปขั้นถัดไปได้ทันที</li></ol></section>' +
+        '<section><h2>ใช้บอร์ดงาน (Kanban)</h2><ol><li>เปิดเมนู "บอร์ดงาน" แต่ละคอลัมน์คือขั้นตอนงานเรียงตามลำดับ คอลัมน์ที่ไฮไลต์มีงานมากที่สุด</li>' +
+        '<li>ลากการ์ดไปวางในคอลัมน์ใหม่ หรือกดปุ่ม ◀ (ถอยกลับ) ▶ (ขั้นถัดไป) บนการ์ด เพื่อเปลี่ยนสถานะ</li>' +
+        '<li>ลากไป "ปิดงานสัปดาห์นี้" คือเปลี่ยนเป็น 0.แก้ไขเรียบร้อย ระบบใส่วันที่เสร็จเป็นวันนี้ให้</li>' +
+        '<li>ใช้ตัวกรองนักพัฒนาเพื่อดูบอร์ดของแต่ละคน การ์ดขอบแดงคืองานเกินกำหนด</li></ol></section>' +
+        '<section><h2>เพิ่มรายการใหม่</h2><ol><li>กด "เพิ่มรายการ" ที่เมนูด้านบน</li><li>เลือกค่าจากรายการในทุกช่อง ช่องที่มี * ต้องกรอก</li><li>ระบบงานเลือกจากรายการหรือพิมพ์ชื่อใหม่ได้</li>' +
+        '<li>กด "บันทึกรายการใหม่" ระบบจะต่อท้ายชีตและให้เลขลำดับอัตโนมัติ</li></ol></section>' +
+        '<section><h2>แก้ไขหรืออัปเดตสถานะ</h2><ol><li>เปิดรายการจาก "รายการทั้งหมด" หรือ "งานของฉัน"</li><li>แก้เฉพาะช่องที่ต้องการแล้วกด "บันทึกการแก้ไข" ระบบเขียนเฉพาะช่องที่เปลี่ยน</li>' +
+        '<li>ถ้าเปลี่ยนเป็น "0.แก้ไขเรียบร้อย" ต้องใส่วันที่เสร็จ</li><li>ถ้าจะยกเลิกงาน ให้กด "ยกเลิกรายการนี้" ระบบจะเปลี่ยนสถานะเป็น 0.ยกเลิก โดยไม่ลบแถว</li></ol></section>' +
+        '<section><h2>ความหมายของคำในแอป</h2><dl>' +
+        '<dt>งานค้าง</dt><dd>ทุกรายการที่สถานะไม่ใช่ 0.แก้ไขเรียบร้อย, 0.ใช้งานได้อยู่แล้ว หรือ 0.ยกเลิก รวมถึงสถานะว่าง (0.รอแจ้งทีมพัฒนา และ 0.จัดทำไฟล์แก้ไข ยังนับเป็นงานค้าง)</dd>' +
+        '<dt>วันกำหนด</dt><dd>ใช้ "วันที่เลื่อน" ถ้ามี ถ้าไม่มีจึงใช้ "วันที่ต้องได้"</dd>' +
+        '<dt>เกินกำหนด</dt><dd>งานค้างที่วันกำหนดผ่านไปแล้ว</dd>' +
+        '<dt>ปิดงานสัปดาห์นี้</dt><dd>นับจาก "วันที่เสร็จ" ช่วงวันจันทร์ถึงวันอาทิตย์นี้</dd>' +
+        '<dt>ข้อมูลไม่ครบ/ผิดช่อง</dt><dd>ค่าที่ไม่อยู่ในตัวเลือก วันที่อ่านไม่ได้ เลขลำดับซ้ำหรือว่าง งานค้างไม่มีวันกำหนด หรือแก้ไขเรียบร้อยแต่ไม่มีวันที่เสร็จ</dd></dl></section>' +
+        '<section><h2>ถ้าบันทึกไม่ได้</h2><ul><li><strong>มีคนแก้ไขรายการนี้ไปก่อนหน้าคุณ</strong> กด "โหลดข้อมูลใหม่" แล้วแก้อีกครั้ง ระบบไม่บันทึกทับงานของคนอื่น</li>' +
+        '<li><strong>แถวนี้ถูกย้ายหรือมีการเรียงข้อมูลใหม่</strong> มีคนเรียงข้อมูลในชีต กด "โหลดข้อมูลใหม่" แล้วเปิดรายการอีกครั้ง</li>' +
+        '<li><strong>มีผู้ใช้อื่นกำลังบันทึกอยู่</strong> รอสักครู่แล้วกดบันทึกอีกครั้ง</li><li><strong>สิทธิ์ดูอย่างเดียว</strong> ขอสิทธิ์แก้ไขชีตจาก PM เจ้าของชีต</li></ul></section>' +
+        '<section><h2>ข้อควรระวัง</h2><p>ห้ามใส่ข้อมูลผู้ป่วยในรายละเอียดหรือไฟล์แนบ แอปนี้เก็บเฉพาะข้อมูลการพัฒนาระบบ</p></section></div>';
+    }
+
+    // ------------------------------------------------------------------ Tour (US7)
+
+    var TOUR = [
+      ['ยินดีต้อนรับ', 'แอปนี้อ่านและบันทึกข้อมูลที่ชีต "สรุปขอแก้ไขโปรแกรม EHP และ แพลตฟอร์มกลาง" โดยตรง คนที่ยังกรอกในชีตก็ใช้งานต่อได้ตามปกติ'],
+      ['ภาพรวม', 'ดูงานค้าง งานเกินกำหนด และขั้นตอนที่งานกองอยู่มากที่สุด กดที่ตัวเลขใดก็ได้เพื่อดูรายการเบื้องหลัง'],
+      ['งานของฉัน', 'เลือกชื่อของคุณครั้งเดียว แล้วจะเห็นเฉพาะงานของคุณ เรียงตามวันกำหนด และเลื่อนสถานะได้ในคลิกเดียว'],
+      ['เพิ่มและแก้ไข', 'ทุกช่องเป็นตัวเลือกตามค่าในชีต จึงไม่มีค่าไปอยู่ผิดช่อง ทุกการแก้ไขถูกบันทึกประวัติไว้ ดูวิธีใช้ละเอียดได้ที่เมนู "วิธีใช้งาน"'],
+    ];
+
+    function tour(step) {
+      var s = TOUR[step];
+      return '<div class="tour" role="dialog" aria-modal="true" aria-labelledby="tour-h"><div class="tour-card"><div class="step">ขั้นที่ ' + (step + 1) + ' จาก ' + TOUR.length + '</div>' +
+        '<h2 id="tour-h">' + esc(s[0]) + '</h2><p>' + esc(s[1]) + '</p><div class="dialog-actions"><button class="btn" data-action="tour-skip">ข้าม</button>' +
+        '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
+    }
+
+    return { monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+  })();
+</script>
