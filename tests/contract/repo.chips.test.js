@@ -111,3 +111,17 @@ describe('repairQuotedOptions (admin)', () => {
     expect(r2.repairQuotedOptions('nobody@x.com', '')).toMatchObject({ ok: false, code: 'NOT_ADMIN' });
   });
 });
+
+describe('repair never writes formulas', () => {
+  it('a logged free-text value that looks like a formula is written with an apostrophe', () => {
+    main.cells[1][col('system') - 1] = '=HYPERLINK("x")';
+    const log = ss.insertSheet(Config.SHEETS.log);
+    log.cells = [
+      Config.LOG_HEADERS.slice(),
+      ['t', 'a@x.com', 'UPDATE', 2, 1, 'ระบบงาน', '', '=HYPERLINK("x")'],
+    ];
+    main.writes = [];
+    repo.repairQuotedOptions('boss@x.com', 'boss@x.com');
+    expect(main.writes).toEqual([{ row: 2, col: col('system'), value: '\'=HYPERLINK("x")' }]);
+  });
+});

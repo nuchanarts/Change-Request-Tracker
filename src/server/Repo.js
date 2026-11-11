@@ -484,7 +484,8 @@ function makeRepo(deps) {
           skipped++;
           return;
         }
-        sh.getRange(row, colIdx + 1).setValue(value);
+        // same guard as normal writes: plain for dropdown values, apostrophe for formula/number-like text
+        sh.getRange(row, colIdx + 1).setValue(asText(value));
         repaired++;
       });
       writeLog([
