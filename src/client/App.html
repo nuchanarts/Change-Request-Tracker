@@ -3,7 +3,7 @@
   (function () {
     'use strict';
     var D = Domain;
-    var KEYS = { filters: 'ehp.filters.v1', tour: 'ehp.tour.v1', name: 'ehp.myname.v1', tab: 'ehp.mytab.v1' };
+    var KEYS = { filters: 'ehp.filters.v1', tour: 'ehp.tour.v1', name: 'ehp.myname.v1', pmName: 'ehp.mypm.v1', tab: 'ehp.mytab.v1' };
     var EMPTY_FILTERS = { platform: '', pm: '', developer: '', urgency: '', from: '', to: '' };
 
     function store(key, value) {
@@ -75,6 +75,11 @@
     /** Remember who "me" is (browser + server, best effort) and show their work. */
     function setMyName(name) {
       if (!name) return;
+      state.choosingName = false;
+      if (state.myTab === 'pm') {
+        store(KEYS.pmName, name); // the PM menu remembers its own name, separate from the developer one
+        return render();
+      }
       store(KEYS.name, name);
       state.choosingName = false;
       if (state.user) state.user.name = name;
@@ -91,6 +96,12 @@
       render();
     }
 
+    state.pmName = function () {
+      var saved = store(KEYS.pmName);
+      if (saved) return saved;
+      var me = state.myName();
+      return state.options && state.options.pm && state.options.pm.indexOf(me) !== -1 ? me : '';
+    };
     state.myName = function () {
       return (state.user && state.user.name) || store(KEYS.name) || '';
     };
@@ -175,7 +186,6 @@
         if (!(state.history && state.history.loading)) state.history = null; // reload history next time (keep an in-flight load)
         state.phase = 'ready';
         document.getElementById('sheet-name').textContent = b.spreadsheetName;
-        document.getElementById('nav-add').hidden = !(b.user.canEdit && b.schema.ok);
         document.getElementById('nav-access').hidden = !b.user.isAdmin;
         // dev lead menu: editors only, with the number of open items that still need a developer
         var unassigned = D.unassignedQueue(rows, state.today).length;
@@ -228,7 +238,7 @@
       var main = document.getElementById('main');
       var r = route();
       document.querySelectorAll('.nav a').forEach(function (a) {
-        var active = a.getAttribute('data-route') === r.name;
+        var active = a.getAttribute('data-route') === (r.name === 'my-work' && r.id === 'pm' ? 'my-work-pm' : r.name);
         if (active) a.setAttribute('aria-current', 'page');
         else a.removeAttribute('aria-current');
       });
