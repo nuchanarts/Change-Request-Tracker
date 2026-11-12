@@ -231,6 +231,20 @@ test.describe('Assign page for the dev lead (2026-11-11)', () => {
     expect(row.developer).toBe(name);
   });
 
+  test('a failed assign shows the reason and keeps the typed name', async ({ page }) => {
+    await open(page, '/#/assign');
+    const first = page.locator('.as-row').first();
+    const id = await first.getAttribute('data-id');
+    // someone else fills in the developer behind our back -> server answers CONFLICT
+    await page.evaluate((s) => {
+      window.__mockSheet.rows.find((r) => r.seq === s).developer = 'คนอื่น';
+    }, id);
+    await first.locator('input[name="developer"]').fill('ทดสอบ');
+    await first.getByRole('button', { name: 'มอบหมาย' }).click();
+    await expect(page.locator('.toast.error')).toContainText('มีคนแก้ไขรายการนี้ไปก่อนหน้าคุณ');
+    await expect(page.locator('.as-row[data-id="' + id + '"] input[name="developer"]')).toHaveValue('ทดสอบ');
+  });
+
   test('viewers do not see the assign menu', async ({ page }) => {
     await open(page, '/?viewer=1#/monitor');
     await expect(page.locator('#nav-assign')).toBeHidden();

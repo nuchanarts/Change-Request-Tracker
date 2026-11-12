@@ -455,14 +455,15 @@
       });
     }
 
-    function saveChanges(row, changes, btn) {
+    /** @param {boolean} [inForm] failures shown on the item form (default: when a button is given) */
+    function saveChanges(row, changes, btn, inForm) {
       if (btn) {
         btn.disabled = true;
         btn.textContent = 'กำลังบันทึก…';
       }
       return api('Api_updateRequest', { rowNumber: row.rowNumber, seq: row.seq, changes: changes }).then(function (res) {
         if (!res.ok) {
-          failMessage(res, !!btn);
+          failMessage(res, inForm === undefined ? !!btn : inForm);
           render();
           return false;
         }
@@ -908,8 +909,13 @@
         var name = D.clean(form.elements.developer.value);
         if (!row || !name) return UI.toast('กรุณาพิมพ์หรือเลือกชื่อนักพัฒนา', 'error');
         // same safe update path as the form: lock, ลำดับ + conflict check, changed cell only, logged
-        saveChanges(row, { developer: { from: row.raw.developer, to: name } }, form.querySelector('button[type="submit"]')).then(function (ok) {
-          if (!ok) return;
+        // the assign page has no form alert area, so failures go to a toast (inForm=false)
+        saveChanges(row, { developer: { from: row.raw.developer, to: name } }, form.querySelector('button[type="submit"]'), false).then(function (ok) {
+          if (!ok) {
+            var again = document.querySelector('.as-row[data-id="' + row.id + '"] input[name="developer"]');
+            if (again) again.value = name; // render() rebuilt the row; keep what was typed
+            return;
+          }
           UI.toast('มอบหมาย #' + row.seq + ' ให้ ' + name + ' แล้ว');
           var next = document.querySelector('.as-row input[name="developer"]');
           if (next) next.focus();
