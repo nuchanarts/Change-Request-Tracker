@@ -18,13 +18,24 @@
         '<strong>ตัวกรอง</strong><span class="filters-count">' + (active ? 'ใช้อยู่ ' + active + ' ตัว' : 'แสดงทุกรายการ') + '</span>' +
         (active ? '<button type="button" class="btn small filters-clear" data-action="clear-filters">' + UI.withIcon('clear', 'ล้างตัวกรอง') + '</button>' : '') + '</div>' +
         UI.select({ name: 'platform', label: 'แพลตฟอร์ม', icon: 'platform', options: o.platform, value: f.platform, emptyLabel: 'ทั้งหมด' }) +
-        UI.select({ name: 'pm', label: 'PM', icon: 'pm', options: o.pm, value: f.pm, emptyLabel: 'ทั้งหมด' }) +
+        pmFilterSelect(o.pm || [], f.pm) +
         UI.select({ name: 'developer', label: 'นักพัฒนา', icon: 'dev', options: devs, value: f.developer, emptyLabel: 'ทั้งหมด' }) +
         UI.select({ name: 'urgency', label: 'ความเร่งด่วน', icon: 'urgency', options: o.urgency, value: f.urgency, emptyLabel: 'ทั้งหมด' }) +
         UI.dateField({ name: 'from', label: 'กำหนดส่งตั้งแต่', icon: 'calendar', value: f.from }) +
         UI.dateField({ name: 'to', label: 'ถึง', icon: 'calendar', value: f.to }) +
         '</form>'
       );
+    }
+
+    /** PM filter: the two PM teams first (user request 2026-11-16), then each PM. */
+    function pmFilterSelect(pms, value) {
+      var teams = D.pmTeams(pms).map(function (t) { return { value: t.label, label: t.label }; });
+      var people = pms.map(function (p) { return { value: p, label: p }; });
+      return UI.select({
+        name: 'pm', label: 'PM', icon: 'pm', value: value, emptyLabel: 'ทั้งหมด',
+        options: teams.map(function (t) { return t.value; }).concat(pms),
+        groups: (teams.length ? [{ label: 'ทีม PM', options: teams }] : []).concat([{ label: 'รายคน', options: people }]),
+      });
     }
 
     function filterSummary(state) {

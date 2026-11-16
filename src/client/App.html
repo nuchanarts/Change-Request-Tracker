@@ -112,7 +112,7 @@
       var from = D.parseDate(f.from);
       var to = D.parseDate(f.to);
       return {
-        platform: one(f.platform), pm: one(f.pm), developer: one(f.developer), urgency: one(f.urgency),
+        platform: one(f.platform), pm: D.pmFilter(f.pm, (state.options && state.options.pm) || []), developer: one(f.developer), urgency: one(f.urgency),
         dateFrom: from.issue ? null : from.date, dateTo: to.issue ? null : to.date,
       };
     };
@@ -556,7 +556,8 @@
     }
     function openExport() {
       var saved = store(REPORT_KEY);
-      exportOpts = { pm: state.filters.pm || '', since: typeof saved === 'number' ? saved : null };
+      // a PM-team filter opens the report with that team's PMs ticked
+      exportOpts = { pm: D.joinPm(D.pmFilter(state.filters.pm, state.options.pm || []), state.options.pm), since: typeof saved === 'number' ? saved : null };
       var dlg = document.getElementById('dialog');
       dlg.className = 'export-dialog';
       dlg.innerHTML = '<form id="export-form" method="dialog">' + Views.exportDialog(state, exportOpts, reportText()) + '</form>';
