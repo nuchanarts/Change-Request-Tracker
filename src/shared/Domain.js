@@ -749,14 +749,28 @@ var Domain = (function () {
   }
 
   /**
+   * Is this row the person's work? For PMs, `name` may also be a list of PMs (a PM team, user request
+   * 2026-11-16): the row counts when any of them is a PM on it.
+   * @param {any} r @param {string|string[]} name @param {'developer'|'pm'} role
+   */
+  function isMine(r, name, role) {
+    if (!name || (Array.isArray(name) && !name.length)) return false;
+    if (role !== 'pm') return r[role] === name;
+    var names = Array.isArray(name) ? name : [name];
+    return r.pms.some(function (/** @type {string} */ p) {
+      return names.indexOf(p) !== -1;
+    });
+  }
+
+  /**
    * @param {any[]} rows enriched rows
-   * @param {string} name person name
+   * @param {string|string[]} name person name (PMs: or a PM team's names)
    * @param {'developer'|'pm'} role
    * @param {SheetDate} today
    */
   function groupMyWork(rows, name, role, today) {
     var mine = rows.filter(function (r) {
-      return name && r.isOpen && (role === 'pm' ? r.pms.indexOf(name) !== -1 : r[role] === name);
+      return r.isOpen && isMine(r, name, role);
     });
     var sortFn = function (/** @type {any} */ a, /** @type {any} */ b) {
       var qa = a.devQueue === null ? Infinity : a.devQueue;
@@ -797,11 +811,12 @@ var Domain = (function () {
   /**
    * My Work by calendar week (user request 2026-11-11): overdue, this week (Mon–Sun containing today),
    * next week, later, no due date; plus "urgent" (overdue or ด่วนที่สุด) and what I closed this week.
-   * @param {any[]} rows @param {string} name @param {'developer'|'pm'} role @param {SheetDate} today
+   * @param {any[]} rows @param {string|string[]} name (PMs: or a PM team's names) @param {'developer'|'pm'} role
+   * @param {SheetDate} today
    */
   function groupMyWeek(rows, name, role, today) {
     var mine = rows.filter(function (r) {
-      return name && (role === 'pm' ? r.pms.indexOf(name) !== -1 : r[role] === name);
+      return isMine(r, name, role);
     });
     var open = mine.filter(function (r) {
       return r.isOpen;
