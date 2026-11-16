@@ -42,3 +42,29 @@ describe('PM team filter', () => {
     expect(D.pmTeams(['วนิดา (แพท)'])).toEqual([{ label: 'ทีม EHP INET', pms: ['วนิดา (แพท)'] }]);
   });
 });
+
+// "ทำตรง งาน PM ด้วย" (user, 2026-11-16): the งาน PM page can show a whole PM team.
+describe('งาน PM for a team', () => {
+  const rows = [
+    mk(1, 'นุชนารถ (แก๊ส)'),
+    mk(2, 'กษิดิ์เดช (พี่ป้อง)'),
+    mk(3, 'วนิดา (แพท)'),
+    mk(4, 'ทิพวรรณ (พี่ส้ม), นุชนารถ (แก๊ส)'),
+  ];
+  const team = D.pmFilter('ทีม EHP/NHIP', PMS);
+  const openOf = (g) => ['overdue', 'thisWeek', 'nextWeek', 'later', 'noDue'].flatMap((k) => g[k]);
+  const seqs = (list) => list.map((r) => r.seq).sort((a, b) => a - b);
+
+  it('groupMyWeek takes the team PMs and counts each row once', () => {
+    expect(seqs(openOf(D.groupMyWeek(rows, team, 'pm', today)))).toEqual([1, 2, 4]);
+  });
+
+  it('groupMyWork takes the team PMs too', () => {
+    const g = D.groupMyWork(rows, team, 'pm', today);
+    expect(g.total).toBe(3);
+  });
+
+  it('a single PM name still works as before', () => {
+    expect(seqs(openOf(D.groupMyWeek(rows, 'วนิดา (แพท)', 'pm', today)))).toEqual([3]);
+  });
+});

@@ -484,27 +484,35 @@
       var isPm = state.myTab === 'pm';
       var name = isPm ? state.pmName() : state.myName();
       var people = ((isPm ? state.options.pm : state.options.developer) || []).slice();
-      if (name && people.indexOf(name) === -1) people.unshift(name);
+      // งาน PM can also show a whole PM team (user request 2026-11-16)
+      var teams = isPm ? D.pmTeams(state.options.pm || []).map(function (t) { return t.label; }) : [];
+      if (name && people.indexOf(name) === -1 && teams.indexOf(name) === -1) people.unshift(name);
+      var who = isPm ? D.pmFilter(name, state.options.pm || []) : name;
+      var nameButton = function (n) {
+        return '<button type="button" class="mw-name' + (n === name ? ' on' : '') + '" data-action="pick-name" data-name="' + esc(n) + '"><span class="kavatar" aria-hidden="true">' + esc(initials(n)) + '</span>' + esc(n) + '</button>';
+      };
+      var nameOption = function (n) { return '<option value="' + esc(n) + '"' + (n === name ? ' selected' : '') + '>' + esc(n) + '</option>'; };
       var html = '<div class="page-head"><h1>' + (isPm ? 'งาน PM' : 'งานของฉัน') + '</h1><span class="muted">' +
         (isPm ? 'งานที่คุณเป็น PM รับผิดชอบ' : 'งานที่คุณเป็นนักพัฒนา') + '</span></div>';
       if (!name || state.choosingName) {
         // one click: tap your own name (user request 2026-11-11)
         return html + '<section class="panel mw-who"><h2>' + (isPm ? 'คุณคือ PM คนไหน?' : 'คุณคือนักพัฒนาคนไหน?') + '</h2><p class="muted">กดที่ชื่อของคุณครั้งเดียว ระบบจะจำไว้และแสดงเฉพาะงานของคุณ</p>' +
-          '<div class="mw-names">' + people.map(function (n) {
-            return '<button type="button" class="mw-name' + (n === name ? ' on' : '') + '" data-action="pick-name" data-name="' + esc(n) + '"><span class="kavatar" aria-hidden="true">' + esc(initials(n)) + '</span>' + esc(n) + '</button>';
-          }).join('') + '</div></section>';
+          (teams.length ? '<h3 class="mw-names-h">ดูทั้งทีม</h3><div class="mw-names">' + teams.map(nameButton).join('') + '</div><h3 class="mw-names-h">รายคน</h3>' : '') +
+          '<div class="mw-names">' + people.map(nameButton).join('') + '</div></section>';
       }
       var role = state.myTab;
       var mf = state.mwFilter;
       var mine = D.filterMyWork(state.rows, mf);
-      var g = D.groupMyWeek(mine, name, role, state.today);
+      var g = D.groupMyWeek(mine, who, role, state.today);
       var chip = function (key, value, label) {
         return '<button type="button" class="mw-chip" data-action="mw-filter" data-key="' + key + '" data-value="' + esc(value) + '" aria-pressed="' + ((mf[key] || '') === value) + '">' + esc(label) + '</button>';
       };
       var active = !!(mf.platform || mf.stage || mf.q);
       html += '<div class="mw-bar" role="search" aria-label="กรองงานของฉัน">' +
         '<div class="mw-bar-who"><label for="mw-who">ดูงานของ</label><select id="mw-who" data-action-change="mw-who">' +
-        people.map(function (n) { return '<option value="' + esc(n) + '"' + (n === name ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></div>' +
+        (teams.length
+          ? '<optgroup label="ทั้งทีม">' + teams.map(nameOption).join('') + '</optgroup><optgroup label="รายคน">' + people.map(nameOption).join('') + '</optgroup>'
+          : people.map(nameOption).join('')) + '</select></div>' +
         '<div class="mw-bar-row" role="group" aria-label="แพลตฟอร์ม">' + chip('platform', '', 'ทุกแพลตฟอร์ม') + (state.options.platform || []).map(function (p) { return chip('platform', p, p); }).join('') + '</div>' +
         '<div class="mw-bar-row" role="group" aria-label="ขั้นงาน">' + chip('stage', '', 'ทุกขั้น') + ['prep', 'dev', 'back', 'test'].map(function (k) { return chip('stage', k, D.STAGE_LABELS[k]); }).join('') + '</div>' +
         '<div class="mw-bar-q"><label for="mw-q" class="sr-only">ค้นหาในงานของฉัน</label><input id="mw-q" type="search" placeholder="ค้นหาเลขลำดับ หรือคำในงานของฉัน" value="' + esc(mf.q || '') + '">' +
