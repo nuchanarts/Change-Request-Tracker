@@ -10,16 +10,16 @@ const mk = (seq, pm) =>
   D.enrich({ rowNumber: seq + 1, seq: String(seq), detail: 'x', status: 'กำลังพัฒนา', pm }, today);
 
 describe('PM team filter', () => {
-  it('offers one choice per team, named with the team and its PMs', () => {
+  it('offers one choice per team, named by the team only (no PM names, user 2026-11-16)', () => {
     expect(D.pmTeams(PMS)).toEqual([
-      { label: 'ทีม EHP/NHIP (แก๊ส, ป้อง)', pms: ['นุชนารถ (แก๊ส)', 'กษิดิ์เดช (พี่ป้อง)'] },
-      { label: 'ทีม EHP INET (แพท, ส้ม)', pms: ['วนิดา (แพท)', 'ทิพวรรณ (พี่ส้ม)'] },
+      { label: 'ทีม EHP/NHIP', pms: ['นุชนารถ (แก๊ส)', 'กษิดิ์เดช (พี่ป้อง)'] },
+      { label: 'ทีม EHP INET', pms: ['วนิดา (แพท)', 'ทิพวรรณ (พี่ส้ม)'] },
     ]);
   });
 
   it('turns a team choice into its PMs, a single PM into itself, empty into no filter', () => {
-    expect(D.pmFilter('ทีม EHP/NHIP (แก๊ส, ป้อง)', PMS)).toEqual(['นุชนารถ (แก๊ส)', 'กษิดิ์เดช (พี่ป้อง)']);
-    expect(D.pmFilter('ทีม EHP INET (แพท, ส้ม)', PMS)).toEqual(['วนิดา (แพท)', 'ทิพวรรณ (พี่ส้ม)']);
+    expect(D.pmFilter('ทีม EHP/NHIP', PMS)).toEqual(['นุชนารถ (แก๊ส)', 'กษิดิ์เดช (พี่ป้อง)']);
+    expect(D.pmFilter('ทีม EHP INET', PMS)).toEqual(['วนิดา (แพท)', 'ทิพวรรณ (พี่ส้ม)']);
     expect(D.pmFilter('วนิดา (แพท)', PMS)).toEqual(['วนิดา (แพท)']);
     expect(D.pmFilter('', PMS)).toEqual([]);
   });
@@ -34,11 +34,11 @@ describe('PM team filter', () => {
       mk(6, 'ทิพวรรณ (พี่ส้ม), นุชนารถ (แก๊ส)'),
     ];
     const seqs = (label) => D.applyFilters(rows, { pm: D.pmFilter(label, PMS) }).map((r) => r.seq);
-    expect(seqs('ทีม EHP/NHIP (แก๊ส, ป้อง)')).toEqual([1, 2, 6]);
-    expect(seqs('ทีม EHP INET (แพท, ส้ม)')).toEqual([3, 6]);
+    expect(seqs('ทีม EHP/NHIP')).toEqual([1, 2, 6]);
+    expect(seqs('ทีม EHP INET')).toEqual([3, 6]);
   });
 
   it('leaves out a team whose PMs are not in the PM list', () => {
-    expect(D.pmTeams(['วนิดา (แพท)'])).toEqual([{ label: 'ทีม EHP INET (แพท)', pms: ['วนิดา (แพท)'] }]);
+    expect(D.pmTeams(['วนิดา (แพท)'])).toEqual([{ label: 'ทีม EHP INET', pms: ['วนิดา (แพท)'] }]);
   });
 });

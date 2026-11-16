@@ -355,23 +355,20 @@ var Domain = (function () {
   }
 
   /**
-   * PM filter choices for the teams, in team then nickname order; teams with no PM in the list are left out.
+   * PM filter choices for the teams ("ทีม EHP/NHIP"), PMs in nickname order; teams with no PM in the list are left out.
    * @param {string[]} pmList @returns {Array<{label:string, pms:string[]}>}
    */
   function pmTeams(pmList) {
     var out = [];
     PM_TEAMS.forEach(function (t) {
       var pms = [];
-      var nicks = [];
       t.nicks.forEach(function (nick) {
         (pmList || []).forEach(function (pm) {
-          if (pmNick(pm) === nick && pms.indexOf(pm) === -1) {
-            pms.push(pm);
-            nicks.push(nick);
-          }
+          if (pmNick(pm) === nick && pms.indexOf(pm) === -1) pms.push(pm);
         });
       });
-      if (pms.length) out.push({ label: 'ทีม ' + t.name + ' (' + nicks.join(', ') + ')', pms: pms });
+      // team name only, no PM names in the label (user request 2026-11-16)
+      if (pms.length) out.push({ label: 'ทีม ' + t.name, pms: pms });
     });
     return out;
   }
