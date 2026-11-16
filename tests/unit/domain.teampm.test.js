@@ -1,0 +1,44 @@
+import { describe, it, expect } from 'vitest';
+import { loadDomain, d } from '../helpers.js';
+
+// "แต่ละหน้าให้เลือกดูเฉพาะงาน PM แก๊ส+ป้องเป็น เฉพาะ EHP/NHIP และ แพท ส้ม เป็น EHP INET" (user, 2026-11-16):
+// two PM-team choices in the shared PM filter, next to the single PMs.
+const D = loadDomain();
+const today = d(2026, 11, 16);
+const PMS = ['นุชนารถ (แก๊ส)', 'วนิดา (แพท)', 'ทิพวรรณ (พี่ส้ม)', 'กษิดิ์เดช (พี่ป้อง)'];
+const mk = (seq, pm) =>
+  D.enrich({ rowNumber: seq + 1, seq: String(seq), detail: 'x', status: 'กำลังพัฒนา', pm }, today);
+
+describe('PM team filter', () => {
+  it('offers one choice per team, named with the team and its PMs', () => {
+    expect(D.pmTeams(PMS)).toEqual([
+      { label: 'ทีม EHP/NHIP (แก๊ส, ป้อง)', pms: ['นุชนารถ (แก๊ส)', 'กษิดิ์เดช (พี่ป้อง)'] },
+      { label: 'ทีม EHP INET (แพท, ส้ม)', pms: ['วนิดา (แพท)', 'ทิพวรรณ (พี่ส้ม)'] },
+    ]);
+  });
+
+  it('turns a team choice into its PMs, a single PM into itself, empty into no filter', () => {
+    expect(D.pmFilter('ทีม EHP/NHIP (แก๊ส, ป้อง)', PMS)).toEqual(['นุชนารถ (แก๊ส)', 'กษิดิ์เดช (พี่ป้อง)']);
+    expect(D.pmFilter('ทีม EHP INET (แพท, ส้ม)', PMS)).toEqual(['วนิดา (แพท)', 'ทิพวรรณ (พี่ส้ม)']);
+    expect(D.pmFilter('วนิดา (แพท)', PMS)).toEqual(['วนิดา (แพท)']);
+    expect(D.pmFilter('', PMS)).toEqual([]);
+  });
+
+  it('keeps only the chosen team rows (shared rows too) and hides other or empty PMs', () => {
+    const rows = [
+      mk(1, 'นุชนารถ (แก๊ส)'),
+      mk(2, 'กษิดิ์เดช (พี่ป้อง)'),
+      mk(3, 'วนิดา (แพท)'),
+      mk(4, 'คนอื่น'),
+      mk(5, ''),
+      mk(6, 'ทิพวรรณ (พี่ส้ม), นุชนารถ (แก๊ส)'),
+    ];
+    const seqs = (label) => D.applyFilters(rows, { pm: D.pmFilter(label, PMS) }).map((r) => r.seq);
+    expect(seqs('ทีม EHP/NHIP (แก๊ส, ป้อง)')).toEqual([1, 2, 6]);
+    expect(seqs('ทีม EHP INET (แพท, ส้ม)')).toEqual([3, 6]);
+  });
+
+  it('leaves out a team whose PMs are not in the PM list', () => {
+    expect(D.pmTeams(['วนิดา (แพท)'])).toEqual([{ label: 'ทีม EHP INET (แพท)', pms: ['วนิดา (แพท)'] }]);
+  });
+});

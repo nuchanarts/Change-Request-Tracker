@@ -341,6 +341,54 @@ var Domain = (function () {
       .filter(Boolean);
   }
 
+  // PM teams for the shared PM filter (user request 2026-11-16), by nickname so the full names stay in
+  // Config.PM_LIST only.
+  var PM_TEAMS = [
+    { name: 'EHP/NHIP', nicks: ['แก๊ส', 'ป้อง'] },
+    { name: 'EHP INET', nicks: ['แพท', 'ส้ม'] },
+  ];
+
+  /** "นุชนารถ (แก๊ส)" → "แก๊ส", "ทิพวรรณ (พี่ส้ม)" → "ส้ม". @param {string} pm */
+  function pmNick(pm) {
+    var m = /\(([^)]+)\)/.exec(str(pm));
+    return (m ? m[1] : str(pm)).trim().replace(/^พี่\s*/, '');
+  }
+
+  /**
+   * PM filter choices for the teams, in team then nickname order; teams with no PM in the list are left out.
+   * @param {string[]} pmList @returns {Array<{label:string, pms:string[]}>}
+   */
+  function pmTeams(pmList) {
+    var out = [];
+    PM_TEAMS.forEach(function (t) {
+      var pms = [];
+      var nicks = [];
+      t.nicks.forEach(function (nick) {
+        (pmList || []).forEach(function (pm) {
+          if (pmNick(pm) === nick && pms.indexOf(pm) === -1) {
+            pms.push(pm);
+            nicks.push(nick);
+          }
+        });
+      });
+      if (pms.length) out.push({ label: 'ทีม ' + t.name + ' (' + nicks.join(', ') + ')', pms: pms });
+    });
+    return out;
+  }
+
+  /**
+   * The PM filter value as the list applyFilters takes: a team label → its PMs, a PM → itself, '' → none.
+   * @param {string} value @param {string[]} pmList
+   */
+  function pmFilter(value, pmList) {
+    var v = clean(value);
+    if (!v) return [];
+    var team = pmTeams(pmList).filter(function (t) {
+      return t.label === v;
+    })[0];
+    return team ? team.pms.slice() : [v];
+  }
+
   /** @param {string[]} names @param {string[]} [order] PM list order */
   function joinPm(names, order) {
     var list = names.map(clean).filter(function (n, i, a) {
@@ -1268,6 +1316,8 @@ var Domain = (function () {
     applyFilters: applyFilters,
     computeMetrics: computeMetrics,
     pmBreakdown: pmBreakdown,
+    pmTeams: pmTeams,
+    pmFilter: pmFilter,
     unassignedQueue: unassignedQueue,
     buildDigest: buildDigest,
     DIGEST_MAX_CHARS: DIGEST_MAX_CHARS,
