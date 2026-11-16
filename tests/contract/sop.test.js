@@ -18,6 +18,12 @@ describe('SOP fragment', () => {
       expect(sop).toContain(`<th scope="col">${role}</th>`);
   });
 
+  // "ยืนยัน SOP" (user, 2026-11-16): the approved SOP carries no draft labels
+  it('is the approved version, with no draft or to-be-confirmed labels', () => {
+    expect(sop).not.toMatch(/ฉบับร่าง|ทีมต้องยืนยัน|sop-tbc/);
+    expect(sop).toContain('ฉบับใช้งานจริง 1.0');
+  });
+
   it('never suggests the forbidden startsWith("0.") rule', () => {
     expect(sop).not.toMatch(/startsWith/);
   });

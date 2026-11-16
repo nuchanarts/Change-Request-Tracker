@@ -1,12 +1,12 @@
 <!--
-  Team SOP (draft 1.0, 2026-11-16). ONE source for the in-app help page (Index.html <template id="tpl-sop">)
+  Team SOP (approved 1.0, 2026-11-16). ONE source for the in-app help page (Index.html <template id="tpl-sop">)
   and the GitHub Pages page docs/sop.html (npm run build:pages). Status values are written exactly as in the
   sheet (constitution III); tests/contract/sop.test.js checks they match Domain.WORKFLOW.
   Static text only: no data, no script.
 -->
 <section class="sop" id="sop" aria-labelledby="sop-h">
   <h2 id="sop-h">SOP การทำงานของทีม (PM · Senior Dev · Dev · Tester)</h2>
-  <p class="sop-meta">ฉบับร่าง 1.0 · 16/11/2026 · ข้อที่มีป้าย <span class="sop-tbc">ทีมต้องยืนยัน</span> เป็นข้อเสนอ ให้ PM และ Senior Dev ยืนยันก่อนประกาศใช้</p>
+  <p class="sop-meta">ฉบับใช้งานจริง 1.0 · ยืนยันโดยทีมเมื่อ 16/11/2026 · ใช้เป็นมาตรฐานเดียวกันของ PM, Senior Dev, Dev และ Tester</p>
   <p>บันทึกและเปลี่ยนสถานะ<strong>ผ่านแอปเป็นหลัก</strong> แอปตรวจข้อมูล กันการแก้ทับกัน และเก็บประวัติทุกการแก้ไขไว้ใน <strong>_app_log</strong> ถ้าแก้ในชีตตรงๆ จะไม่มีประวัติเหล่านี้</p>
 
   <h3>1. บทบาท</h3>
@@ -45,7 +45,7 @@
         <tr><td>4</td><td><code>0.รอแจ้งทีมพัฒนา</code></td><td>PM</td><td>แจ้ง Senior Dev แล้ว</td><td>5 หรือ 6</td></tr>
         <tr><td>5</td><td><code>dev ขอ Sourecode อจ.</code></td><td>Dev / Senior Dev</td><td>ได้ source code จาก อจ. แล้ว</td><td>6</td></tr>
         <tr><td>6</td><td><code>รอทีมพัฒนา</code></td><td>Senior Dev</td><td>ใส่ <strong>นักพัฒนา</strong> และ <strong>ลำดับการแก้ไข Dev</strong> แล้ว</td><td>7</td></tr>
-        <tr><td>7</td><td><code>กำลังพัฒนา</code></td><td>Dev</td><td>ตอนเริ่มใส่ <strong>เริ่มพัฒนา</strong> · ตอนส่งทดสอบใส่ <strong>พัฒนาเสร็จ</strong> และ <strong>ระยะเวลาพัฒนา(ชม.)</strong> · Senior Dev ตรวจโค้ด <span class="sop-tbc">ทีมต้องยืนยัน</span></td><td>9</td></tr>
+        <tr><td>7</td><td><code>กำลังพัฒนา</code></td><td>Dev</td><td>ตอนเริ่มใส่ <strong>เริ่มพัฒนา</strong> · ตอนส่งทดสอบใส่ <strong>พัฒนาเสร็จ</strong> และ <strong>ระยะเวลาพัฒนา(ชม.)</strong> · Senior Dev ตรวจโค้ด</td><td>9</td></tr>
         <tr><td>8</td><td><code>ส่งกลับนักพัฒนาแก้ไข</code></td><td>Tester</td><td>บันทึกจุดที่ไม่ผ่านใน Taiga แล้ว · Dev แก้เสร็จ ส่งทดสอบใหม่</td><td>9</td></tr>
         <tr><td>9</td><td><code>กำลังทดสอบ</code></td><td>Dev (ตอนส่งทดสอบ)</td><td>Tester ทดสอบครบทุกข้อใน Taiga · ผ่าน → 10 หรือ 11 · ไม่ผ่าน → 8</td><td>8, 10, 11</td></tr>
         <tr><td>10</td><td><code>รอ compile</code></td><td>Tester</td><td>Senior Dev compile/deploy แล้ว ใส่ <strong>วันที่ Deploy</strong></td><td>13</td></tr>
@@ -57,8 +57,8 @@
     </table>
   </div>
   <ul>
-    <li><strong>เลื่อนวัน:</strong> ใส่ "วันที่เลื่อน" ห้ามแก้ "วันที่ต้องได้" เพื่อให้วันเดิมยังอยู่ แอปใช้วันที่เลื่อนเป็นกำหนดส่งถ้ามี การเลื่อนต้องให้ PM อนุมัติ <span class="sop-tbc">ทีมต้องยืนยัน</span></li>
-    <li><strong>ด่วนที่สุด:</strong> PM แจ้ง Senior Dev ทันทีที่บันทึก ไม่ต้องรอสรุปวันจันทร์ แล้ว Senior Dev แทรกคิว <span class="sop-tbc">ทีมต้องยืนยัน</span></li>
+    <li><strong>เลื่อนวัน:</strong> ใส่ "วันที่เลื่อน" ห้ามแก้ "วันที่ต้องได้" เพื่อให้วันเดิมยังอยู่ แอปใช้วันที่เลื่อนเป็นกำหนดส่งถ้ามี การเลื่อนต้องให้ PM อนุมัติ</li>
+    <li><strong>ด่วนที่สุด:</strong> PM แจ้ง Senior Dev ทันทีที่บันทึก ไม่ต้องรอสรุปวันจันทร์ แล้ว Senior Dev แทรกคิว</li>
   </ul>
 
   <h3>4. RACI</h3>
@@ -74,7 +74,7 @@
         <tr><th scope="row">ขอ source code จาก อจ.</th><td>I</td><td><b>A</b></td><td>R</td><td>–</td></tr>
         <tr><th scope="row">มอบหมายนักพัฒนา + จัดลำดับคิว</th><td>C</td><td><b>A/R</b></td><td>I</td><td>–</td></tr>
         <tr><th scope="row">พัฒนา + บันทึกเวลา</th><td>I</td><td><b>A</b></td><td>R</td><td>–</td></tr>
-        <tr><th scope="row">ตรวจโค้ดก่อนส่งทดสอบ <span class="sop-tbc">ทีมต้องยืนยัน</span></th><td>–</td><td><b>A/R</b></td><td>C</td><td>–</td></tr>
+        <tr><th scope="row">ตรวจโค้ดก่อนส่งทดสอบ</th><td>–</td><td><b>A/R</b></td><td>C</td><td>–</td></tr>
         <tr><th scope="row">ทดสอบ / ตัดสินผ่านหรือส่งกลับ</th><td>I</td><td>C</td><td>C</td><td><b>A/R</b></td></tr>
         <tr><th scope="row">แก้ตามผลทดสอบ</th><td>I</td><td><b>A</b></td><td>R</td><td>C</td></tr>
         <tr><th scope="row">compile / deploy</th><td>I</td><td><b>A/R</b></td><td>C</td><td>I</td></tr>
@@ -102,13 +102,13 @@
   <ul>
     <li>คนที่มีสิทธิ์แก้จะเปลี่ยนเป็นสถานะไหนก็ได้ ปุ่ม "เปลี่ยนเป็น …" แค่เสนอสถานะถัดไปตามลำดับ</li>
     <li>ช่องนักพัฒนา, ลำดับคิว, เริ่มพัฒนา/พัฒนาเสร็จ, วันที่ Deploy แอปไม่บังคับ แต่ SOP นี้กำหนดให้กรอกตามข้อ 3</li>
-    <li>รายการที่ขึ้นป้าย "ข้อมูลที่ควรแก้" ให้ผู้รับผิดชอบแก้ภายในวันทำการถัดไป <span class="sop-tbc">ทีมต้องยืนยัน</span></li>
+    <li>รายการที่ขึ้นป้าย "ข้อมูลที่ควรแก้" ให้ผู้รับผิดชอบแก้ภายในวันทำการถัดไป</li>
   </ul>
 
   <h3>6. รอบติดตามงาน</h3>
   <ul>
     <li><strong>ทุกวัน:</strong> Dev อัปเดตสถานะใน "งานของฉัน" · Tester เคลียร์รายการ "กำลังทดสอบ"</li>
-    <li><strong>วันจันทร์:</strong> แมวส้มส่งสรุปงานประจำสัปดาห์เข้า LINE · PM และ Senior Dev ทบทวนงานเลยกำหนด งานด่วน และคิวพัฒนา <span class="sop-tbc">ทีมต้องยืนยัน</span></li>
+    <li><strong>วันจันทร์:</strong> แมวส้มส่งสรุปงานประจำสัปดาห์เข้า LINE · PM และ Senior Dev ทบทวนงานเลยกำหนด งานด่วน และคิวพัฒนา</li>
   </ul>
 
   <h3>7. Checklist ต่อบทบาท</h3>
