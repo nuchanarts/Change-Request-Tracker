@@ -226,7 +226,7 @@ test('งาน PM lists only PMs; งานของฉัน lists only develo
   await page.getByRole('link', { name: 'งานของฉัน' }).click();
   await expect(page.locator('h1')).toHaveText('งานของฉัน');
   const devNames = await page.locator('.mw-name').allTextContents();
-  devNames.forEach((n) => expect(n).toContain('นักพัฒนา'));
+  devNames.filter((n) => !n.includes('ทุกคน')).forEach((n) => expect(n).toContain('นักพัฒนา'));
   await expect(page.getByRole('link', { name: 'งานของฉัน' })).toHaveAttribute('aria-current', 'page');
   await expect(page.locator('.nav a[href="#/new"]')).toHaveCount(0);
   await expect(page.locator('.hero-add')).toHaveCount(0); // not on this page; it lives on ภาพรวม

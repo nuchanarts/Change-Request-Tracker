@@ -750,6 +750,9 @@ var Domain = (function () {
     };
   }
 
+  /** My Work "ทุกคน": every developer's work at once (user request 2026-11-18). Unassigned items are left out. */
+  var ALL_DEVELOPERS = 'ทุกคน';
+
   /**
    * Is this row the person's work? For PMs, `name` may also be a list of PMs (a PM team, user request
    * 2026-11-16): the row counts when any of them is a PM on it.
@@ -757,6 +760,7 @@ var Domain = (function () {
    */
   function isMine(r, name, role) {
     if (!name || (Array.isArray(name) && !name.length)) return false;
+    if (role === 'developer' && name === ALL_DEVELOPERS) return r.developer !== '';
     if (role !== 'pm') return r[role] === name;
     var names = Array.isArray(name) ? name : [name];
     return r.pms.some(function (/** @type {string} */ p) {
@@ -868,7 +872,7 @@ var Domain = (function () {
     });
     var total = 0;
     rows.forEach(function (r) {
-      if (!name || !r.isOpen || r.developer !== name || !r.effectiveDue || !inRange(r.effectiveDue, range))
+      if (!r.isOpen || !isMine(r, name, 'developer') || !r.effectiveDue || !inRange(r.effectiveDue, range))
         return;
       days[dayNumber(r.effectiveDue) - dayNumber(range.from)].items.push(r);
       total++;
@@ -1395,6 +1399,7 @@ var Domain = (function () {
     computeMetrics: computeMetrics,
     pmBreakdown: pmBreakdown,
     pmTeams: pmTeams,
+    ALL_DEVELOPERS: ALL_DEVELOPERS,
     pmFilter: pmFilter,
     unassignedQueue: unassignedQueue,
     buildDigest: buildDigest,

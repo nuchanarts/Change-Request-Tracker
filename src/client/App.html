@@ -3,7 +3,7 @@
   (function () {
     'use strict';
     var D = Domain;
-    var KEYS = { filters: 'ehp.filters.v1', tour: 'ehp.tour.v1', name: 'ehp.myname.v1', pmName: 'ehp.mypm.v1', tab: 'ehp.mytab.v1' };
+    var KEYS = { filters: 'ehp.filters.v1', tour: 'ehp.tour.v1', name: 'ehp.myname.v1', pmName: 'ehp.mypm.v1', tab: 'ehp.mytab.v1', devAll: 'ehp.mydevall.v1' };
     var EMPTY_FILTERS = { platform: '', pm: '', developer: '', urgency: '', from: '', to: '' };
 
     function store(key, value) {
@@ -81,6 +81,9 @@
         store(KEYS.pmName, name); // the PM menu remembers its own name, separate from the developer one
         return render();
       }
+      // "ทุกคน" is a view, not an identity: it never replaces who "me" is (user request 2026-11-18)
+      store(KEYS.devAll, name === D.ALL_DEVELOPERS);
+      if (name === D.ALL_DEVELOPERS) return render();
       store(KEYS.name, name);
       state.choosingName = false;
       if (state.user) state.user.name = name;
@@ -102,6 +105,10 @@
       if (saved) return saved;
       var me = state.myName();
       return state.options && state.options.pm && state.options.pm.indexOf(me) !== -1 ? me : '';
+    };
+    /** Whose work งานของฉัน shows: ทุกคน, or me. */
+    state.devName = function () {
+      return store(KEYS.devAll) === true ? D.ALL_DEVELOPERS : state.myName();
     };
     state.myName = function () {
       return (state.user && state.user.name) || store(KEYS.name) || '';
