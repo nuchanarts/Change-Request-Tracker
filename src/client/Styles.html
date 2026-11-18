@@ -564,6 +564,17 @@
   .export-text { width: 100%; min-height: 320px; font-size: 14px; line-height: 1.6; background: var(--surface-2); }
 
   /* User menu (logout / switch account) */
+  /* presence: who is online (2026-11-18) */
+  .presence { position: relative; }
+  .presence summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; white-space: nowrap; }
+  .presence summary::-webkit-details-marker { display: none; }
+  .presence-dot { width: 9px; height: 9px; border-radius: 50%; background: #1f9d55; box-shadow: 0 0 0 3px rgba(31, 157, 85, 0.18); }
+  .presence-pop { position: absolute; right: 0; top: 44px; z-index: 50; width: min(290px, calc(100vw - 32px)); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; box-shadow: 0 12px 32px rgba(15, 61, 58, 0.16); }
+  .presence-h { margin: 0 0 6px; font-weight: 600; }
+  .presence-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 50vh; overflow: auto; }
+  .presence-list li { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; }
+  .presence-name { font-weight: 500; overflow-wrap: anywhere; }
+  .presence-what { grid-column: 2; font-size: 13px; color: var(--muted); }
   .user-menu { position: relative; }
   .user-menu summary { list-style: none; cursor: pointer; }
   .user-menu summary::-webkit-details-marker { display: none; }

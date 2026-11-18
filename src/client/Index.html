@@ -34,6 +34,14 @@
           <a href="#/help" data-route="help" data-icon="help" class="nav-icon-only" title="วิธีใช้งาน"><span class="sr-only">วิธีใช้งาน</span></a>
           <a href="https://taiga.hosxp.net/login" class="nav-ext" target="_blank" rel="noopener noreferrer" aria-label="Taiga (เปิดในแท็บใหม่)">Taiga ↗</a>
         </nav>
+        <details class="presence" id="presence" hidden>
+          <summary id="presence-count" aria-label="ใครออนไลน์อยู่"></summary>
+          <div class="presence-pop">
+            <p class="presence-h">ออนไลน์ตอนนี้</p>
+            <ul class="presence-list" id="presence-list"></ul>
+            <p class="user-note">อัปเดตทุก 1 นาที</p>
+          </div>
+        </details>
         <details class="user-menu" id="user-menu" hidden>
           <summary aria-label="บัญชีผู้ใช้"><span class="avatar" id="user-avatar" aria-hidden="true">?</span></summary>
           <div class="user-pop">

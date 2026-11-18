@@ -1,6 +1,7 @@
 /* Browser mock of google.script.run for the local preview and Playwright E2E.
  * Mirrors the server contract (contracts/server-api.md) using the same Domain rules.
- * URL options: ?viewer=1 (view-only user), ?latency=ms, ?fail=bootstrap (simulate a server error).
+ * URL options: ?viewer=1 (view-only user), ?latency=ms, ?fail=bootstrap (simulate a server error),
+ * ?presence=editing (a fake teammate is editing item 1).
  */
 (function () {
   'use strict';
@@ -93,6 +94,22 @@
   };
 
   var handlers = {
+    Api_heartbeat: function (input) {
+      window.__heartbeats = (window.__heartbeats || 0) + 1;
+      var me = {
+        email: user.email,
+        name: user.name || 'ผู้ทดสอบ',
+        view: input.view,
+        seq: input.seq === undefined ? null : input.seq,
+      };
+      var others = [
+        { email: 'dev@example.com', name: 'นักพัฒนา แดง', view: 'kanban', seq: null },
+        params.get('presence') === 'editing'
+          ? { email: 'pm@example.com', name: 'พีเอ็ม สมใจ', view: 'edit', seq: 1 }
+          : { email: 'pm@example.com', name: 'พีเอ็ม สมใจ', view: 'items', seq: null },
+      ];
+      return ok({ nowMs: Date.now(), online: [me].concat(others) });
+    },
     Api_bootstrap: function () {
       if (params.get('fail') === 'bootstrap')
         return {

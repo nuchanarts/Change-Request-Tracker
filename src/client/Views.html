@@ -413,6 +413,8 @@
       var values = state.formDraft || (row ? row.raw : defaults(state));
       var title = mode === 'new' ? 'เพิ่มรายการขอแก้ไขใหม่' : 'รายการ #' + (row.seq === null ? '–' : row.seq);
       var html = schemaBanner(state) + readOnlyBanner(state);
+      // someone else editing this item (presence, 2026-11-18): updated in place by the heartbeat, never re-rendered
+      html += '<div id="presence-warn" role="status">' + (row ? presenceWarn(state, row) : '') + '</div>';
       html += '<div class="page-head">' + UI.backButton() + '<h1>' + esc(title) + '</h1>' + (row ? UI.statusBadge(row.status) + '<span class="muted">' + UI.due(row, state.today) + '</span>' : '<span class="muted">ช่องที่มี * ต้องกรอก</span>') + '</div>';
       if (state.formAlert) html += '<div class="banner danger" role="alert">' + esc(state.formAlert.message) + (state.formAlert.reload ? ' <button class="btn small" data-action="reload-item">โหลดข้อมูลใหม่</button>' : '') + '</div>';
       if (row && row.issues.length) {
@@ -803,6 +805,35 @@
       return D.stageOf(c.status);
     }
 
+    // ------------------------------------------------------------------ presence (2026-11-18)
+
+    var PRESENCE_LABELS = { monitor: 'หน้าหลัก', assign: 'มอบหมายงาน', kanban: 'บอร์ดงาน', 'my-work': 'งานของฉัน', 'my-work-pm': 'งาน PM', items: 'รายการทั้งหมด', access: 'จัดการสิทธิ์', help: 'วิธีใช้งาน', new: 'กำลังเพิ่มรายการใหม่' };
+
+    function presenceLabel(e) {
+      if (e.view === 'edit') return e.seq === null ? 'กำลังแก้รายการ' : 'กำลังแก้ #' + e.seq;
+      return PRESENCE_LABELS[e.view] || 'ใช้งานอยู่';
+    }
+
+    /** Presence list as the {email: entry} map Domain.presence takes. */
+    function presenceMap(state) {
+      var m = {};
+      (state.online || []).forEach(function (e) { m[e.email] = { name: e.name, view: e.view, seq: e.seq, at: state.onlineAt }; });
+      return m;
+    }
+
+    function presenceWarn(state, row) {
+      if (!row || row.seq === null || !state.online) return '';
+      var names = D.presence.editorsOf(presenceMap(state), row.seq, String(state.user.email || '').toLowerCase(), state.onlineAt);
+      return names.length ? '<div class="banner warn">' + esc(names.join(', ')) + ' กำลังแก้รายการนี้อยู่</div>' : '';
+    }
+
+    function presenceList(state) {
+      var me = String(state.user.email || '').toLowerCase();
+      return (state.online || []).map(function (e) {
+        return '<li><span class="kavatar" aria-hidden="true">' + esc(initials(e.name)) + '</span><span class="presence-name">' + esc(e.name) + (e.email === me ? ' <span class="muted">(คุณ)</span>' : '') + '</span><span class="presence-what">' + esc(presenceLabel(e)) + '</span></li>';
+      }).join('');
+    }
+
     function initials(name) {
       var n = String(name || '').replace(/^(นักพัฒนา|พีเอ็ม)\s+/, '').trim();
       return n ? n.charAt(0) : '?';
@@ -862,6 +893,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>
