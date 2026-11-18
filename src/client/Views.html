@@ -453,9 +453,20 @@
 
     /** Open items without a developer, one row each with a name box + "มอบหมาย"; workload on the side. */
     function assign(state) {
-      var queue = D.unassignedQueue(state.rows, state.today);
+      var all = D.unassignedQueue(state.rows, state.today);
+      // hide statuses the dev lead is not ready to assign yet, e.g. files still being prepared (user request 2026-11-18)
+      var hidden = state.asHidden || [];
+      var queue = all.filter(function (r) { return hidden.indexOf(r.status) === -1; });
+      var counts = {};
+      all.forEach(function (r) { counts[r.status] = (counts[r.status] || 0) + 1; });
+      var statuses = D.WORKFLOW.filter(function (s) { return counts[s]; });
+      var chips = statuses.length
+        ? '<div class="mw-bar-row as-status" role="group" aria-label="สถานะที่แสดง"><span class="muted">สถานะ:</span>' + statuses.map(function (s) {
+            return '<button type="button" class="mw-chip" data-action="as-status" data-status="' + esc(s) + '" aria-pressed="' + (hidden.indexOf(s) === -1) + '">' + esc(D.statusLabel(s)) + ' <span class="num">' + counts[s] + '</span></button>';
+          }).join('') + (hidden.length ? '<button type="button" class="btn small" data-action="as-status-all">แสดงทุกสถานะ</button>' : '') + '</div>'
+        : '';
       var load = D.computeMetrics(state.rows, state.today).byDeveloper.filter(function (p) { return p.name !== D.UNASSIGNED; });
-      var html = '<div class="page-head"><h1>มอบหมายงาน</h1><span class="muted spacer">งานค้างที่ยังไม่มีนักพัฒนา ' + queue.length + ' งาน เรียงจากงานที่ควรมอบหมายก่อน</span>' +
+      var html = '<div class="page-head"><h1>มอบหมายงาน</h1><span class="muted spacer">งานค้างที่ยังไม่มีนักพัฒนา ' + (queue.length === all.length ? all.length + ' งาน' : 'แสดง ' + queue.length + ' จาก ' + all.length + ' งาน') + ' เรียงจากงานที่ควรมอบหมายก่อน</span>' +
         '<button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button></div>';
       if (!state.user.canEdit) {
         return html + UI.emptyState('บัญชีนี้มีสิทธิ์ดูอย่างเดียว', 'ขอสิทธิ์แก้ไขจากผู้ดูแลก่อน จึงจะมอบหมายงานได้', '');
@@ -472,7 +483,9 @@
               '<input id="' + esc(fid) + '" name="developer" list="as-devs" autocomplete="off" placeholder="พิมพ์หรือเลือกชื่อ" required>' +
               '<button type="submit" class="btn primary small">มอบหมาย</button></div></form></li>';
           }).join('') + '</ol>'
-        : UI.emptyState('มอบหมายครบทุกงานแล้ว 🎉', 'ไม่มีงานค้างที่ยังไม่ระบุนักพัฒนา', '<a class="btn" href="#/kanban">ไปที่บอร์ดงาน</a>');
+        : all.length
+          ? UI.emptyState('ซ่อนทุกสถานะอยู่', 'กดสถานะด้านบนเพื่อแสดงงาน', '<button type="button" class="btn" data-action="as-status-all">แสดงทุกสถานะ</button>')
+          : UI.emptyState('มอบหมายครบทุกงานแล้ว 🎉', 'ไม่มีงานค้างที่ยังไม่ระบุนักพัฒนา', '<a class="btn" href="#/kanban">ไปที่บอร์ดงาน</a>');
       var side = '<aside class="panel as-load" aria-labelledby="as-load-h"><h2 id="as-load-h">งานค้างของนักพัฒนา</h2>' +
         '<p class="muted">ใช้ดูภาระงานก่อนแบ่งงาน กดชื่อเพื่อใส่ในช่องที่เลือกไว้ล่าสุด</p>' +
         (load.length ? '<ul>' + load.map(function (p) {
@@ -480,7 +493,7 @@
             '<span class="num">' + p.open + ' งาน' + (p.overdue ? ' · <span class="due-over">เกิน ' + p.overdue + '</span>' : '') + '</span></button></li>';
         }).join('') + '</ul>' : '<p class="muted">ยังไม่มีข้อมูล</p>') + '</aside>';
       var devs = (state.options.developer || []).map(function (n) { return '<option value="' + esc(n) + '"></option>'; }).join('');
-      return html + '<datalist id="as-devs">' + devs + '</datalist><div class="as-layout"><section aria-label="งานที่ยังไม่มีนักพัฒนา">' + list + '</section>' + side + '</div>';
+      return html + '<datalist id="as-devs">' + devs + '</datalist><div class="as-layout"><section aria-label="งานที่ยังไม่มีนักพัฒนา">' + chips + list + '</section>' + side + '</div>';
     }
 
     function myWork(state) {

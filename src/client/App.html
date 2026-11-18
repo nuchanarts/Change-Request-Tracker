@@ -35,6 +35,7 @@
       sort: { key: 'due', dir: 1 },
       myTab: store(KEYS.tab) || 'developer',
       mwFilter: store('ehp.mwfilter.v1') || {},
+      asHidden: store('ehp.ashidden.v1') || [], // มอบหมายงาน: statuses hidden by the dev lead
       kanbanCollapsed: store('ehp.kcollapsed.v1') || {},
       kanbanShowEmpty: store('ehp.kshowempty.v1') === true,
       choosingName: false,
@@ -764,6 +765,19 @@
         closeCalendar();
       },
       back: back,
+      'as-status': function (el) {
+        var s = el.getAttribute('data-status');
+        var i = state.asHidden.indexOf(s);
+        if (i === -1) state.asHidden.push(s);
+        else state.asHidden.splice(i, 1);
+        store('ehp.ashidden.v1', state.asHidden);
+        render();
+      },
+      'as-status-all': function () {
+        state.asHidden = [];
+        store('ehp.ashidden.v1', state.asHidden);
+        render();
+      },
       'as-fill': function (el) {
         var input = (lastAssignInput && document.contains(lastAssignInput) && lastAssignInput) || document.querySelector('.as-row input[name="developer"]');
         if (!input) return;
