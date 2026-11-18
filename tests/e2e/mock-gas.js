@@ -1,7 +1,8 @@
 /* Browser mock of google.script.run for the local preview and Playwright E2E.
  * Mirrors the server contract (contracts/server-api.md) using the same Domain rules.
  * URL options: ?viewer=1 (view-only user), ?latency=ms, ?fail=bootstrap (simulate a server error),
- * ?presence=editing (a fake teammate is editing item 1).
+ * ?presence=editing (a fake teammate is editing item 1),
+ * ?notester=1 (sheet without the optional ผู้ทดสอบ column).
  */
 (function () {
   'use strict';
@@ -121,7 +122,7 @@
         loadedAt: now(),
         today: fx.today,
         user: user,
-        schema: { ok: true, missing: [] },
+        schema: { ok: true, missing: [], absent: params.get('notester') ? ['tester'] : [] },
         options: options,
         rows: rows.filter(function (r) {
           return String(r.detail || '').trim();

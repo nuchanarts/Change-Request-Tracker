@@ -80,7 +80,7 @@ var Config = (function () {
     RETIRED: ['แฮ่ม'],
     LOCK_MS: 10000,
     CACHE_SECONDS: 300,
-    CACHE_KEYS: { options: 'options:v3' },
+    CACHE_KEYS: { options: 'options:v4' }, // v4: + tester list (2026-11-18)
     // Who is online (2026-11-18): one JSON map in the script cache, never a sheet. Short lock: a busy
     // lock skips the write so heartbeats never slow down real saves.
     PRESENCE: { CACHE_KEY: 'bgs_presence', CACHE_SECONDS: 600, LOCK_MS: 1500 },

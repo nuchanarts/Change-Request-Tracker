@@ -109,7 +109,7 @@ function Api_bootstrap() {
           isAdmin: ctx.repo.isAdmin(ctx.email, owner_(ctx)),
         };
       })(),
-      schema: { ok: data.missing.length === 0, missing: data.missing },
+      schema: { ok: data.missing.length === 0, missing: data.missing, absent: data.absent || [] },
       options: ctx.repo.options(data.rows),
       rows: data.rows,
       spreadsheetName: ctx.ss.getName(),

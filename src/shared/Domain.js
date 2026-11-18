@@ -33,6 +33,8 @@ var Domain = (function () {
     { key: 'devHours', header: 'ระยะเวลาพัฒนา(ชม.)', type: 'number' },
     { key: 'devStart', header: 'เริ่มพัฒนา', type: 'date' },
     { key: 'devEnd', header: 'พัฒนาเสร็จ', type: 'date' },
+    // Optional (user request 2026-11-18): a sheet without this column still works; the field is hidden.
+    { key: 'tester', header: 'ผู้ทดสอบ', type: 'freePerson', optional: true },
   ];
   var COLUMN_BY_KEY = {};
   COLUMNS.forEach(function (c) {
@@ -44,7 +46,7 @@ var Domain = (function () {
     return c.key;
   });
   var OPTION_KEYS = ['platform', 'issueType', 'urgency'];
-  var PERSON_KEYS = ['pm', 'developer'];
+  var PERSON_KEYS = ['pm', 'developer', 'tester'];
 
   var DONE = '0.แก้ไขเรียบร้อย';
   var CANCELLED = '0.ยกเลิก';
@@ -1220,7 +1222,9 @@ var Domain = (function () {
       if (optionList(options, key).indexOf(v) === -1) {
         warnings[key] =
           col.type === 'freePerson'
-            ? 'เป็นชื่อนักพัฒนาใหม่ที่ยังไม่มีในรายการ'
+            ? key === 'tester'
+              ? 'เป็นชื่อผู้ทดสอบใหม่ที่ยังไม่มีในรายการ'
+              : 'เป็นชื่อนักพัฒนาใหม่ที่ยังไม่มีในรายการ'
             : 'เป็นระบบงานใหม่ที่ยังไม่มีในรายการ';
       }
     } else if (col.type === 'date') {

@@ -52,12 +52,14 @@ function makeRepo(deps) {
     var index = {};
     /** @type {string[]} */
     var missing = [];
+    /** @type {string[]} optional columns this sheet does not have (keys) */
+    var absent = [];
     D.COLUMNS.forEach(function (/** @type {any} */ c) {
       var i = headers.indexOf(c.header);
-      if (i === -1) missing.push(c.header);
+      if (i === -1) (c.optional ? absent : missing).push(c.optional ? c.key : c.header);
       else index[c.key] = i;
     });
-    return { index: index, missing: missing, width: headers.length };
+    return { index: index, missing: missing, absent: absent, width: headers.length };
   }
 
   /** @param {string} name @param {string[]} headers */
@@ -159,7 +161,7 @@ function makeRepo(deps) {
       if (links[i - 1] && links[i - 1].length) o.ticketLinks = links[i - 1];
       rows.push(o);
     }
-    return { rows: rows, missing: map.missing };
+    return { rows: rows, missing: map.missing, absent: map.absent };
   }
 
   /**
@@ -281,6 +283,7 @@ function makeRepo(deps) {
       fromValidation('developer') || people || distinct(rows, ['developer']),
       C.RETIRED,
     );
+    o.tester = D.withoutRetired(fromValidation('tester') || o.developer, C.RETIRED);
     // "ชื่อของฉัน" picker: the four PMs, then developers (user request 2026-11-11)
     o.person = o.pm.concat(
       o.developer.filter(function (n) {
@@ -314,7 +317,7 @@ function makeRepo(deps) {
       var log = [[now, email, 'CREATE', rowNumber, seq, D.COLUMN_BY_KEY.seq.header, '', String(seq)]];
       line[map.index.seq] = seq;
       D.COLUMNS.forEach(function (/** @type {any} */ c) {
-        if (c.key === 'seq' || clean(input[c.key]) === '') return;
+        if (c.key === 'seq' || map.index[c.key] === undefined || clean(input[c.key]) === '') return;
         line[map.index[c.key]] = toCellValue(c.key, input[c.key], '', !!dateColumns[c.key]);
         log.push([now, email, 'CREATE', rowNumber, seq, c.header, '', clean(input[c.key])]);
       });
