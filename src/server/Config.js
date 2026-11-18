@@ -81,6 +81,9 @@ var Config = (function () {
     LOCK_MS: 10000,
     CACHE_SECONDS: 300,
     CACHE_KEYS: { options: 'options:v3' },
+    // Who is online (2026-11-18): one JSON map in the script cache, never a sheet. Short lock: a busy
+    // lock skips the write so heartbeats never slow down real saves.
+    PRESENCE: { CACHE_KEY: 'bgs_presence', CACHE_SECONDS: 600, LOCK_MS: 1500 },
     EDIT_PROBE_KEY: 'bgs_app_edit_probe',
     EDIT_PROBE_CACHE_SECONDS: 21600,
     EDIT_CACHE_PREFIX: 'canEdit:v3:',

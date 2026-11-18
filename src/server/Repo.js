@@ -9,6 +9,7 @@
  *   cache?: any,                    // script Cache with get/put/remove (optional)
  *   userCache?: any,                // per-user Cache for the edit-permission probe (optional)
  *   effectiveEmail?: () => string,  // account the script runs as; the probe is used only if it equals the caller
+ *   nowMs?: () => number,           // epoch ms, for presence heartbeats (optional; defaults to Date.now)
  *   nowText: () => string,          // 'd/m/yyyy HH:mm:ss' in Asia/Bangkok
  *   makeDate: (y:number, m:number, d:number) => any  // midnight Asia/Bangkok
  * }} deps
@@ -608,6 +609,52 @@ function makeRepo(deps) {
     return null;
   }
 
+  // ------------------------------------------------------------------ presence (script cache only)
+
+  /** Presence map from the cache; a missing or corrupt value is an empty map. */
+  function readPresence() {
+    var raw = deps.cache ? deps.cache.get(C.PRESENCE.CACHE_KEY) : null;
+    if (!raw) return {};
+    try {
+      var m = JSON.parse(raw);
+      return m && typeof m === 'object' && !Array.isArray(m) ? m : {};
+    } catch (_err) {
+      return {};
+    }
+  }
+
+  /**
+   * Record that `email` is on `view` (and editing `seq`) and return who is online. Never writes a sheet.
+   * If the short lock is busy the write is skipped and the current list is still returned.
+   * @param {string} email @param {string} view @param {number|null} seq
+   */
+  function heartbeat(email, view, seq) {
+    var nowMs = deps.nowMs ? deps.nowMs() : Date.now();
+    var e = clean(email).toLowerCase();
+    var map = readPresence();
+    if (e && deps.cache) {
+      var lock = deps.getLock();
+      if (lock.tryLock(C.PRESENCE.LOCK_MS)) {
+        try {
+          map = readPresence();
+          var prev = map[e];
+          // The name rarely changes: reuse it so a heartbeat does not read _app_users every minute.
+          var name = (prev && prev.name) || getUserName(e) || e.split('@')[0];
+          map = D.presence.touch(map, e, { name: name, view: view, seq: seq }, nowMs);
+          deps.cache.put(C.PRESENCE.CACHE_KEY, JSON.stringify(map), C.PRESENCE.CACHE_SECONDS);
+        } finally {
+          lock.releaseLock();
+        }
+      }
+    }
+    return {
+      nowMs: nowMs,
+      online: D.presence.active(map, nowMs).map(function (p) {
+        return { email: p.email, name: p.name, view: p.view, seq: p.seq };
+      }),
+    };
+  }
+
   /** @param {string} email @param {string} name */
   function setUserName(email, name) {
     return withLock(function () {
@@ -979,6 +1026,7 @@ function makeRepo(deps) {
   }
 
   return {
+    heartbeat: heartbeat,
     readAll: readAll,
     readRow: readRow,
     options: options,
