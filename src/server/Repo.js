@@ -633,14 +633,14 @@ function makeRepo(deps) {
     var e = clean(email).toLowerCase();
     var map = readPresence();
     if (e && deps.cache) {
+      // The name rarely changes: reuse it so a heartbeat does not read _app_users every minute
+      // (setUserName refreshes it). Looked up before the lock, so real saves never wait on this read.
+      var prev = map[e];
+      var name = (prev && prev.name) || getUserName(e) || e.split('@')[0];
       var lock = deps.getLock();
       if (lock.tryLock(C.PRESENCE.LOCK_MS)) {
         try {
-          map = readPresence();
-          var prev = map[e];
-          // The name rarely changes: reuse it so a heartbeat does not read _app_users every minute.
-          var name = (prev && prev.name) || getUserName(e) || e.split('@')[0];
-          map = D.presence.touch(map, e, { name: name, view: view, seq: seq }, nowMs);
+          map = D.presence.touch(readPresence(), e, { name: name, view: view, seq: seq }, nowMs);
           deps.cache.put(C.PRESENCE.CACHE_KEY, JSON.stringify(map), C.PRESENCE.CACHE_SECONDS);
         } finally {
           lock.releaseLock();
@@ -674,6 +674,12 @@ function makeRepo(deps) {
       if (found === -1) sh.appendRow([e, name, now].map(asText));
       else sh.getRange(found, 2, 1, 2).setValues([[asText(name), asText(now)]]);
       writeLog([[now, e, 'MAP_USER', '', '', C.USER_NAME_LABEL, old, name]]);
+      // presence shows the new name from the next heartbeat (review fix 2026-11-18)
+      var online = readPresence();
+      if (online[e] && deps.cache) {
+        online[e].name = name;
+        deps.cache.put(C.PRESENCE.CACHE_KEY, JSON.stringify(online), C.PRESENCE.CACHE_SECONDS);
+      }
       return C.ok({ name: name });
     });
   }

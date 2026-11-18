@@ -94,3 +94,12 @@ describe('Repo.heartbeat', () => {
     expect(users.writes).toEqual([]);
   });
 });
+
+describe('Repo.heartbeat name refresh (review fix 2026-11-18)', () => {
+  it('a name set after the first heartbeat replaces the email fallback', () => {
+    expect(repo.heartbeat('somchai@x.com', 'monitor', null).online[0].name).toBe('somchai');
+    expect(repo.setUserName('somchai@x.com', 'สมชาย').ok).toBe(true);
+    now += 60000;
+    expect(repo.heartbeat('somchai@x.com', 'monitor', null).online[0].name).toBe('สมชาย');
+  });
+});

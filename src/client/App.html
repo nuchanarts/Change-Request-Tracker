@@ -184,7 +184,10 @@
       document.getElementById('presence-list').innerHTML = Views.presenceList(state);
       var warn = document.getElementById('presence-warn');
       var r = route();
-      if (warn && r.name === 'items' && r.id) warn.innerHTML = Views.presenceWarn(state, state.byId[r.id]);
+      if (warn && r.name === 'items' && r.id) {
+        var html = Views.presenceWarn(state, state.byId[r.id]);
+        if (warn.innerHTML !== html) warn.innerHTML = html; // unchanged: no rewrite, so screen readers are not re-told
+      }
     }
 
     function heartbeat() {

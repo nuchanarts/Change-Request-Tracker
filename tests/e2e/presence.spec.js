@@ -69,3 +69,25 @@ test('help page explains the online badge', async ({ page }) => {
   await open(page, '/#/help');
   await expect(page.getByRole('heading', { name: 'ดูว่าใครออนไลน์' })).toBeVisible();
 });
+
+test('the badge is announced with its count', async ({ page }) => {
+  await open(page, '/#/monitor');
+  await expect(page.locator('#presence-count')).toHaveAccessibleName(/3 คนออนไลน์/);
+});
+
+test('the edit warning is not rewritten (re-announced) when nothing changed', async ({ page }) => {
+  await page.clock.install();
+  await open(page, '/?presence=editing#/items/1');
+  await expect(page.locator('#presence-warn')).toContainText('กำลังแก้รายการนี้อยู่');
+  await page.evaluate(() => {
+    window.__warnWrites = 0;
+    new MutationObserver(() => window.__warnWrites++).observe(document.getElementById('presence-warn'), {
+      childList: true,
+      subtree: true,
+    });
+  });
+  const before = await page.evaluate(() => window.__heartbeats);
+  await page.clock.fastForward(61000);
+  await expect.poll(() => page.evaluate(() => window.__heartbeats)).toBeGreaterThan(before);
+  expect(await page.evaluate(() => window.__warnWrites)).toBe(0);
+});
