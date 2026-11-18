@@ -196,6 +196,13 @@ function Api_saveAccess(input) {
   });
 }
 
+/** Share the sheet with every active member who is not a named editor yet (admins only, 2026-11-18). */
+function Api_shareAll() {
+  return guard_(function (ctx) {
+    return ctx.repo.shareAll(ctx.email, owner_(ctx));
+  });
+}
+
 /** Admin repair: rewrite dropdown cells written with a leading apostrophe so their chips show colours. */
 function Api_repairChips() {
   return guard_(function (ctx) {

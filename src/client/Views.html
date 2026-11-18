@@ -652,17 +652,33 @@
         UI.input({ name: 'acc-name', label: 'ชื่อ (ไม่บังคับ)' }) +
         UI.select({ name: 'acc-role', label: 'บทบาท', options: a.roles, value: a.roles[1] || a.roles[0], allowEmpty: false }) +
         '<div class="actions"><button class="btn primary" type="submit">เพิ่มเข้าทีม</button></div></form></section>';
-      html += '<section class="panel" aria-labelledby="am-h"><div class="panel-head"><h2 id="am-h">สมาชิกทั้งหมด <span class="count">' + a.members.length + '</span></h2>' +
+      // removing someone = status ระงับ + sharing taken back; the row stays as history (constitution: rows are never deleted)
+      var current = a.members.filter(function (m) { return m.status === a.states.allowed; });
+      var removed = a.members.filter(function (m) { return m.status === a.states.suspended; });
+      html += '<section class="panel" aria-labelledby="as-h"><div class="panel-head"><h2 id="as-h">แชร์ชีตให้ทีม</h2></div>' +
+        '<p class="muted">เพิ่มคนเข้าทีม = แอปแชร์ชีตให้เป็นผู้แก้ไขทันที · นำออกจากทีม = ถอนสิทธิ์แชร์ ' +
+        'ถ้าจะเปลี่ยนลิงก์ชีตเป็น "ผู้มีสิทธิ์ดู" ให้กดปุ่มนี้ก่อน ทีมจะยังแก้ไขผ่านแอปได้</p>' +
+        '<button class="btn" data-action="share-all">' + UI.withIcon('shield', 'แชร์ชีตให้สมาชิกทุกคน') + '</button></section>';
+      html += '<section class="panel" aria-labelledby="am-h"><div class="panel-head"><h2 id="am-h">สมาชิกทั้งหมด <span class="count">' + current.length + '</span></h2>' +
         '<span class="muted">ผู้ดูแลจัดการสิทธิ์ได้ ผู้แก้ไขเพิ่ม/แก้รายการได้ เจ้าของชีตเป็นผู้ดูแลเสมอ</span></div>' +
-        '<div class="table-wrap"><table class="access-table"><thead><tr><th>อีเมล</th><th>ชื่อ</th><th>บทบาท</th><th>สถานะ</th></tr></thead><tbody>' +
-        a.members.map(function (m) {
+        '<div class="table-wrap"><table class="access-table"><thead><tr><th>อีเมล</th><th>ชื่อ</th><th>บทบาท</th><th>สถานะ</th><th><span class="sr-only">นำออก</span></th></tr></thead><tbody>' +
+        current.map(function (m) {
           var sel = function (field, list, value) {
             return '<select class="access-select" data-email="' + esc(m.email) + '" data-field="' + field + '" aria-label="' + (field === 'role' ? 'บทบาทของ ' : 'สถานะของ ') + esc(m.email) + '">' +
               list.map(function (v) { return '<option' + (v === value ? ' selected' : '') + '>' + esc(v) + '</option>'; }).join('') + '</select>';
           };
-          return '<tr class="st-' + (m.status === a.states.allowed ? 'ok' : m.status === a.states.pending ? 'wait' : 'off') + '"><td>' + esc(m.email) + (m.email === a.owner ? ' <span class="badge s-done">เจ้าของชีต</span>' : '') + '</td><td>' + esc(m.name) + '</td>' +
-            '<td>' + sel('role', a.roles, m.role) + '</td><td>' + sel('status', [a.states.allowed, a.states.pending, a.states.suspended], m.status) + '</td></tr>';
+          return '<tr class="st-' + (m.status === a.states.allowed ? 'ok' : m.status === a.states.pending ? 'wait' : 'off') + '"><td>' + esc(m.email) + (m.email === a.owner ? ' <span class="badge s-done">เจ้าของชีต</span>' : '') + '</td><td><input class="access-name" data-email="' + esc(m.email) + '" value="' + esc(m.name) + '" aria-label="ชื่อของ ' + esc(m.email) + '" placeholder="ใส่ชื่อ"></td>' +
+            '<td>' + sel('role', a.roles, m.role) + '</td><td>' + sel('status', [a.states.allowed, a.states.pending, a.states.suspended], m.status) + '</td>' +
+            '<td>' + (m.email === a.owner ? '' : '<button class="btn small danger" data-action="access-set" data-email="' + esc(m.email) + '" data-field="status" data-value="' + esc(a.states.suspended) + '">นำออกจากทีม</button>') + '</td></tr>';
         }).join('') + '</tbody></table></div></section>';
+      if (removed.length) {
+        html += '<details class="panel access-removed"><summary><h2 class="inline-h">นำออกแล้ว <span class="count">' + removed.length + '</span></h2></summary>' +
+          '<p class="muted">เข้าแอปได้แบบดูอย่างเดียว ไม่ได้รับแชร์ชีตแล้ว กด "คืนสิทธิ์" เพื่อให้กลับมาแก้ไขได้</p>' +
+          removed.map(function (m) {
+            return '<div class="access-req"><div><strong>' + esc(m.email) + '</strong>' + (m.name ? ' <span class="muted">' + esc(m.name) + '</span>' : '') + '</div>' +
+              '<div class="access-actions"><button class="btn small" data-action="access-set" data-email="' + esc(m.email) + '" data-field="status" data-value="' + esc(a.states.allowed) + '">คืนสิทธิ์</button></div></div>';
+          }).join('') + '</details>';
+      }
       html += deletedPanel(state) + notifyPanel(state);
       return html;
     }

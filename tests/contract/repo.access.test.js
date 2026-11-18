@@ -103,7 +103,8 @@ describe('saveAccess (admins only)', () => {
       status: A.allowed,
       name: 'PM สอง',
     });
-    expect(log().map((r) => r[2])).toEqual(['ACCESS_UPDATE', 'ACCESS_ADD']);
+    // approving and adding also share the sheet (2026-11-18)
+    expect(log().map((r) => r[2])).toEqual(['ACCESS_UPDATE', 'ACCESS_SHARE', 'ACCESS_ADD', 'ACCESS_SHARE']);
   });
 
   it('non-admins are refused', () => {

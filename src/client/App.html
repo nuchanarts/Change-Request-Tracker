@@ -620,7 +620,9 @@
           var why = Object.keys(fields).map(function (k) { return fields[k]; });
           UI.toast(res.message + (why.length ? ': ' + why.join(', ') : ''), 'error');
         } else {
-          UI.toast('บันทึกสิทธิ์ของ ' + res.data.email + ' แล้ว (' + res.data.role + ', ' + res.data.status + ')');
+          var msg = 'บันทึกสิทธิ์ของ ' + res.data.email + ' แล้ว (' + res.data.role + ', ' + res.data.status + ')';
+          if (res.data.shared === 'failed') UI.toast(msg + ' แต่แชร์ชีตไม่สำเร็จ กรุณาแชร์เองใน Google Drive', 'error');
+          else UI.toast(msg + (res.data.shared === 'added' ? ' · แชร์ชีตให้แล้ว' : res.data.shared === 'removed' ? ' · ถอนสิทธิ์แชร์แล้ว' : ''));
         }
         state.access = null;
         render();
@@ -868,6 +870,17 @@
           render();
         });
       },
+      'share-all': function (el) {
+        el.disabled = true;
+        api('Api_shareAll').then(function (res) {
+          el.disabled = false;
+          if (!res.ok) return UI.toast(res.message, 'error');
+          var d = res.data;
+          var msg = 'แชร์เพิ่ม ' + d.added + ' คน (มีสิทธิ์อยู่แล้ว ' + d.already + ' คน)';
+          if (d.failed.length) UI.toast(msg + ' แชร์ไม่สำเร็จ: ' + d.failed.join(', '), 'error');
+          else UI.toast(msg);
+        });
+      },
       'access-set': function (el) {
         var input = { email: el.getAttribute('data-email') };
         input[el.getAttribute('data-field')] = el.getAttribute('data-value');
@@ -934,6 +947,9 @@
       var form = ev.target.form;
       if (ev.target.id === 'mw-who') return setMyName(ev.target.value);
       if (ev.target.id === 'my-name') return setIdentity(ev.target.value);
+      if (ev.target.classList && ev.target.classList.contains('access-name')) {
+        return saveAccess({ email: ev.target.getAttribute('data-email'), name: ev.target.value });
+      }
       if (ev.target.classList && ev.target.classList.contains('access-select')) {
         var input = { email: ev.target.getAttribute('data-email') };
         input[ev.target.getAttribute('data-field')] = ev.target.value;

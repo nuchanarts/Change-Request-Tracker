@@ -212,6 +212,17 @@ export class FakeSpreadsheet {
     if (this.editors === 'throw') throw new Error('Access denied');
     return this.editors.map((e) => ({ getEmail: () => e }));
   }
+  // sharing (access management 2026-11-18); shareFails simulates an admin without share rights
+  addEditor(email) {
+    if (this.shareFails) throw new Error('No permission to share');
+    if (!this.editors.includes(email)) this.editors.push(email);
+    return this;
+  }
+  removeEditor(email) {
+    if (this.shareFails) throw new Error('No permission to share');
+    this.editors = this.editors.filter((e) => e !== email);
+    return this;
+  }
 }
 
 export class FakeLock {
