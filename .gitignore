@@ -20,3 +20,6 @@ playwright-report/
 test-results/
 playwright-report/
 .playwright-mcp/
+
+# superpowers plan workspaces (local scratch)
+.superpowers/
