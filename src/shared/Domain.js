@@ -1294,7 +1294,69 @@ var Domain = (function () {
     return max + 1;
   }
 
+  // ---------------------------------------------------------------- presence (2026-11-18)
+
+  /**
+   * Who is online and what they are doing. The map is {email: {name, view, seq, at}} kept in the
+   * script cache; an entry is online while nowMs - at <= TTL_MS. Pure: the clock is passed in.
+   */
+  var presence = (function () {
+    var TTL_MS = 180000;
+    /** @typedef {{name:string, view:string, seq:number|null, at:number}} PresenceEntry */
+
+    /** @param {Object<string, PresenceEntry>|null} map @param {number} nowMs */
+    function active(map, nowMs) {
+      return Object.keys(map || {})
+        .filter(function (email) {
+          var e = /** @type {any} */ (map)[email];
+          return e && typeof e.at === 'number' && nowMs - e.at <= TTL_MS;
+        })
+        .map(function (email) {
+          var e = /** @type {any} */ (map)[email];
+          return {
+            email: email,
+            name: String(e.name || ''),
+            view: String(e.view || ''),
+            seq: typeof e.seq === 'number' ? e.seq : null,
+            at: e.at,
+          };
+        })
+        .sort(function (a, b) {
+          return a.name.localeCompare(b.name, 'th') || a.email.localeCompare(b.email);
+        });
+    }
+
+    /**
+     * @param {Object<string, PresenceEntry>|null} map @param {string} email
+     * @param {{name:string, view:string, seq:number|null}} entry @param {number} nowMs
+     * @returns {Object<string, PresenceEntry>}
+     */
+    function touch(map, email, entry, nowMs) {
+      /** @type {Object<string, PresenceEntry>} */
+      var out = {};
+      active(map, nowMs).forEach(function (e) {
+        out[e.email] = { name: e.name, view: e.view, seq: e.seq, at: e.at };
+      });
+      out[email] = { name: entry.name, view: entry.view, seq: entry.seq, at: nowMs };
+      return out;
+    }
+
+    /** Names of others editing item `seq`. @param {Object<string, PresenceEntry>|null} map @param {number} seq @param {string} selfEmail @param {number} nowMs */
+    function editorsOf(map, seq, selfEmail, nowMs) {
+      return active(map, nowMs)
+        .filter(function (e) {
+          return e.view === 'edit' && e.seq === seq && e.email !== selfEmail;
+        })
+        .map(function (e) {
+          return e.name;
+        });
+    }
+
+    return { TTL_MS: TTL_MS, touch: touch, active: active, editorsOf: editorsOf };
+  })();
+
   return {
+    presence: presence,
     COLUMNS: COLUMNS,
     COLUMN_BY_KEY: COLUMN_BY_KEY,
     DATE_KEYS: DATE_KEYS,
