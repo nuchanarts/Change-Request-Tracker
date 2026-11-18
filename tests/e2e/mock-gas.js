@@ -2,7 +2,7 @@
  * Mirrors the server contract (contracts/server-api.md) using the same Domain rules.
  * URL options: ?viewer=1 (view-only user), ?latency=ms, ?fail=bootstrap (simulate a server error),
  * ?presence=editing (a fake teammate is editing item 1),
- * ?notester=1 (sheet without the optional ผู้ทดสอบ column).
+ * ?notester=1 (sheet without the optional ผู้ทดสอบ column), ?sharefail=1 (sharing the sheet fails).
  */
 (function () {
   'use strict';
@@ -323,13 +323,25 @@
           note: '',
           role: 'ผู้แก้ไข',
           status: STATES.allowed,
+          isNew: true,
         };
         members.push(m);
       }
+      var wasActive = m.status === STATES.allowed && !m.isNew;
+      delete m.isNew;
       ['name', 'note', 'role', 'status'].forEach(function (k) {
         if (input[k] !== undefined) m[k] = input[k];
       });
-      return ok(Object.assign({}, m));
+      var out = Object.assign({}, m);
+      var isActive = m.status === STATES.allowed;
+      if (isActive !== wasActive)
+        out.shared = params.get('sharefail') ? 'failed' : isActive ? 'added' : 'removed';
+      return ok(out);
+    },
+    Api_shareAll: function () {
+      if (!user.isAdmin)
+        return { ok: false, code: 'NOT_ADMIN', message: 'เฉพาะผู้ดูแลเท่านั้นที่จัดการสิทธิ์ได้' };
+      return ok({ added: 1, already: 1, failed: [] });
     },
     Api_repairChips: function () {
       if (!user.isAdmin)

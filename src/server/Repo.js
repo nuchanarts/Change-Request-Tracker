@@ -997,7 +997,79 @@ function makeRepo(deps) {
           ],
         ]);
       }
-      return C.ok({ email: e, name: next.name, note: next.note, role: next.role, status: next.status });
+      // Sheet sharing follows membership (user request 2026-11-18): becoming active shares the sheet as an
+      // editor, leaving (ระงับ / รออนุมัติ) takes it back. The owner is never unshared. Best effort: a
+      // sharing failure still saves the member and is reported, so the admin can share by hand.
+      var wasActive = !!(m && m.status === C.ACCESS.allowed);
+      var isActive = next.status === C.ACCESS.allowed;
+      /** @type {string|undefined} */
+      var shared;
+      if (isActive !== wasActive && !(e === owner && !isActive)) {
+        shared = setSharing(e, isActive) ? (isActive ? 'added' : 'removed') : 'failed';
+        writeLog([
+          [
+            now,
+            admin,
+            'ACCESS_SHARE',
+            '',
+            '',
+            e,
+            isActive ? '' : SHARE_LABEL,
+            shared === 'failed' ? 'แชร์ไม่สำเร็จ' : isActive ? SHARE_LABEL : '',
+          ],
+        ]);
+      }
+      var out = { email: e, name: next.name, note: next.note, role: next.role, status: next.status };
+      if (shared) /** @type {any} */ (out).shared = shared;
+      return C.ok(out);
+    });
+  }
+
+  var SHARE_LABEL = 'ผู้แก้ไขชีต';
+
+  /** Add or remove `email` as a named editor of the spreadsheet; false when Google refuses. @param {string} email @param {boolean} on */
+  function setSharing(email, on) {
+    try {
+      if (on) ss.addEditor(email);
+      else ss.removeEditor(email);
+      return true;
+    } catch (err) {
+      console.warn('sharing failed', email, on, err);
+      return false;
+    }
+  }
+
+  /**
+   * Share the sheet with every active member who is not a named editor yet (admins only). Run this before
+   * changing the sheet's link to view-only, so the team keeps editing through the app.
+   * @param {string} adminEmail @param {string} ownerEmail
+   */
+  function shareAll(adminEmail, ownerEmail) {
+    var admin = clean(adminEmail).toLowerCase();
+    if (!isAdmin(admin, ownerEmail)) return C.fail('NOT_ADMIN');
+    return withLock(function () {
+      var owner = clean(ownerEmail).toLowerCase();
+      var named = [];
+      try {
+        named = ss.getEditors().map(function (/** @type {any} */ u) {
+          return clean(u.getEmail()).toLowerCase();
+        });
+      } catch (err) {
+        console.warn('getEditors failed', err);
+      }
+      var res = { added: 0, already: 0, failed: /** @type {string[]} */ ([]) };
+      var log = [];
+      var now = deps.nowText();
+      (members() || []).forEach(function (/** @type {any} */ m) {
+        if (m.status !== C.ACCESS.allowed || m.email === owner) return;
+        if (named.indexOf(m.email) !== -1) return res.already++;
+        if (setSharing(m.email, true)) {
+          res.added++;
+          log.push([now, admin, 'ACCESS_SHARE', '', '', m.email, '', SHARE_LABEL]);
+        } else res.failed.push(m.email);
+      });
+      if (log.length) writeLog(log);
+      return C.ok(res);
     });
   }
 
@@ -1036,6 +1108,7 @@ function makeRepo(deps) {
 
   return {
     heartbeat: heartbeat,
+    shareAll: shareAll,
     readAll: readAll,
     readRow: readRow,
     options: options,
