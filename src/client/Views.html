@@ -482,10 +482,12 @@
     function myWork(state) {
       // "งานของฉัน" (developers) and "งาน PM" are separate menus, each with its own name list (user request 2026-11-11)
       var isPm = state.myTab === 'pm';
-      var name = isPm ? state.pmName() : state.myName();
+      var name = isPm ? state.pmName() : state.devName();
       var people = ((isPm ? state.options.pm : state.options.developer) || []).slice();
-      // งาน PM can also show a whole PM team (user request 2026-11-16)
-      var teams = isPm ? D.pmTeams(state.options.pm || []).map(function (t) { return t.label; }) : [];
+      // งาน PM can also show a whole PM team (user request 2026-11-16); งานของฉัน can show ทุกคน (2026-11-18)
+      var teams = isPm ? D.pmTeams(state.options.pm || []).map(function (t) { return t.label; }) : [D.ALL_DEVELOPERS];
+      var everyone = !isPm && name === D.ALL_DEVELOPERS;
+      state.mwShowDev = everyone; // cards say whose work it is
       if (name && people.indexOf(name) === -1 && teams.indexOf(name) === -1) people.unshift(name);
       var who = isPm ? D.pmFilter(name, state.options.pm || []) : name;
       var nameButton = function (n) {
@@ -493,7 +495,7 @@
       };
       var nameOption = function (n) { return '<option value="' + esc(n) + '"' + (n === name ? ' selected' : '') + '>' + esc(n) + '</option>'; };
       var html = '<div class="page-head"><h1>' + (isPm ? 'งาน PM' : 'งานของฉัน') + '</h1><span class="muted">' +
-        (isPm ? 'งานที่คุณเป็น PM รับผิดชอบ' : 'งานที่คุณเป็นนักพัฒนา') + '</span></div>';
+        (isPm ? 'งานที่คุณเป็น PM รับผิดชอบ' : everyone ? 'งานของนักพัฒนาทุกคน' : 'งานที่คุณเป็นนักพัฒนา') + '</span></div>';
       if (!name || state.choosingName) {
         // one click: tap your own name (user request 2026-11-11)
         return html + '<section class="panel mw-who"><h2>' + (isPm ? 'คุณคือ PM คนไหน?' : 'คุณคือนักพัฒนาคนไหน?') + '</h2><p class="muted">กดที่ชื่อของคุณครั้งเดียว ระบบจะจำไว้และแสดงเฉพาะงานของคุณ</p>' +
@@ -603,7 +605,7 @@
       }
       return '<article class="work' + (r.isOverdue ? ' over' : '') + '"><div><a href="#/items/' + encodeURIComponent(r.id) + '" style="color:inherit">' + esc(r.detail) + '</a>' +
         '<div class="meta"><span>#' + esc(r.seq === null ? '–' : r.seq) + '</span><span>' + esc(r.platform) + ' / ' + esc(r.system) + '</span>' +
-        (r.devQueue !== null ? '<span>คิวที่ ' + r.devQueue + '</span>' : '') + '<span>' + UI.urgency(r.urgency) + '</span>' + UI.statusBadge(r.status) + '<span>' + UI.due(r, state.today) + '</span>' + (r.ticketUrl ? UI.ticketLink(r) : '') + '</div></div>' +
+        (state.mwShowDev && r.developer ? '<span class="dev-name">👤 ' + esc(r.developer) + '</span>' : '') + (r.devQueue !== null ? '<span>คิวที่ ' + r.devQueue + '</span>' : '') + '<span>' + UI.urgency(r.urgency) + '</span>' + UI.statusBadge(r.status) + '<span>' + UI.due(r, state.today) + '</span>' + (r.ticketUrl ? UI.ticketLink(r) : '') + '</div></div>' +
         '<div class="actions">' + actions + '</div></article>';
     }
 
