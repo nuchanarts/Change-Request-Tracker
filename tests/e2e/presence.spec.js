@@ -64,3 +64,8 @@ test.describe('presence', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 });
+
+test('help page explains the online badge', async ({ page }) => {
+  await open(page, '/#/help');
+  await expect(page.getByRole('heading', { name: 'ดูว่าใครออนไลน์' })).toBeVisible();
+});
