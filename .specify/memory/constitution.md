@@ -1,7 +1,9 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 3.0.0 → 4.0.0 (MAJOR: the "never delete rows" rule is redefined. By user decision on
+Version change: 4.0.0 → 4.1.0 (MINOR: Data Contract gains the optional column "ผู้ทดสอบ", which already exists in
+the sheet; the app reads/writes it when present and hides the field when absent. User request 2026-11-18.)
+Previous: 3.0.0 → 4.0.0 (MAJOR: the "never delete rows" rule is redefined. By user decision on
 2026-11-11, any editor may delete one item row from the app, through a guarded path only: lock, ลำดับ check,
 full-row conflict check, and a full JSON snapshot of the row in _app_log for manual restore.)
 Previous: 2.1.1 → 3.0.0 (MAJOR: Data Contract status workflow reordered and two statuses added,
@@ -246,6 +248,7 @@ Follow-up TODOs: none.
 | ระยะเวลาพัฒนา(ชม.) | ตัวเลข | | |
 | เริ่มพัฒนา | วันที่ | | |
 | พัฒนาเสร็จ | วันที่ | | |
+| ผู้ทดสอบ | dropdown + พิมพ์ชื่อใหม่ได้ | | **คอลัมน์ทางเลือก** (เพิ่ม 2026-11-18): ถ้าชีตไม่มีคอลัมน์นี้ แอปยังทำงานปกติและซ่อนช่องนี้ รายชื่อเหมือนนักพัฒนา |
 
 **ลำดับขั้นตอนของสถานะ** (ใช้เรียงในกราฟและ dropdown):
 `0.จัดทำไฟล์แก้ไข` → `0.จัดทำ Taiga` → `รอ PM ตรวจสอบ Taiga` → `0.รอแจ้งทีมพัฒนา` → `dev ขอ Sourecode อจ.` → `รอทีมพัฒนา` → `กำลังพัฒนา` → `ส่งกลับนักพัฒนาแก้ไข` → `กำลังทดสอบ` → `รอ compile` → `รอ Complie ต้องแจ้งอจ.` → **ปิดงาน:** `0.ยกเลิก` / `0.ใช้งานได้อยู่แล้ว` / `0.แก้ไขเรียบร้อย`
@@ -298,4 +301,4 @@ Follow-up TODOs: none.
 - ทุก plan และทุก review ต้องตรวจว่าเป็นไปตาม constitution นี้ ความซับซ้อนที่ไม่มีเหตุผลรองรับจะทำให้รวมงานไม่ได้
 - คำแนะนำสำหรับ agent อยู่ใน `CLAUDE.md` และต้องสอดคล้องกับเอกสารนี้เสมอ
 
-**Version**: 4.0.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-11
+**Version**: 4.1.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-18
