@@ -337,6 +337,7 @@
       return ok({ repaired: 3, skipped: 1 });
     },
     Api_setMyName: function (name) {
+      (window.__setMyNameCalls = window.__setMyNameCalls || []).push(name);
       user.name = name;
       return ok({ name: name });
     },

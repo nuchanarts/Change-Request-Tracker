@@ -3,7 +3,7 @@
   (function () {
     'use strict';
     var D = Domain;
-    var KEYS = { filters: 'ehp.filters.v1', tour: 'ehp.tour.v1', name: 'ehp.myname.v1', pmName: 'ehp.mypm.v1', tab: 'ehp.mytab.v1', devAll: 'ehp.mydevall.v1' };
+    var KEYS = { filters: 'ehp.filters.v1', tour: 'ehp.tour.v1', name: 'ehp.myname.v1', pmName: 'ehp.mypm.v1', tab: 'ehp.mytab.v1', devAll: 'ehp.mydevall.v1', devView: 'ehp.mydevview.v1' };
     var EMPTY_FILTERS = { platform: '', pm: '', developer: '', urgency: '', from: '', to: '' };
 
     function store(key, value) {
@@ -73,7 +73,10 @@
     }
     state.moveCol = moveCol;
 
-    /** Remember who "me" is (browser + server, best effort) and show their work. */
+    /**
+     * Whose work งานของฉัน / งาน PM shows. A view only: it never changes who "me" is
+     * ("ฉันไม่ใช่กิ่ง", user 2026-11-18). Who I am is set in the account menu (setIdentity).
+     */
     function setMyName(name) {
       if (!name) return;
       state.choosingName = false;
@@ -81,16 +84,31 @@
         store(KEYS.pmName, name); // the PM menu remembers its own name, separate from the developer one
         return render();
       }
-      // "ทุกคน" is a view, not an identity: it never replaces who "me" is (user request 2026-11-18)
       store(KEYS.devAll, name === D.ALL_DEVELOPERS);
-      if (name === D.ALL_DEVELOPERS) return render();
+      if (name !== D.ALL_DEVELOPERS) store(KEYS.devView, name);
+      render();
+    }
+
+    /** Remember who "me" is (browser + server, best effort): the account menu's ชื่อของฉัน. */
+    function setIdentity(name) {
+      if (!name) return;
       store(KEYS.name, name);
-      state.choosingName = false;
       if (state.user) state.user.name = name;
       render();
       api('Api_setMyName', name).then(function (res) {
-        if (!res.ok && res.code !== 'FORBIDDEN' && res.code !== 'NOT_ALLOWED') UI.toast(res.message, 'error');
+        if (res.ok) return UI.toast('บันทึกชื่อของฉันแล้ว: ' + name);
+        if (res.code !== 'FORBIDDEN' && res.code !== 'NOT_ALLOWED') UI.toast(res.message, 'error');
       });
+    }
+
+    function renderMyNamePick() {
+      var sel = document.getElementById('my-name');
+      var me = state.myName();
+      var people = ((state.options && state.options.person) || []).slice();
+      if (me && people.indexOf(me) === -1) people.unshift(me);
+      sel.innerHTML = '<option value="">— เลือกชื่อของคุณ —</option>' + people.map(function (n) {
+        return '<option value="' + UI.esc(n) + '"' + (n === me ? ' selected' : '') + '>' + UI.esc(n) + '</option>';
+      }).join('');
     }
 
     function setMwFilter(key, value) {
@@ -108,7 +126,7 @@
     };
     /** Whose work งานของฉัน shows: ทุกคน, or me. */
     state.devName = function () {
-      return store(KEYS.devAll) === true ? D.ALL_DEVELOPERS : state.myName();
+      return store(KEYS.devAll) === true ? D.ALL_DEVELOPERS : store(KEYS.devView) || state.myName();
     };
     state.myName = function () {
       return (state.user && state.user.name) || store(KEYS.name) || '';
@@ -261,6 +279,7 @@
         document.getElementById('user-email').textContent = b.user.email || '';
         document.getElementById('user-avatar').textContent = (b.user.email || '?').charAt(0).toUpperCase();
         document.getElementById('user-role').textContent = b.user.isAdmin ? 'ผู้ดูแล' : b.user.canEdit ? 'ผู้แก้ไข' : 'ดูอย่างเดียว';
+        renderMyNamePick();
         state.access = null;
         render();
         startHeartbeat();
@@ -900,6 +919,7 @@
     document.addEventListener('change', function (ev) {
       var form = ev.target.form;
       if (ev.target.id === 'mw-who') return setMyName(ev.target.value);
+      if (ev.target.id === 'my-name') return setIdentity(ev.target.value);
       if (ev.target.classList && ev.target.classList.contains('access-select')) {
         var input = { email: ev.target.getAttribute('data-email') };
         input[ev.target.getAttribute('data-field')] = ev.target.value;
