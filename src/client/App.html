@@ -159,6 +159,62 @@
       });
     }
 
+    // ------------------------------------------------------------------ presence (2026-11-18)
+    // Heartbeat every 60 s while the tab is visible; the server keeps who is online in the script cache.
+
+    var HEARTBEAT_MS = 60000;
+    var hbTimer = null;
+    var hbDebounce = null;
+
+    function presenceView() {
+      var r = route();
+      if (r.name === 'items' && r.id) {
+        var row = state.byId[r.id];
+        return { view: 'edit', seq: row && row.seq !== null ? row.seq : null };
+      }
+      if (r.name === 'my-work' && r.id === 'pm') return { view: 'my-work-pm', seq: null };
+      return { view: r.name, seq: null };
+    }
+
+    function renderPresence() {
+      var box = document.getElementById('presence');
+      var list = state.online || [];
+      box.hidden = !list.length;
+      document.getElementById('presence-count').innerHTML = '<span class="presence-dot" aria-hidden="true"></span><span class="num">' + list.length + '</span> คนออนไลน์';
+      document.getElementById('presence-list').innerHTML = Views.presenceList(state);
+      var warn = document.getElementById('presence-warn');
+      var r = route();
+      if (warn && r.name === 'items' && r.id) {
+        var html = Views.presenceWarn(state, state.byId[r.id]);
+        if (warn.innerHTML !== html) warn.innerHTML = html; // unchanged: no rewrite, so screen readers are not re-told
+      }
+    }
+
+    function heartbeat() {
+      if (document.visibilityState === 'hidden' || !state.user) return;
+      api('Api_heartbeat', presenceView()).then(function (res) {
+        if (!res.ok) return console.warn('heartbeat', res.code); // silent: presence is a nice-to-have
+        state.online = res.data.online;
+        state.onlineAt = res.data.nowMs;
+        renderPresence();
+      });
+    }
+
+    function startHeartbeat() {
+      if (hbTimer) return;
+      heartbeat();
+      hbTimer = setInterval(heartbeat, HEARTBEAT_MS);
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') heartbeat();
+      });
+    }
+
+    function heartbeatSoon() {
+      if (!hbTimer) return;
+      clearTimeout(hbDebounce);
+      hbDebounce = setTimeout(heartbeat, 2000);
+    }
+
     function load() {
       state.phase = state.rows.length ? 'refreshing' : 'loading';
       if (state.phase === 'loading') render();
@@ -200,6 +256,7 @@
         document.getElementById('user-role').textContent = b.user.isAdmin ? 'ผู้ดูแล' : b.user.canEdit ? 'ผู้แก้ไข' : 'ดูอย่างเดียว';
         state.access = null;
         render();
+        startHeartbeat();
         // offer the tour once per page load, never again after saves/reloads (or when storage is blocked)
         if (!state.tourOffered) {
           state.tourOffered = true;
@@ -229,6 +286,7 @@
       currentHash = hash || '#/monitor';
       resetForm();
       render();
+      heartbeatSoon();
       document.getElementById('main').focus({ preventScroll: true });
       var y = pendingBack ? scrollMemo[currentHash] || 0 : 0;
       pendingBack = false;

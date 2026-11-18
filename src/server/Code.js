@@ -45,6 +45,9 @@ function context_() {
     effectiveEmail: function () {
       return Session.getEffectiveUser().getEmail();
     },
+    nowMs: function () {
+      return Date.now();
+    },
     nowText: function () {
       return Utilities.formatDate(new Date(), Config.TZ, 'd/M/yyyy HH:mm:ss');
     },
@@ -111,6 +114,19 @@ function Api_bootstrap() {
       rows: data.rows,
       spreadsheetName: ctx.ss.getName(),
     });
+  });
+}
+
+/**
+ * Presence heartbeat (2026-11-18): records what the caller is doing and returns who is online.
+ * The email always comes from the session, never from the client. Writes no sheet.
+ * @param {{view?: string, seq?: any}} input
+ */
+function Api_heartbeat(input) {
+  return guard_(function (ctx) {
+    var view = String((input && input.view) || '').slice(0, 20);
+    var seq = input && input.seq !== undefined && input.seq !== null ? Domain.toInt(input.seq) : null;
+    return Config.ok(ctx.repo.heartbeat(ctx.email, view, typeof seq === 'number' ? seq : null));
   });
 }
 

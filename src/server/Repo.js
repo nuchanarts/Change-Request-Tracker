@@ -9,6 +9,7 @@
  *   cache?: any,                    // script Cache with get/put/remove (optional)
  *   userCache?: any,                // per-user Cache for the edit-permission probe (optional)
  *   effectiveEmail?: () => string,  // account the script runs as; the probe is used only if it equals the caller
+ *   nowMs?: () => number,           // epoch ms, for presence heartbeats (optional; defaults to Date.now)
  *   nowText: () => string,          // 'd/m/yyyy HH:mm:ss' in Asia/Bangkok
  *   makeDate: (y:number, m:number, d:number) => any  // midnight Asia/Bangkok
  * }} deps
@@ -608,6 +609,52 @@ function makeRepo(deps) {
     return null;
   }
 
+  // ------------------------------------------------------------------ presence (script cache only)
+
+  /** Presence map from the cache; a missing or corrupt value is an empty map. */
+  function readPresence() {
+    var raw = deps.cache ? deps.cache.get(C.PRESENCE.CACHE_KEY) : null;
+    if (!raw) return {};
+    try {
+      var m = JSON.parse(raw);
+      return m && typeof m === 'object' && !Array.isArray(m) ? m : {};
+    } catch (_err) {
+      return {};
+    }
+  }
+
+  /**
+   * Record that `email` is on `view` (and editing `seq`) and return who is online. Never writes a sheet.
+   * If the short lock is busy the write is skipped and the current list is still returned.
+   * @param {string} email @param {string} view @param {number|null} seq
+   */
+  function heartbeat(email, view, seq) {
+    var nowMs = deps.nowMs ? deps.nowMs() : Date.now();
+    var e = clean(email).toLowerCase();
+    var map = readPresence();
+    if (e && deps.cache) {
+      // The name rarely changes: reuse it so a heartbeat does not read _app_users every minute
+      // (setUserName refreshes it). Looked up before the lock, so real saves never wait on this read.
+      var prev = map[e];
+      var name = (prev && prev.name) || getUserName(e) || e.split('@')[0];
+      var lock = deps.getLock();
+      if (lock.tryLock(C.PRESENCE.LOCK_MS)) {
+        try {
+          map = D.presence.touch(readPresence(), e, { name: name, view: view, seq: seq }, nowMs);
+          deps.cache.put(C.PRESENCE.CACHE_KEY, JSON.stringify(map), C.PRESENCE.CACHE_SECONDS);
+        } finally {
+          lock.releaseLock();
+        }
+      }
+    }
+    return {
+      nowMs: nowMs,
+      online: D.presence.active(map, nowMs).map(function (p) {
+        return { email: p.email, name: p.name, view: p.view, seq: p.seq };
+      }),
+    };
+  }
+
   /** @param {string} email @param {string} name */
   function setUserName(email, name) {
     return withLock(function () {
@@ -627,6 +674,12 @@ function makeRepo(deps) {
       if (found === -1) sh.appendRow([e, name, now].map(asText));
       else sh.getRange(found, 2, 1, 2).setValues([[asText(name), asText(now)]]);
       writeLog([[now, e, 'MAP_USER', '', '', C.USER_NAME_LABEL, old, name]]);
+      // presence shows the new name from the next heartbeat (review fix 2026-11-18)
+      var online = readPresence();
+      if (online[e] && deps.cache) {
+        online[e].name = name;
+        deps.cache.put(C.PRESENCE.CACHE_KEY, JSON.stringify(online), C.PRESENCE.CACHE_SECONDS);
+      }
       return C.ok({ name: name });
     });
   }
@@ -979,6 +1032,7 @@ function makeRepo(deps) {
   }
 
   return {
+    heartbeat: heartbeat,
     readAll: readAll,
     readRow: readRow,
     options: options,

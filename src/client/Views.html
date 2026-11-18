@@ -413,6 +413,8 @@
       var values = state.formDraft || (row ? row.raw : defaults(state));
       var title = mode === 'new' ? 'เพิ่มรายการขอแก้ไขใหม่' : 'รายการ #' + (row.seq === null ? '–' : row.seq);
       var html = schemaBanner(state) + readOnlyBanner(state);
+      // someone else editing this item (presence, 2026-11-18): updated in place by the heartbeat, never re-rendered
+      html += '<div id="presence-warn" role="status">' + (row ? presenceWarn(state, row) : '') + '</div>';
       html += '<div class="page-head">' + UI.backButton() + '<h1>' + esc(title) + '</h1>' + (row ? UI.statusBadge(row.status) + '<span class="muted">' + UI.due(row, state.today) + '</span>' : '<span class="muted">ช่องที่มี * ต้องกรอก</span>') + '</div>';
       if (state.formAlert) html += '<div class="banner danger" role="alert">' + esc(state.formAlert.message) + (state.formAlert.reload ? ' <button class="btn small" data-action="reload-item">โหลดข้อมูลใหม่</button>' : '') + '</div>';
       if (row && row.issues.length) {
@@ -803,6 +805,35 @@
       return D.stageOf(c.status);
     }
 
+    // ------------------------------------------------------------------ presence (2026-11-18)
+
+    var PRESENCE_LABELS = { monitor: 'หน้าหลัก', assign: 'มอบหมายงาน', kanban: 'บอร์ดงาน', 'my-work': 'งานของฉัน', 'my-work-pm': 'งาน PM', items: 'รายการทั้งหมด', access: 'จัดการสิทธิ์', help: 'วิธีใช้งาน', new: 'กำลังเพิ่มรายการใหม่' };
+
+    function presenceLabel(e) {
+      if (e.view === 'edit') return e.seq === null ? 'กำลังแก้รายการ' : 'กำลังแก้ #' + e.seq;
+      return PRESENCE_LABELS[e.view] || 'ใช้งานอยู่';
+    }
+
+    /** Presence list as the {email: entry} map Domain.presence takes. */
+    function presenceMap(state) {
+      var m = {};
+      (state.online || []).forEach(function (e) { m[e.email] = { name: e.name, view: e.view, seq: e.seq, at: state.onlineAt }; });
+      return m;
+    }
+
+    function presenceWarn(state, row) {
+      if (!row || row.seq === null || !state.online) return '';
+      var names = D.presence.editorsOf(presenceMap(state), row.seq, String(state.user.email || '').toLowerCase(), state.onlineAt);
+      return names.length ? '<div class="banner warn">' + esc(names.join(', ')) + ' กำลังแก้รายการนี้อยู่</div>' : '';
+    }
+
+    function presenceList(state) {
+      var me = String(state.user.email || '').toLowerCase();
+      return (state.online || []).map(function (e) {
+        return '<li><span class="kavatar" aria-hidden="true">' + esc(initials(e.name)) + '</span><span class="presence-name">' + esc(e.name) + (e.email === me ? ' <span class="muted">(คุณ)</span>' : '') + '</span><span class="presence-what">' + esc(presenceLabel(e)) + '</span></li>';
+      }).join('');
+    }
+
     function initials(name) {
       var n = String(name || '').replace(/^(นักพัฒนา|พีเอ็ม)\s+/, '').trim();
       return n ? n.charAt(0) : '?';
@@ -825,6 +856,7 @@
         '<li>กด "โหลดข้อมูลใหม่" เพื่อดึงข้อมูลล่าสุดจากชีต</li></ol></section>' +
         '<section><h2>ดูงานของฉัน</h2><ol><li>นักพัฒนาเปิดเมนู "งานของฉัน" PM เปิดเมนู "งาน PM" ครั้งแรกให้กดที่ชื่อของคุณ</li><li>ด้านบนคือ 🔥 ต้องตามด่วน (เกินกำหนด/ด่วนที่สุด) และ 📅 ต้องทำสัปดาห์นี้ ด้านล่างคือ "แผนรายสัปดาห์" ดูทีละวัน กด ‹ › เพื่อดูสัปดาห์อื่น</li><li>กรองด้วยแพลตฟอร์ม ขั้นงาน หรือค้นหา</li><li>หัวหน้า dev ใช้เมนู "มอบหมายงาน" ใส่ชื่อนักพัฒนาให้งานที่ยังไม่มีคนทำ</li>' +
         '<li>กดปุ่ม "เปลี่ยนเป็น …" เพื่อเลื่อนงานไปขั้นถัดไปได้ทันที</li></ol></section>' +
+        '<section><h2>ดูว่าใครออนไลน์</h2><ol><li>ป้าย 🟢 "N คนออนไลน์" มุมขวาบน กดเพื่อดูว่าใครเปิดแอปอยู่ และกำลังดูหน้าไหนหรือแก้รายการไหน (อัปเดตทุก 1 นาที)</li><li>ถ้าเปิดรายการที่คนอื่นกำลังแก้อยู่ จะขึ้นเตือน "… กำลังแก้รายการนี้อยู่" คุยกันก่อนบันทึก ถ้าบันทึกชนกัน แอปจะเตือนและไม่เขียนทับ</li></ol></section>' +
         '<section><h2>ใช้บอร์ดงาน (Kanban)</h2><ol><li>เปิดเมนู "บอร์ดงาน" แต่ละคอลัมน์คือขั้นตอนงานเรียงตามลำดับ คอลัมน์ที่ไฮไลต์มีงานมากที่สุด</li>' +
         '<li>ลากการ์ดไปวางในคอลัมน์ใหม่ หรือกดปุ่ม ◀ (ถอยกลับ) ▶ (ขั้นถัดไป) บนการ์ด เพื่อเปลี่ยนสถานะ</li>' +
         '<li>ลากไป "ปิดงานสัปดาห์นี้" คือเปลี่ยนเป็น 0.แก้ไขเรียบร้อย ระบบใส่วันที่เสร็จเป็นวันนี้ให้</li>' +
@@ -862,6 +894,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>
