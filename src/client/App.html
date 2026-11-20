@@ -247,6 +247,42 @@
       hbDebounce = setTimeout(heartbeat, 2000);
     }
 
+    // ------------------------------------------------------------------ colour themes (2026-11-20)
+    // A per-browser choice (like the remembered filters): stored in localStorage, applied before the first paint
+    // of each view. Unknown values fall back to the default green.
+
+    var SKIN_KEY = 'ehp.skin.v1';
+    var SKINS = [
+      { id: 'green', label: 'เขียว (ค่าเริ่มต้น)', color: '#0f766e' },
+      { id: 'sky', label: 'ฟ้า', color: '#1d64b0' },
+      { id: 'pink', label: 'ชมพู', color: '#b3195a' },
+      { id: 'purple', label: 'ม่วง', color: '#6d28d9' },
+      { id: 'orange', label: 'ส้ม', color: '#b93e0b' },
+    ];
+
+    function applySkin(id) {
+      var skin = SKINS.filter(function (s) { return s.id === id; })[0] || SKINS[0];
+      if (skin.id === 'green') document.documentElement.removeAttribute('data-skin');
+      else document.documentElement.setAttribute('data-skin', skin.id);
+      var host = document.getElementById('skin-pick');
+      if (host) {
+        host.innerHTML = SKINS.map(function (s) {
+          return '<button type="button" data-skin="' + s.id + '" data-action="pick-skin" style="--sw:' + s.color + '" aria-pressed="' + (s.id === skin.id) + '" aria-label="ธีม' + UI.esc(s.label) + '" title="' + UI.esc(s.label) + '"></button>';
+        }).join('');
+      }
+      return skin.id;
+    }
+    applySkin(store(SKIN_KEY));
+
+    // The account menu opens towards the side with room: when the header wraps, the avatar sits at the left
+    // edge and a right-aligned popover would open off screen (found 2026-11-20).
+    document.getElementById('user-menu').addEventListener('toggle', function (ev) {
+      var menu = ev.currentTarget;
+      if (!menu.open) return;
+      var rect = menu.getBoundingClientRect();
+      menu.classList.toggle('pop-left', rect.right < 290);
+    });
+
     // ------------------------------------------------------------------ remembered copy (speed, 2026-11-20)
     // The last good load is kept in this browser. The next visit shows it at once, marked "กำลังอัปเดต",
     // and replaces it when the server answers. Writes wait for fresh data (api() refuses them meanwhile).
@@ -1017,6 +1053,12 @@
         saveAccess(input);
       },
       'dr-export': exportDoneReport,
+      'pick-skin': function (el) {
+        var id = applySkin(el.getAttribute('data-skin'));
+        store(SKIN_KEY, id);
+        var again = document.querySelector('#skin-pick [data-skin="' + id + '"]');
+        if (again) again.focus();
+      },
       'export-open': openExport,
       'export-close': function () { document.getElementById('dialog').close(); },
       'export-copy': function () {
