@@ -73,6 +73,33 @@ class FakeRange {
   getDataValidation() {
     return this.sheet.validations[`${this.row}:${this.col}`] || null;
   }
+  // Real API: Range.getDataValidations() / setDataValidations(rules[][]) (null = no rule)
+  getDataValidations() {
+    return this._matrix(() => null).map((line, r) =>
+      line.map((_, c) => this.sheet.validations[`${this.row + r}:${this.col + c}`] || null),
+    );
+  }
+  setDataValidations(m) {
+    m.forEach((line, r) =>
+      line.forEach((v, c) => {
+        const k = `${this.row + r}:${this.col + c}`;
+        if (v) this.sheet.validations[k] = v;
+        else delete this.sheet.validations[k];
+      }),
+    );
+    return this;
+  }
+  // Real API: Range.copyTo(destination, {formatOnly: true}) — colours, fonts, borders, number formats
+  copyTo(dest, options) {
+    if (!(options && options.formatOnly)) throw new Error('fake copyTo: only {formatOnly: true} is modelled');
+    this.sheet.formats = this.sheet.formats || {};
+    for (let r = 0; r < dest.numRows; r++)
+      for (let c = 0; c < dest.numCols; c++)
+        this.sheet.formats[`${dest.row + r}:${dest.col + c}`] =
+          this.sheet.formats[`${this.row + Math.min(r, this.numRows - 1)}:${this.col + c}`];
+    this.sheet.formatCopies = (this.sheet.formatCopies || []).concat({ from: this.row, to: dest.row });
+    return this;
+  }
   // Real API shape: RichTextValue.getLinkUrl() (whole cell) and getRuns()[i].getLinkUrl() (part of the text).
   getRichTextValues() {
     this.sheet.richReads = (this.sheet.richReads || 0) + 1;

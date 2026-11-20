@@ -995,7 +995,7 @@
         el.textContent = 'กำลังซ่อม…';
         api('Api_repairChips').then(function (res) {
           if (!res.ok) UI.toast(res.message, 'error');
-          else UI.toast('ซ่อมแล้ว ' + res.data.repaired + ' ช่อง (ข้าม ' + res.data.skipped + ' ช่องที่มีคนแก้ต่อแล้ว)');
+          else UI.toast('ซ่อมแล้ว ' + res.data.repaired + ' ช่อง และใส่สี/dropdown ให้ ' + (res.data.rows || 0) + ' แถว (ข้าม ' + res.data.skipped + ' ช่องที่มีคนแก้ต่อแล้ว)');
           render();
         });
       },

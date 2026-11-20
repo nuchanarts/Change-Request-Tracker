@@ -3,7 +3,7 @@
 // option cells the app wrote earlier.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRequire } from 'node:module';
-import { FakeSheet, FakeSpreadsheet, FakeLock, FakeCache } from './FakeSpreadsheet.js';
+import { FakeSheet, FakeSpreadsheet, FakeLock, FakeCache, FakeValidation } from './FakeSpreadsheet.js';
 
 const require = createRequire(import.meta.url);
 const makeRepo = require('../../src/server/Repo.js');
@@ -123,5 +123,77 @@ describe('repair never writes formulas', () => {
     main.writes = [];
     repo.repairQuotedOptions('boss@x.com', 'boss@x.com');
     expect(main.writes).toEqual([{ row: 2, col: col('system'), value: '\'=HYPERLINK("x")' }]);
+  });
+});
+
+// "ช่องสีหลุดใน google sheet … แถวใหม่ที่เพิ่มจากแอป" (user, 2026-11-20): appendRow writes values only, so a new
+// row lost the dropdown chips and colours of the rows above. The new row now copies both from the row above.
+describe('a new row keeps the look of the rows above', () => {
+  const input = {
+    platform: 'EHP',
+    issueType: 'defect',
+    urgency: 'ปกติ',
+    status: '0.รอแจ้งทีมพัฒนา',
+    system: 'OPD',
+    detail: 'งานใหม่',
+    pm: 'PM-A',
+    dueDate: '30/11/2026',
+  };
+  it('copies data validation (dropdown chips) and formats from the last row', () => {
+    const statusRule = new FakeValidation('VALUE_IN_LIST', [['กำลังพัฒนา']]);
+    main.setValidation(3, col('status'), statusRule);
+    main.formats = { [`3:${col('status')}`]: 'green chip' };
+    const res = repo.create(input, 'boss@x.com');
+    expect(res.ok).toBe(true);
+    expect(res.data.rowNumber).toBe(4);
+    expect(main.getRange(4, col('status')).getDataValidation()).toBe(statusRule);
+    expect(main.formats[`4:${col('status')}`]).toBe('green chip');
+    expect(main.formatCopies).toEqual([{ from: 3, to: 4 }]);
+  });
+
+  it('a sheet with only the header row has nothing to copy and still saves', () => {
+    main = new FakeSheet(Config.SHEETS.main, [HEADERS.slice()]);
+    ss = new FakeSpreadsheet([main], { editors: ['boss@x.com'] });
+    repo = makeRepo({
+      ss,
+      getLock: () => new FakeLock(),
+      cache: new FakeCache(),
+      nowText: () => 't',
+      makeDate: (y, m, d) => new Date(y, m - 1, d),
+    });
+    expect(repo.create(input, 'boss@x.com').ok).toBe(true);
+    expect(main.formatCopies).toBeUndefined();
+  });
+});
+
+// Rows added by earlier versions already lost their look: the admin repair copies it back.
+describe('repairRowLook', () => {
+  it('gives rows without the status dropdown the look of the nearest good row above', () => {
+    const rule = new FakeValidation('VALUE_IN_LIST', [['กำลังพัฒนา']]);
+    main = new FakeSheet(Config.SHEETS.main, [HEADERS.slice(), line(1), line(2), line(3), line(4)]);
+    main.setValidation(2, col('status'), rule);
+    main.setValidation(3, col('status'), rule);
+    main.formats = { [`3:${col('status')}`]: 'green chip' };
+    ss = new FakeSpreadsheet([main], { editors: ['boss@x.com'] });
+    repo = makeRepo({
+      ss,
+      getLock: () => new FakeLock(),
+      cache: new FakeCache(),
+      userCache: new FakeCache(),
+      effectiveEmail: () => 'boss@x.com',
+      nowText: () => 't',
+      makeDate: (y, m, d) => new Date(y, m - 1, d),
+    });
+    const res = repo.repairRowLook('boss@x.com', 'boss@x.com');
+    expect(res).toEqual({ ok: true, data: { rows: 2 } });
+    expect(main.getRange(4, col('status')).getDataValidation()).toBe(rule);
+    expect(main.getRange(5, col('status')).getDataValidation()).toBe(rule);
+    expect(main.formats[`5:${col('status')}`]).toBe('green chip');
+    // nothing to do the second time
+    expect(repo.repairRowLook('boss@x.com', 'boss@x.com').data.rows).toBe(0);
+  });
+
+  it('admins only', () => {
+    expect(repo.repairRowLook('nobody@x.com', 'boss@x.com').ok).toBe(false);
   });
 });

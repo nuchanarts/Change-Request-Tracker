@@ -219,7 +219,11 @@ function Api_shareAll() {
 /** Admin repair: rewrite dropdown cells written with a leading apostrophe so their chips show colours. */
 function Api_repairChips() {
   return guard_(function (ctx) {
-    return ctx.repo.repairQuotedOptions(ctx.email, owner_(ctx));
+    var chips = ctx.repo.repairQuotedOptions(ctx.email, owner_(ctx));
+    if (!chips.ok) return chips;
+    var look = ctx.repo.repairRowLook(ctx.email, owner_(ctx)); // rows added without colours (2026-11-20)
+    if (!look.ok) return look;
+    return Config.ok({ repaired: chips.data.repaired, skipped: chips.data.skipped, rows: look.data.rows });
   });
 }
 

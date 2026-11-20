@@ -124,7 +124,7 @@ test('filters use the full width (six equal columns on desktop)', async ({ page 
 test('admins can repair dropdown chips', async ({ page }) => {
   await open(page, '/#/access');
   await page.getByRole('button', { name: 'ซ่อมสี dropdown' }).click();
-  await expect(page.locator('.toast')).toContainText('ซ่อมแล้ว 3 ช่อง');
+  await expect(page.locator('.toast')).toContainText('ซ่อมแล้ว 3 ช่อง และใส่สี/dropdown ให้ 2 แถว');
 });
 
 test('My Work (developer): urgent and this week side by side, done this week, no "no due" section', async ({
