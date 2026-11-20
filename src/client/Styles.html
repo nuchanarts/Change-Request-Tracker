@@ -744,7 +744,9 @@
   .as-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 12px; padding: 12px 14px; }
   .as-row.over { border-left-color: #dc2626; background: linear-gradient(90deg, #fff6f5, #fff 40%); }
   .as-top { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
-  .as-title { display: block; font-weight: 500; margin: 4px 0; font-size: 15px; }
+  .as-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 4px 0; }
+  .as-title { font-weight: 500; font-size: 15px; }
+  .as-head .badge { white-space: nowrap; }
   .as-sub { font-size: 13px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .as-pick { display: flex; gap: 6px; align-items: center; }
   .as-pick input { width: 200px; min-height: 38px; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; font: inherit; }

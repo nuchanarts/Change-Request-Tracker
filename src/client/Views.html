@@ -477,8 +477,9 @@
             return '<li><form class="as-row' + (r.isOverdue ? ' over' : '') + '" data-id="' + esc(r.id) + '">' +
               '<div class="as-info"><div class="as-top"><span class="kseq num">#' + esc(r.seq === null ? '–' : r.seq) + '</span><span class="kplat">' + esc(r.platform) + '</span>' +
               '<span class="muted">' + esc(r.system) + '</span>' + (D.urgencyRank(r.urgency) < 2 ? UI.urgency(r.urgency) : '') + '<span>' + UI.due(r, state.today) + '</span></div>' +
-              '<a href="#/items/' + encodeURIComponent(r.id) + '" class="as-title">' + esc(r.detail) + '</a>' +
-              '<div class="as-sub muted">' + UI.statusBadge(r.status) + ' PM: ' + esc(r.pm || '–') +
+              // status right after the title, on the same line (user request 2026-11-20)
+              '<div class="as-head"><a href="#/items/' + encodeURIComponent(r.id) + '" class="as-title">' + esc(r.detail) + '</a>' + UI.statusBadge(r.status) + '</div>' +
+              '<div class="as-sub muted">PM: ' + esc(r.pm || '–') +
                 // Taiga/MANTIS one click away (user request 2026-11-20); a plain number has no link to follow
                 (r.ticketUrl ? ' ' + UI.ticketLink(r) : r.ticket ? ' <span class="num">#' + esc(r.ticket) + '</span>' : '') + '</div></div>' +
               '<div class="as-pick"><label for="' + esc(fid) + '" class="sr-only">นักพัฒนาสำหรับรายการ #' + esc(r.seq) + '</label>' +

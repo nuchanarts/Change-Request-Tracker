@@ -24,3 +24,11 @@ test('each มอบหมายงาน row links straight to its Taiga item i
     await expect(link).toHaveAttribute('target', '_blank');
   }
 });
+
+test('the status sits on the title line', async ({ page }) => {
+  await open(page, '/#/assign');
+  const row = page.locator('.as-row').first();
+  await expect(row.locator('.as-head .as-title')).toHaveCount(1);
+  await expect(row.locator('.as-head .badge')).toHaveCount(1);
+  await expect(row.locator('.as-sub .badge')).toHaveCount(0);
+});
