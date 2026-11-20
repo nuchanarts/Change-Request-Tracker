@@ -78,7 +78,7 @@
           <rect width="32" height="32" rx="9" fill="currentColor" />
           <path d="M8 10l5 6-5 6M14.5 10l5 6-5 6M21 10l5 6-5 6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
-        Change Request Tracker Systems <span class="ver">v1.20.1</span>
+        Change Request Tracker Systems <span class="ver">v1.20.2</span>
       </a>
       <a class="go" href="./">เปิดแอป</a>
     </header>
@@ -110,7 +110,7 @@
 
   <h3>2. Workflow</h3>
   <ol class="sop-flow">
-    <li>จัดทำไฟล์แก้ไข → จัดทำ Taiga → รอ PM ตรวจสอบ Taiga (ไม่ผ่าน → PM ส่งกลับแก้ไขไฟล์ Taiga) → รอแจ้งทีมพัฒนา</li>
+    <li>จัดทำไฟล์แก้ไข → จัดทำ Taiga → รอ PM ตรวจสอบ Taiga (ไม่ผ่าน → PM ส่งกลับแก้ไข Taiga) → รอแจ้งทีมพัฒนา</li>
     <li>(ถ้าต้องใช้) dev ขอ Sourecode อจ. → รอทีมพัฒนา → กำลังพัฒนา → กำลังทดสอบ</li>
     <li>ทดสอบไม่ผ่าน → ส่งกลับนักพัฒนาแก้ไข → กำลังทดสอบ (วนจนผ่าน)</li>
     <li>ทดสอบผ่าน → รอ compile หรือ รอ Complie ต้องแจ้งอจ. → แก้ไขเรียบร้อย</li>
@@ -127,7 +127,7 @@
         <tr><td>1</td><td><code>0.จัดทำไฟล์แก้ไข</code></td><td>PM</td><td>รายละเอียดครบ อ่านเข้าใจ มีภาพหน้าจอหรือตัวอย่าง</td><td>2</td></tr>
         <tr><td>2</td><td><code>0.จัดทำ Taiga</code></td><td>PM</td><td>สร้าง Taiga แล้ว ใส่เลข/ลิงก์ในช่อง <strong>ข้อมูลลิงค์ Taiga หรือ MANTIS</strong></td><td>3</td></tr>
         <tr><td>3</td><td><code>รอ PM ตรวจสอบ Taiga</code></td><td>PM</td><td>Taiga ถูกต้อง ใส่ <strong>ความเร่งด่วน</strong> และ <strong>วันที่ต้องได้</strong> แล้ว · ไม่ถูกต้อง → 4</td><td>4, 5</td></tr>
-        <tr><td>4</td><td><code>0.PM ส่งกลับแก้ไขไฟล์ Taiga</code></td><td>PM</td><td>เขียนจุดที่ต้องแก้ไว้ใน Taiga · ผู้จัดทำแก้ไฟล์/Taiga เสร็จ ส่งให้ PM ตรวจใหม่</td><td>3</td></tr>
+        <tr><td>4</td><td><code>0.PM ส่งกลับแก้ไข Taiga</code></td><td>PM</td><td>เขียนจุดที่ต้องแก้ไว้ใน Taiga · ผู้จัดทำแก้ไฟล์/Taiga เสร็จ ส่งให้ PM ตรวจใหม่</td><td>3</td></tr>
         <tr><td>5</td><td><code>0.รอแจ้งทีมพัฒนา</code></td><td>PM</td><td>แจ้ง Senior Dev แล้ว</td><td>6 หรือ 7</td></tr>
         <tr><td>6</td><td><code>dev ขอ Sourecode อจ.</code></td><td>Dev / Senior Dev</td><td>ได้ source code จาก อจ. แล้ว</td><td>7</td></tr>
         <tr><td>7</td><td><code>รอทีมพัฒนา</code></td><td>Senior Dev</td><td>ใส่ <strong>นักพัฒนา</strong> และ <strong>ลำดับการแก้ไข Dev</strong> แล้ว</td><td>8</td></tr>
