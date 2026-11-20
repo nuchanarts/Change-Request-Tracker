@@ -25,8 +25,14 @@ test.describe('US1 Monitor', () => {
     const boxes = await page.locator('.stage').evaluateAll((els) =>
       els.map((el) => {
         const c = el.querySelector('.count').getBoundingClientRect();
+        const box = el.getBoundingClientRect();
         const nm = el.querySelector('.name');
-        return { top: Math.round(c.top), over: nm.scrollWidth - nm.clientWidth, text: nm.textContent };
+        // offset inside its own box, so a two-row layout still counts as lined up
+        return {
+          top: Math.round(c.top - box.top),
+          over: nm.scrollWidth - nm.clientWidth,
+          text: nm.textContent,
+        };
       }),
     );
     if (info.project.name !== 'mobile-375') expect(new Set(boxes.map((b) => b.top)).size).toBe(1);
@@ -35,6 +41,21 @@ test.describe('US1 Monitor', () => {
       expect(b.text).not.toMatch(/^0./);
     }
     await expect(page.locator('.pipeline')).not.toContainText('"0.');
+    // "ให้คำขึ้นสองบรรทัด สวยๆ" (user, 2026-11-20): on desktop every step name is two whole lines, none cut off
+    if (info.project.name !== 'mobile-375') {
+      const lines = await page.locator('.stage .name').evaluateAll((els) =>
+        els.map((el) =>
+          [...el.querySelectorAll('.line')].map((l) => ({
+            t: l.textContent,
+            cut: l.scrollWidth > l.clientWidth + 1,
+          })),
+        ),
+      );
+      for (const l of lines) {
+        expect(l.length, JSON.stringify(l)).toBe(2);
+        for (const x of l) expect(x.cut, x.t).toBe(false);
+      }
+    }
     await expect(page.locator('.hero')).not.toContainText('"0.');
   });
 

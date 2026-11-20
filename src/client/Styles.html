@@ -233,18 +233,16 @@
   .stage .fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent-soft); z-index: 0; }
   .stage > * { position: relative; z-index: 1; }
   .stage .count { font-size: 26px; font-weight: 600; line-height: 1; }
-  .stage .name {
-    font-size: 12.5px; line-height: 1.35; color: var(--muted); overflow-wrap: break-word; word-break: normal; line-break: strict;
-    height: calc(3em * 1.35); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
-  }
+  .stage .name { font-size: 12.5px; line-height: 1.35; color: var(--muted); display: flex; flex-direction: column; min-width: 0; }
+  .stage .name .line { display: block; min-height: 1.35em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .stage.bottleneck .fill { background: var(--accent); }
   .stage.bottleneck .count, .stage.bottleneck .name { color: var(--accent-ink); }
   .stage:hover .name { color: var(--ink); text-decoration: underline; }
   .stage.bottleneck:hover .name { color: var(--accent-ink); }
   .stage.zero .count { color: var(--muted); font-weight: 400; }
   .pipeline-extra { margin-top: var(--s-3); font-size: 13px; color: var(--muted); }
-  /* mid widths: 12 steps in one row get too narrow to read, so show two rows of six */
-  @media (min-width: 761px) and (max-width: 1100px) {
+  /* below ~1600px, 12 steps in one row cannot fit their two-line names, so show two rows of six */
+  @media (min-width: 761px) and (max-width: 1599px) {
     .stages { flex-wrap: wrap; row-gap: 6px; }
     .stage { flex: 1 1 calc(100% / 6 - 3px); }
   }
@@ -253,7 +251,8 @@
     .stage, .stage:first-child { clip-path: none; border-radius: 0; flex-direction: row; align-items: center; justify-content: space-between; padding: var(--s-2) var(--s-3); }
     .stage .fill { top: 0; bottom: 0; right: auto; height: auto !important; }
     .stage .count { font-size: 18px; order: 2; }
-    .stage .name { height: auto; -webkit-line-clamp: 1; line-clamp: 1; }
+    .stage .name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stage .name .line { display: inline; }
     .stage.bottleneck { background: var(--accent); }
     .intro .stage .fill { animation-name: growx; transform-origin: left; }
   }

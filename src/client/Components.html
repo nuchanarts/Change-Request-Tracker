@@ -17,10 +17,37 @@
       var s = String(status || '').trim();
       if (s === D.DONE) return 's-done';
       if (!D.isOpen(s)) return 's-closed';
-      if (s === 'ส่งกลับนักพัฒนาแก้ไข' || s === '0.PM ส่งกลับแก้ไขไฟล์ Taiga') return 's-back';
+      if (s === 'ส่งกลับนักพัฒนาแก้ไข' || s === '0.PM ส่งกลับแก้ไข Taiga') return 's-back';
       if (s === 'กำลังทดสอบ' || s === 'รอ PM ตรวจสอบ Taiga') return 's-test';
       if (s === 'กำลังพัฒนา' || s === '0.จัดทำไฟล์แก้ไข' || s === 'รอ compile' || s === 'รอ Complie ต้องแจ้งอจ.') return 's-dev';
       return 's-wait';
+    }
+
+    // Where each step name breaks into two lines on the Monitor pipeline (user request 2026-11-20).
+    // Display only: keys are screen labels (statusLabel), sheet values are never changed.
+    var STATUS_LINES = {
+      'จัดทำไฟล์แก้ไข': ['จัดทำ', 'ไฟล์แก้ไข'],
+      'จัดทำ Taiga': ['จัดทำ', 'Taiga'],
+      'รอ PM ตรวจสอบ Taiga': ['รอ PM', 'ตรวจสอบ Taiga'],
+      'PM ส่งกลับแก้ไข Taiga': ['PM ส่งกลับ', 'แก้ไข Taiga'],
+      'รอแจ้งทีมพัฒนา': ['รอแจ้ง', 'ทีมพัฒนา'],
+      'dev ขอ Sourecode อจ.': ['dev ขอ', 'Sourecode อจ.'],
+      'รอทีมพัฒนา': ['รอ', 'ทีมพัฒนา'],
+      'กำลังพัฒนา': ['กำลัง', 'พัฒนา'],
+      'ส่งกลับนักพัฒนาแก้ไข': ['ส่งกลับ', 'นักพัฒนาแก้ไข'],
+      'กำลังทดสอบ': ['กำลัง', 'ทดสอบ'],
+      'รอ compile': ['รอ', 'compile'],
+      'รอ Complie ต้องแจ้งอจ.': ['รอ Complie', 'ต้องแจ้ง อจ.'],
+    };
+
+    /** Step name as two lines; an unknown status breaks at the space nearest the middle. */
+    function statusLines(status) {
+      var label = D.statusLabel(status);
+      if (STATUS_LINES[label]) return STATUS_LINES[label];
+      var mid = label.length / 2;
+      var best = -1;
+      label.replace(/ /g, function (_, i) { if (best === -1 || Math.abs(i - mid) < Math.abs(best - mid)) best = i; return _; });
+      return best === -1 ? [label, ''] : [label.slice(0, best), label.slice(best + 1)];
     }
 
     function statusBadge(status) {
@@ -300,7 +327,7 @@
     }
 
     return {
-      esc: esc, statusBadge: statusBadge, statusClass: statusClass, urgency: urgency, due: due, ticket: ticket,
+      esc: esc, statusLines: statusLines, statusBadge: statusBadge, statusClass: statusClass, urgency: urgency, due: due, ticket: ticket,
       helpTip: helpTip, withIcon: withIcon, backButton: backButton, calendar: calendar, ticketLink: ticketLink, taigaButton: taigaButton, TAIGA_URL: TAIGA_URL, illustration: illustration, icon: icon, emptyState: emptyState, loading: loading, errorState: errorState,
       select: select, multiPick: multiPick, statusGroups: statusGroups, input: input, textarea: textarea, combobox: combobox, dateField: dateField,
       toast: toast, confirm: confirm,

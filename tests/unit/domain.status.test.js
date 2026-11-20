@@ -29,7 +29,7 @@ describe('status semantics (constitution IV)', () => {
       '0.จัดทำไฟล์แก้ไข',
       '0.จัดทำ Taiga',
       'รอ PM ตรวจสอบ Taiga',
-      '0.PM ส่งกลับแก้ไขไฟล์ Taiga',
+      '0.PM ส่งกลับแก้ไข Taiga',
       '0.รอแจ้งทีมพัฒนา',
       'dev ขอ Sourecode อจ.',
       'รอทีมพัฒนา',
@@ -44,9 +44,9 @@ describe('status semantics (constitution IV)', () => {
     ]);
   });
 
-  it('0.PM ส่งกลับแก้ไขไฟล์ Taiga (new in the sheet, 2026-11-20) is open, never closed by its "0." prefix', () => {
-    expect(D.isOpen('0.PM ส่งกลับแก้ไขไฟล์ Taiga')).toBe(true);
-    expect(D.stageOf('0.PM ส่งกลับแก้ไขไฟล์ Taiga')).toBe('prep');
+  it('0.PM ส่งกลับแก้ไข Taiga (new in the sheet, 2026-11-20) is open, never closed by its "0." prefix', () => {
+    expect(D.isOpen('0.PM ส่งกลับแก้ไข Taiga')).toBe(true);
+    expect(D.stageOf('0.PM ส่งกลับแก้ไข Taiga')).toBe('prep');
   });
 
   it('new statuses are open; new items still start at 0.รอแจ้งทีมพัฒนา', () => {
