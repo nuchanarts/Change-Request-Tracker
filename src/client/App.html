@@ -724,7 +724,7 @@
     function doneReportState() {
       if (!state.dr) {
         var saved = store(DR_KEY) || {};
-        state.dr = { status: typeof saved.status === 'string' ? saved.status : D.DONE, mode: saved.mode || 'month', y: state.today.y, m: state.today.m, from: '', to: '' };
+        state.dr = { status: typeof saved.status === 'string' ? saved.status : D.DONE, mode: saved.mode || 'month', y: state.today.y, m: state.today.m, from: '', to: '', platform: saved.platform || '', pm: saved.pm || '' };
       }
       return state;
     }
@@ -732,20 +732,21 @@
       var dr = state.dr;
       var el = form.elements;
       dr.status = el['dr-status'].value;
+      dr.platform = el['dr-platform'].value;
+      dr.pm = el['dr-pm'].value;
       dr.mode = el['dr-mode'].value;
       if (el['dr-year']) dr.y = Number(el['dr-year'].value) || dr.y;
       if (el['dr-month']) dr.m = Number(el['dr-month'].value) || dr.m;
       if (el['dr-from']) dr.from = el['dr-from'].value;
       if (el['dr-to']) dr.to = el['dr-to'].value;
-      store(DR_KEY, { status: dr.status, mode: dr.mode });
+      store(DR_KEY, { status: dr.status, mode: dr.mode, platform: dr.platform, pm: dr.pm });
       var focusId = document.activeElement && document.activeElement.id;
       render();
       var again = focusId && document.getElementById(focusId);
       if (again) again.focus();
     }
     function exportDoneReport() {
-      var q = Views.drQuery(state.dr);
-      var rep = D.doneReport(state.rows, q);
+      var rep = Views.drReport(state);
       var blob = new Blob(['﻿' + D.doneReportCsv(rep.rows)], { type: 'text/csv;charset=utf-8' });
       var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);

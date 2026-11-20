@@ -28,11 +28,11 @@
     }
 
     /** PM filter: the two PM teams first (user request 2026-11-16), then each PM. */
-    function pmFilterSelect(pms, value) {
+    function pmFilterSelect(pms, value, name) {
       var teams = D.pmTeams(pms).map(function (t) { return { value: t.label, label: t.label }; });
       var people = pms.map(function (p) { return { value: p, label: p }; });
       return UI.select({
-        name: 'pm', label: 'PM', icon: 'pm', value: value, emptyLabel: 'ทั้งหมด',
+        name: name || 'pm', label: 'PM', icon: 'pm', value: value, emptyLabel: 'ทั้งหมด',
         options: teams.map(function (t) { return t.value; }).concat(pms),
         groups: (teams.length ? [{ label: 'ทีม PM', options: teams }] : []).concat([{ label: 'รายคน', options: people }]),
       });
@@ -806,9 +806,19 @@
       return 'ทุกช่วงเวลา';
     }
 
+    /** แพลตฟอร์ม / PM (incl. PM teams) narrow the rows first, then status + วันที่เสร็จ (user request 2026-11-20). */
+    function drReport(state) {
+      var dr = state.dr;
+      var rows = D.applyFilters(state.rows, {
+        platform: dr.platform ? [dr.platform] : [],
+        pm: D.pmFilter(dr.pm, (state.options && state.options.pm) || []),
+      });
+      return D.doneReport(rows, drQuery(dr));
+    }
+
     function doneReport(state) {
       var dr = state.dr;
-      var rep = D.doneReport(state.rows, drQuery(dr));
+      var rep = drReport(state);
       var statusOpts = { name: 'dr-status', label: 'สถานะ', icon: 'report', value: dr.status, emptyLabel: 'ทุกสถานะ',
         options: ['closed'].concat(D.WORKFLOW),
         groups: [{ label: 'ปิดงาน', options: [{ value: 'closed', label: 'ปิดแล้วทั้งหมด (3 สถานะ)' }] }].concat(UI.statusGroups()) };
@@ -829,7 +839,9 @@
       var html = '<div class="page-head"><h1>รายงานงานที่ปิด</h1><span class="muted">' + esc(drPeriodLabel(dr, rep.range)) + '</span>' +
         '<span class="spacer"></span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button>' +
         '<button class="btn small primary" data-action="dr-export"' + (rep.total ? '' : ' disabled') + '>' + UI.withIcon('download', 'Export CSV (Excel)') + '</button></div>';
-      html += '<form class="filters dr-filters" id="dr-form" aria-label="ตัวเลือกรายงาน">' + UI.select(statusOpts) + modeSel + period + '</form>';
+      var platformSel = UI.select({ name: 'dr-platform', label: 'แพลตฟอร์ม', icon: 'platform', options: state.options.platform, value: dr.platform, emptyLabel: 'ทั้งหมด' });
+      var pmSel = pmFilterSelect(state.options.pm || [], dr.pm, 'dr-pm');
+      html += '<form class="filters dr-filters" id="dr-form" aria-label="ตัวเลือกรายงาน">' + UI.select(statusOpts) + platformSel + pmSel + modeSel + period + '</form>';
       html += '<div class="dr-summary" role="status"><span>พบ <strong id="dr-count" class="num">' + rep.total + '</strong> รายการ</span>' +
         rep.byStatus.map(function (s) { return '<span class="dr-chip">' + UI.statusBadge(s.status) + ' <span class="num">' + s.count + '</span></span>'; }).join('') + '</div>';
       if (rep.noDoneDate) {
@@ -838,11 +850,13 @@
       }
       if (!rep.total) return html + UI.emptyState('ไม่มีรายการในช่วงนี้', 'ลองเปลี่ยนสถานะ หรือช่วงวันที่เสร็จ', '');
       html += '<div class="table-wrap"><table class="responsive" id="dr-table"><thead><tr>' +
-        '<th>ลำดับ</th><th data-hide-mobile>แพลตฟอร์ม</th><th data-hide-mobile>ระบบงาน</th><th>รายละเอียด</th><th>Taiga/MANTIS</th><th>สถานะ</th><th>นักพัฒนา</th><th data-hide-mobile>PM</th><th>วันที่เสร็จ</th><th data-hide-mobile>วันที่ Deploy</th>' +
+        '<th>ลำดับ</th><th data-hide-mobile>แพลตฟอร์ม</th><th data-hide-mobile>ระบบงาน</th><th>รายละเอียด</th><th>Taiga/MANTIS</th><th>สถานะ</th><th>นักพัฒนา</th><th>ผู้ทดสอบ</th><th data-hide-mobile>PM</th><th>วันที่เสร็จ</th><th data-hide-mobile>วันที่ Deploy</th>' +
         '</tr></thead><tbody>' + rep.rows.map(function (r) {
           return '<tr class="clickable" data-action="open-item" data-id="' + esc(r.id) + '">' +
-            ['seq', 'platform', 'system', 'detail', 'ticket', 'status', 'developer', 'pm'].map(function (k) {
-              return k === 'seq' ? '<td class="num" data-hide-mobile>' + esc(r.seq === null ? '–' : r.seq) + '</td>' : ITEM_COLS[k].cell(r, state);
+            ['seq', 'platform', 'system', 'detail', 'ticket', 'status', 'developer', 'tester', 'pm'].map(function (k) {
+              if (k === 'seq') return '<td class="num" data-hide-mobile>' + esc(r.seq === null ? '–' : r.seq) + '</td>';
+              if (k === 'tester') return '<td>' + (r.tester ? esc(r.tester) : '<span class="muted">–</span>') + '</td>';
+              return ITEM_COLS[k].cell(r, state);
             }).join('') +
             '<td class="num">' + (r.doneDate.date ? esc(D.formatThai(r.doneDate.date)) : '<span class="muted">–</span>') + '</td>' +
             '<td class="num" data-hide-mobile>' + (r.deployDate.date ? esc(D.formatThai(r.deployDate.date)) : '<span class="muted">–</span>') + '</td></tr>';
@@ -1050,6 +1064,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>
