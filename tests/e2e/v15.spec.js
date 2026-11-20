@@ -56,7 +56,7 @@ test.describe('Navigation order, Taiga link, access admin (2026-11-11)', () => {
 
 test.describe('My Work by week', () => {
   test('shows urgent / this week / next week / done tiles and sections', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('ehp.myname.v1', JSON.stringify('นักพัฒนา แดง')));
+    await page.addInitScript(() => (window.__mockUserName = 'นักพัฒนา แดง'));
     await open(page, '/#/my-work');
     await expect(page.locator('.mw-tile')).toHaveCount(4);
     await expect(page.locator('#mw-urgent h2')).toContainText('ต้องตามด่วน');
@@ -124,13 +124,13 @@ test('filters use the full width (six equal columns on desktop)', async ({ page 
 test('admins can repair dropdown chips', async ({ page }) => {
   await open(page, '/#/access');
   await page.getByRole('button', { name: 'ซ่อมสี dropdown' }).click();
-  await expect(page.locator('.toast')).toContainText('ซ่อมแล้ว 3 ช่อง');
+  await expect(page.locator('.toast')).toContainText('ซ่อมแล้ว 3 ช่อง และใส่สี/dropdown ให้ 2 แถว');
 });
 
 test('My Work (developer): urgent and this week side by side, done this week, no "no due" section', async ({
   page,
 }) => {
-  await page.addInitScript(() => localStorage.setItem('ehp.myname.v1', JSON.stringify('นักพัฒนา แดง')));
+  await page.addInitScript(() => (window.__mockUserName = 'นักพัฒนา แดง'));
   await open(page, '/#/my-work');
   await expect(page.locator('.mw-two > #mw-urgent')).toHaveCount(1);
   await expect(page.locator('.mw-two > #mw-this')).toHaveCount(1);
@@ -142,7 +142,7 @@ test('My Work (PM): "no due date" section belongs to the PM tab, no "done" encou
   page,
 }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('ehp.myname.v1', JSON.stringify('พีเอ็ม สมใจ'));
+    window.__mockUserName = 'พีเอ็ม สมใจ';
   });
   await open(page, '/#/my-work/pm');
   await expect(page.locator('#mw-nodue')).toHaveCount(1);
@@ -153,7 +153,7 @@ test('My Work (PM): "no due date" section belongs to the PM tab, no "done" encou
 test('งานของฉัน: developer menu with a week planner that moves by week; งาน PM is its own menu', async ({
   page,
 }) => {
-  await page.addInitScript(() => localStorage.setItem('ehp.myname.v1', JSON.stringify('นักพัฒนา แดง')));
+  await page.addInitScript(() => (window.__mockUserName = 'นักพัฒนา แดง'));
   await open(page, '/#/my-work');
   await expect(page.locator('h1')).toHaveText('งานนักพัฒนา');
   await expect(page.locator('#mw-urgent')).toHaveCount(1);
@@ -174,7 +174,7 @@ test('งานของฉัน: developer menu with a week planner that moves
 });
 
 test('My Work: pick any status from the card, not only the next step (2026-11-11)', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('ehp.myname.v1', JSON.stringify('นักพัฒนา แดง')));
+  await page.addInitScript(() => (window.__mockUserName = 'นักพัฒนา แดง'));
   await open(page, '/#/my-work');
   const form = page.locator('.qs-form').first();
   const id = await form.getAttribute('data-id');

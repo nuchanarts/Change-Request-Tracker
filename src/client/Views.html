@@ -168,7 +168,7 @@
 
     function myWorkChip(state) {
       var name = state.myName();
-      if (!name) return '<a class="hero-chip" href="#/my-work">เลือกชื่อของคุณ เพื่อดูงานของตัวเอง</a>';
+      if (!name) return '<a class="hero-chip" href="#/my-work">ดูงานของนักพัฒนาแต่ละคน</a>';
       var dev = D.groupMyWork(state.rows, name, 'developer', state.today);
       var pm = D.groupMyWork(state.rows, name, 'pm', state.today);
       var g = dev.total || !pm.total ? dev : pm;
@@ -192,7 +192,7 @@
         '<button class="btn small export-btn" data-action="export-open">' + UI.withIcon('report', 'สรุปรายงาน (Export)') + '</button>' +
         '<button class="btn small" data-action="reload">' + UI.withIcon('reload', 'โหลดข้อมูลใหม่') + '</button>' +
         '<span class="hero-meta">' + esc(filterSummary(state)) + ', ข้อมูล ณ ' + esc(state.loadedAt) + '</span></div></div>' +
-        '<div class="hero-art">' + UI.illustration() + '</div>' +
+        '<div class="hero-art">' + UI.mascots() + '</div>' +
         (count ? '<div class="hero-stats">' +
           stat(state, 'lead', 'open', m.openCount, 'งานค้าง', m.openIds, 'งานที่สถานะยังไม่ใช่ แก้ไขเรียบร้อย / ใช้งานได้อยู่แล้ว / ยกเลิก (รวมสถานะว่าง)', 'open') +
           stat(state, 'danger', 'overdue', m.overdueCount, 'เกินกำหนด', m.overdueIds, 'งานค้างที่วันกำหนดผ่านไปแล้ว โดยใช้วันที่เลื่อนก่อน ถ้าไม่มีจึงใช้วันที่ต้องได้', 'overdue') +
@@ -570,7 +570,7 @@
         (isPm ? 'งานที่คุณเป็น PM รับผิดชอบ' : everyone ? 'งานของนักพัฒนาทุกคน' : 'งานที่คุณเป็นนักพัฒนา') + '</span></div>';
       if (!name || state.choosingName) {
         // one click: tap your own name (user request 2026-11-11)
-        return html + '<section class="panel mw-who"><h2>' + (isPm ? 'ดูงานของ PM คนไหน?' : 'ดูงานของนักพัฒนาคนไหน?') + '</h2><p class="muted">กดชื่อที่ต้องการดูงาน ระบบจะจำไว้ (ตั้งชื่อของคุณเองได้ที่เมนูบัญชีมุมขวาบน)</p>' +
+        return html + '<section class="panel mw-who"><h2>' + (isPm ? 'ดูงานของ PM คนไหน?' : 'ดูงานของนักพัฒนาคนไหน?') + '</h2><p class="muted">กดชื่อที่ต้องการดูงาน ระบบจะจำไว้ (ชื่อของคุณเองผู้ดูแลกำหนดในหน้า จัดการสิทธิ์)</p>' +
           (teams.length ? '<h3 class="mw-names-h">ดูทั้งทีม</h3><div class="mw-names">' + teams.map(nameButton).join('') + '</div><h3 class="mw-names-h">รายคน</h3>' : '') +
           '<div class="mw-names">' + people.map(nameButton).join('') + '</div></section>';
       }
@@ -699,7 +699,7 @@
           }).join('') + '</section>';
       }
       html += '<section class="panel repair-panel" aria-labelledby="ar-h"><div class="panel-head"><h2 id="ar-h">ซ่อมสีของ dropdown ในชีต</h2></div>' +
-        '<p class="muted">แอปเวอร์ชันก่อน v1.6.0 ใส่เครื่องหมาย &#39; หน้าค่าที่บันทึก ทำให้ chip สีในชีตไม่ขึ้น กดปุ่มนี้เพื่อเขียนค่าเดิมกลับแบบไม่มี &#39; (เฉพาะช่องที่แอปเคยบันทึกและยังไม่มีใครแก้ต่อ)</p>' +
+        '<p class="muted">แอปเวอร์ชันก่อน v1.6.0 ใส่เครื่องหมาย &#39; หน้าค่าที่บันทึก ทำให้ chip สีในชีตไม่ขึ้น กดปุ่มนี้เพื่อเขียนค่าเดิมกลับแบบไม่มี &#39; (เฉพาะช่องที่แอปเคยบันทึกและยังไม่มีใครแก้ต่อ) และใส่สี/dropdown ให้แถวที่เพิ่มจากแอปแล้วสีหลุด (คัดลอกจากแถวด้านบน ไม่แตะค่าในช่อง)</p>' +
         '<button class="btn primary" data-action="repair-chips">' + UI.withIcon('reload', 'ซ่อมสี dropdown') + '</button></section>';
       html += '<section class="panel" aria-labelledby="aa-h"><div class="panel-head"><h2 id="aa-h">เพิ่มคนเข้าทีม</h2></div>' +
         '<form id="access-add" class="access-add">' +

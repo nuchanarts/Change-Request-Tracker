@@ -12,7 +12,7 @@ const assignedOpen = (page) =>
   });
 
 test('งานของฉัน offers ทุกคน and shows every developer with names on cards', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('ehp.myname.v1', JSON.stringify('นักพัฒนา แดง')));
+  await page.addInitScript(() => (window.__mockUserName = 'นักพัฒนา แดง'));
   await open(page, '/#/my-work');
   const who = page.locator('#mw-who');
   await expect(who.locator('optgroup[label="ทั้งทีม"] option')).toHaveText(['ทุกคน']);
@@ -22,7 +22,9 @@ test('งานของฉัน offers ทุกคน and shows every develop
   expect(await assignedOpen(page)).toBeGreaterThan(0);
   await expect(page.locator('#mw-urgent .work .dev-name').first()).toBeVisible();
   // "me" is unchanged
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('ehp.myname.v1')))).toBe('นักพัฒนา แดง');
+  await page.locator('#user-menu summary').click();
+  await expect(page.locator('#my-name-text')).toHaveText('นักพัฒนา แดง');
+  await page.locator('#user-menu summary').click();
   // back to one person
   await who.selectOption('นักพัฒนา แดง');
   await expect(page.locator('.page-head .muted')).toHaveText('งานที่คุณเป็นนักพัฒนา');

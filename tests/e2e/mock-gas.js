@@ -120,6 +120,7 @@
           code: 'NO_ACCESS',
           message: 'บัญชีนี้ไม่มีสิทธิ์เปิดชีตข้อมูล กรุณาขอสิทธิ์จาก PM เจ้าของชีต แล้วเปิดแอปใหม่',
         };
+      if (window.__mockUserName) user.name = window.__mockUserName; // name set by the admin (2026-11-20)
       return ok({
         loadedAt: now(),
         today: fx.today,
@@ -348,7 +349,7 @@
     Api_repairChips: function () {
       if (!user.isAdmin)
         return { ok: false, code: 'NOT_ADMIN', message: 'เฉพาะผู้ดูแลเท่านั้นที่จัดการสิทธิ์ได้' };
-      return ok({ repaired: 3, skipped: 1 });
+      return ok({ repaired: 3, skipped: 1, rows: 2 });
     },
     Api_setMyName: function (name) {
       (window.__setMyNameCalls = window.__setMyNameCalls || []).push(name);

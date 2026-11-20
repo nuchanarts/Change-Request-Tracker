@@ -322,9 +322,73 @@ function makeRepo(deps) {
         log.push([now, email, 'CREATE', rowNumber, seq, c.header, '', clean(input[c.key])]);
       });
       sh.appendRow(line);
+      inheritRowLook(sh, rowNumber, map.width);
       writeLog(log);
       if (deps.cache) deps.cache.remove(C.CACHE_KEYS.options);
       return C.ok({ rowNumber: rowNumber, seq: seq });
+    });
+  }
+
+  /**
+   * appendRow writes values only, so a new row had no dropdown chips or colours (user report 2026-11-20).
+   * Copy both from the row above. Best effort: the values are already saved, so a failure is only logged.
+   * @param {any} sh @param {number} rowNumber the row just appended @param {number} width
+   */
+  function inheritRowLook(sh, rowNumber, width) {
+    if (rowNumber - 1 < 2 || width < 1) return; // nothing but the header above
+    try {
+      var above = sh.getRange(rowNumber - 1, 1, 1, width);
+      var row = sh.getRange(rowNumber, 1, 1, width);
+      above.copyTo(row, { formatOnly: true });
+      row.setDataValidations(above.getDataValidations());
+    } catch (err) {
+      console.warn('could not copy the look of row ' + (rowNumber - 1), err);
+    }
+  }
+
+  /**
+   * Admin repair for rows the app added before 2026-11-20 without the look of the rows above: every item
+   * row whose สถานะ cell has no dropdown gets the formats and dropdowns of the nearest row above that has one.
+   * Values are never touched. @param {string} adminEmail @param {string} ownerEmail
+   */
+  function repairRowLook(adminEmail, ownerEmail) {
+    if (!isAdmin(adminEmail, ownerEmail)) return C.fail('NOT_ADMIN');
+    return withLock(function () {
+      var sh = mainSheet();
+      var display = sh.getDataRange().getDisplayValues();
+      var map = mapHeaders(display[0] || []);
+      if (map.index.status === undefined || display.length < 3) return C.ok({ rows: 0 });
+      var rules = sh.getRange(2, map.index.status + 1, display.length - 1, 1).getDataValidations();
+      var good = -1; // sheet row of the nearest row above with a status dropdown
+      var fixed = 0;
+      for (var i = 0; i < rules.length; i++) {
+        var rowNumber = i + 2;
+        if (rules[i][0]) {
+          good = rowNumber;
+          continue;
+        }
+        var isItem = map.index.detail === undefined || clean(display[i + 1][map.index.detail]) !== '';
+        if (!isItem || good === -1) continue;
+        var src = sh.getRange(good, 1, 1, map.width);
+        var dest = sh.getRange(rowNumber, 1, 1, map.width);
+        src.copyTo(dest, { formatOnly: true });
+        dest.setDataValidations(src.getDataValidations());
+        fixed++;
+      }
+      if (fixed)
+        writeLog([
+          [
+            deps.nowText(),
+            clean(adminEmail).toLowerCase(),
+            'REPAIR_LOOK',
+            '',
+            '',
+            '(รูปแบบแถว)',
+            '',
+            fixed + ' แถว',
+          ],
+        ]);
+      return C.ok({ rows: fixed });
     });
   }
 
@@ -557,6 +621,7 @@ function makeRepo(deps) {
       });
       var rowNumber = sh.getLastRow() + 1;
       sh.appendRow(line);
+      inheritRowLook(sh, rowNumber, line.length);
       writeLog([
         [deps.nowText(), email, 'RESTORE', rowNumber, seq, '(ทั้งแถว)', '', 'กู้คืนจาก _app_log แถว ' + n],
       ]);
@@ -601,8 +666,15 @@ function makeRepo(deps) {
 
   // ------------------------------------------------------------------ users & permissions
 
-  /** @param {string} email */
+  /**
+   * The person's display name. The admin's team list (_app_allowed, edited in จัดการสิทธิ์) wins: people can
+   * no longer name themselves (user decision 2026-11-20). A name in _app_users from before is only a fallback
+   * until the admin fills one in.
+   * @param {string} email
+   */
   function getUserName(email) {
+    var m = findMember(members(), clean(email).toLowerCase());
+    if (m && m.name) return m.name;
     var sh = ss.getSheetByName(C.SHEETS.users);
     if (!sh) return null;
     var data = sh.getDataRange().getDisplayValues();
@@ -1057,6 +1129,19 @@ function makeRepo(deps) {
         ]);
       }
       var out = { email: e, name: next.name, note: next.note, role: next.role, status: next.status };
+      if (deps.cache && next.name) {
+        var nowMs = deps.nowMs ? deps.nowMs() : Date.now();
+        deps.cache.put(
+          C.PRESENCE.NAME_KEY_PREFIX + e,
+          JSON.stringify({ name: next.name, at: nowMs }),
+          C.PRESENCE.CACHE_SECONDS,
+        );
+        var online = readPresence();
+        if (online[e]) {
+          online[e].name = next.name;
+          deps.cache.put(C.PRESENCE.CACHE_KEY, JSON.stringify(online), C.PRESENCE.CACHE_SECONDS);
+        }
+      }
       if (shared) /** @type {any} */ (out).shared = shared;
       return C.ok(out);
     });
@@ -1158,6 +1243,7 @@ function makeRepo(deps) {
     enqueueNotify: enqueueNotify,
     getUserName: getUserName,
     bootstrapAccess: bootstrapAccess,
+    repairRowLook: repairRowLook,
     setUserName: setUserName,
     canEdit: canEdit,
     editAccess: editAccess,

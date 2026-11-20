@@ -149,7 +149,7 @@ test.describe('US4 My Work', () => {
   test('quick filters: switch person, platform and stage chips, search; remembered; clear', async ({
     page,
   }) => {
-    await page.addInitScript(() => localStorage.setItem('ehp.myname.v1', JSON.stringify('นักพัฒนา แดง')));
+    await page.addInitScript(() => (window.__mockUserName = 'นักพัฒนา แดง'));
     await open(page, '/#/my-work');
     const count = async () => page.locator('.work').count();
     const all = await count();

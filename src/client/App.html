@@ -76,7 +76,7 @@
 
     /**
      * Whose work นักพัฒนา (my-work) / งาน PM shows. A view only: it never changes who "me" is
-     * ("ฉันไม่ใช่กิ่ง", user 2026-11-18). Who I am is set in the account menu (setIdentity).
+     * ("ฉันไม่ใช่กิ่ง", user 2026-11-18). Who I am comes from the admin's team list.
      */
     function setMyName(name) {
       if (!name) return;
@@ -90,26 +90,9 @@
       render();
     }
 
-    /** Remember who "me" is (browser + server, best effort): the account menu's ชื่อของฉัน. */
-    function setIdentity(name) {
-      if (!name) return;
-      store(KEYS.name, name);
-      if (state.user) state.user.name = name;
-      render();
-      api('Api_setMyName', name).then(function (res) {
-        if (res.ok) return UI.toast('บันทึกชื่อของฉันแล้ว: ' + name);
-        if (res.code !== 'FORBIDDEN' && res.code !== 'NOT_ALLOWED') UI.toast(res.message, 'error');
-      });
-    }
-
-    function renderMyNamePick() {
-      var sel = document.getElementById('my-name');
-      var me = state.myName();
-      var people = ((state.options && state.options.person) || []).slice();
-      if (me && people.indexOf(me) === -1) people.unshift(me);
-      sel.innerHTML = '<option value="">— เลือกชื่อของคุณ —</option>' + people.map(function (n) {
-        return '<option value="' + UI.esc(n) + '"' + (n === me ? ' selected' : '') + '>' + UI.esc(n) + '</option>';
-      }).join('');
+    /** The account menu shows who I am; only an admin can change it (จัดการสิทธิ์, user decision 2026-11-20). */
+    function renderMyName() {
+      document.getElementById('my-name-text').textContent = state.myName() || 'ยังไม่ได้ตั้งชื่อ';
     }
 
     function setMwFilter(key, value) {
@@ -130,7 +113,8 @@
       return store(KEYS.devAll) === true ? D.ALL_DEVELOPERS : store(KEYS.devView) || state.myName();
     };
     state.myName = function () {
-      return (state.user && state.user.name) || store(KEYS.name) || '';
+      // the server's answer only: a name typed into this browser earlier no longer counts (2026-11-20)
+      return (state.user && state.user.name) || '';
     };
     state.domainFilters = function () {
       var f = state.filters;
@@ -246,6 +230,48 @@
       clearTimeout(hbDebounce);
       hbDebounce = setTimeout(heartbeat, 2000);
     }
+
+    // ------------------------------------------------------------------ colour themes (2026-11-20)
+    // A per-browser choice (like the remembered filters): stored in localStorage, applied before the first paint
+    // of each view. Unknown values fall back to the default green.
+
+    var SKIN_KEY = 'ehp.skin.v1';
+    var SKINS = [
+      { id: 'green', label: 'เขียว (ค่าเริ่มต้น)', color: '#0f766e' },
+      { id: 'sky', label: 'ฟ้า', color: '#1d64b0' },
+      { id: 'pink', label: 'ชมพู', color: '#b3195a' },
+      { id: 'purple', label: 'ม่วง', color: '#6d28d9' },
+      { id: 'orange', label: 'ส้ม', color: '#b93e0b' },
+    ];
+
+    function applySkin(id) {
+      var skin = SKINS.filter(function (s) { return s.id === id; })[0] || SKINS[0];
+      if (skin.id === 'green') document.documentElement.removeAttribute('data-skin');
+      else document.documentElement.setAttribute('data-skin', skin.id);
+      var host = document.getElementById('skin-pick');
+      if (host) {
+        host.innerHTML = SKINS.map(function (s) {
+          return '<button type="button" data-skin="' + s.id + '" data-action="pick-skin" style="--sw:' + s.color + '" aria-pressed="' + (s.id === skin.id) + '" aria-label="ธีม' + UI.esc(s.label) + '" title="' + UI.esc(s.label) + '"></button>';
+        }).join('');
+      }
+      return skin.id;
+    }
+    applySkin(store(SKIN_KEY));
+
+    // The account menu opens towards the side with room: when the header wraps, the avatar sits at the left
+    // edge and a right-aligned popover would open off screen (found 2026-11-20).
+    document.getElementById('user-menu').addEventListener('toggle', function (ev) {
+      var menu = ev.currentTarget;
+      if (!menu.open) return;
+      var pop = menu.querySelector('.user-pop');
+      pop.style.transform = '';
+      menu.classList.toggle('pop-left', menu.getBoundingClientRect().right < 290);
+      // still off screen (narrow phones): slide it back inside with an 8px margin
+      var r = pop.getBoundingClientRect();
+      var vw = document.documentElement.clientWidth;
+      var dx = r.right > vw - 8 ? vw - 8 - r.right : r.left < 8 ? 8 - r.left : 0;
+      if (dx) pop.style.transform = 'translateX(' + Math.round(dx) + 'px)';
+    });
 
     // ------------------------------------------------------------------ remembered copy (speed, 2026-11-20)
     // The last good load is kept in this browser. The next visit shows it at once, marked "กำลังอัปเดต",
@@ -367,7 +393,7 @@
       document.getElementById('user-email').textContent = b.user.email || '';
       document.getElementById('user-avatar').textContent = (b.user.email || '?').charAt(0).toUpperCase();
       document.getElementById('user-role').textContent = b.user.isAdmin ? 'ผู้ดูแล' : b.user.canEdit ? 'ผู้แก้ไข' : 'ดูอย่างเดียว';
-      renderMyNamePick();
+      renderMyName();
       state.access = null;
       setStale(stale);
       render();
@@ -995,7 +1021,7 @@
         el.textContent = 'กำลังซ่อม…';
         api('Api_repairChips').then(function (res) {
           if (!res.ok) UI.toast(res.message, 'error');
-          else UI.toast('ซ่อมแล้ว ' + res.data.repaired + ' ช่อง (ข้าม ' + res.data.skipped + ' ช่องที่มีคนแก้ต่อแล้ว)');
+          else UI.toast('ซ่อมแล้ว ' + res.data.repaired + ' ช่อง และใส่สี/dropdown ให้ ' + (res.data.rows || 0) + ' แถว (ข้าม ' + res.data.skipped + ' ช่องที่มีคนแก้ต่อแล้ว)');
           render();
         });
       },
@@ -1017,6 +1043,12 @@
         saveAccess(input);
       },
       'dr-export': exportDoneReport,
+      'pick-skin': function (el) {
+        var id = applySkin(el.getAttribute('data-skin'));
+        store(SKIN_KEY, id);
+        var again = document.querySelector('#skin-pick [data-skin="' + id + '"]');
+        if (again) again.focus();
+      },
       'export-open': openExport,
       'export-close': function () { document.getElementById('dialog').close(); },
       'export-copy': function () {
@@ -1076,7 +1108,6 @@
     document.addEventListener('change', function (ev) {
       var form = ev.target.form;
       if (ev.target.id === 'mw-who') return setMyName(ev.target.value);
-      if (ev.target.id === 'my-name') return setIdentity(ev.target.value);
       if (ev.target.classList && ev.target.classList.contains('access-name')) {
         return saveAccess({ email: ev.target.getAttribute('data-email'), name: ev.target.value });
       }

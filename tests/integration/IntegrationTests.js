@@ -68,6 +68,20 @@ function runIntegrationTests() {
     saved,
   );
   check('วันที่แสดงเป็น d/m/yyyy', saved.dueDate === '31/12/2026', saved.dueDate);
+  // the new row keeps the dropdown chips / colours of the row above (user report 2026-11-20)
+  var statusCol = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0].indexOf('สถานะ') + 1;
+  var ruleAbove = sheet.getRange(rowNumber - 1, statusCol).getDataValidation();
+  var ruleNew = sheet.getRange(rowNumber, statusCol).getDataValidation();
+  check('แถวใหม่มี dropdown สถานะเหมือนแถวบน', !ruleAbove || !!ruleNew, {
+    above: !!ruleAbove,
+    created: !!ruleNew,
+  });
+  check(
+    'แถวใหม่มีสีพื้นเหมือนแถวบน',
+    sheet.getRange(rowNumber - 1, statusCol).getBackground() ===
+      sheet.getRange(rowNumber, statusCol).getBackground(),
+    null,
+  );
   check(
     'มี log ทุกช่องที่สร้าง',
     logRows() - logBefore === Object.keys(input).length + 1,
