@@ -108,3 +108,23 @@ describe('bootstrapAccess', () => {
     expect(repo.bootstrapAccess('owner@x.com', 'owner@x.com').isAdmin).toBe(true);
   });
 });
+
+// "ชื่อของฉัน ทำไมให้เลือกเองได้ คนอื่นก็เลือกเป็นที่ไม่ใช่ตัวเองได้" (user, 2026-11-20): names come from the team
+// list the admin keeps in จัดการสิทธิ์. An old self-chosen _app_users name is only a fallback.
+describe('getUserName follows the admin', () => {
+  it('prefers the name in _app_allowed over _app_users', () => {
+    build({
+      allowed: [
+        ['gas@x.com', 'นุชนารถ (แก๊ส)', '', 'ผู้ดูแล', 'อนุญาต'],
+        ['new@x.com', '', '', 'ผู้แก้ไข', 'อนุญาต'],
+      ],
+    });
+    ss.insertSheet(Config.SHEETS.users).appendRow(['อีเมล', 'ชื่อ', 'อัปเดต']);
+    const users = ss.getSheetByName(Config.SHEETS.users);
+    users.appendRow(['gas@x.com', 'กิ่ง', '']);
+    users.appendRow(['new@x.com', 'ชื่อเก่า', '']);
+    expect(repo.getUserName('GAS@x.com')).toBe('นุชนารถ (แก๊ส)');
+    expect(repo.getUserName('new@x.com')).toBe('ชื่อเก่า'); // admin left it blank: old name until they set one
+    expect(repo.getUserName('nobody@x.com')).toBeNull();
+  });
+});

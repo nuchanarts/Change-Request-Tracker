@@ -168,7 +168,7 @@
 
     function myWorkChip(state) {
       var name = state.myName();
-      if (!name) return '<a class="hero-chip" href="#/my-work">เลือกชื่อของคุณ เพื่อดูงานของตัวเอง</a>';
+      if (!name) return '<a class="hero-chip" href="#/my-work">ดูงานของนักพัฒนาแต่ละคน</a>';
       var dev = D.groupMyWork(state.rows, name, 'developer', state.today);
       var pm = D.groupMyWork(state.rows, name, 'pm', state.today);
       var g = dev.total || !pm.total ? dev : pm;
@@ -570,7 +570,7 @@
         (isPm ? 'งานที่คุณเป็น PM รับผิดชอบ' : everyone ? 'งานของนักพัฒนาทุกคน' : 'งานที่คุณเป็นนักพัฒนา') + '</span></div>';
       if (!name || state.choosingName) {
         // one click: tap your own name (user request 2026-11-11)
-        return html + '<section class="panel mw-who"><h2>' + (isPm ? 'ดูงานของ PM คนไหน?' : 'ดูงานของนักพัฒนาคนไหน?') + '</h2><p class="muted">กดชื่อที่ต้องการดูงาน ระบบจะจำไว้ (ตั้งชื่อของคุณเองได้ที่เมนูบัญชีมุมขวาบน)</p>' +
+        return html + '<section class="panel mw-who"><h2>' + (isPm ? 'ดูงานของ PM คนไหน?' : 'ดูงานของนักพัฒนาคนไหน?') + '</h2><p class="muted">กดชื่อที่ต้องการดูงาน ระบบจะจำไว้ (ชื่อของคุณเองผู้ดูแลกำหนดในหน้า จัดการสิทธิ์)</p>' +
           (teams.length ? '<h3 class="mw-names-h">ดูทั้งทีม</h3><div class="mw-names">' + teams.map(nameButton).join('') + '</div><h3 class="mw-names-h">รายคน</h3>' : '') +
           '<div class="mw-names">' + people.map(nameButton).join('') + '</div></section>';
       }

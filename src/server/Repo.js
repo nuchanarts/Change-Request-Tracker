@@ -666,8 +666,15 @@ function makeRepo(deps) {
 
   // ------------------------------------------------------------------ users & permissions
 
-  /** @param {string} email */
+  /**
+   * The person's display name. The admin's team list (_app_allowed, edited in จัดการสิทธิ์) wins: people can
+   * no longer name themselves (user decision 2026-11-20). A name in _app_users from before is only a fallback
+   * until the admin fills one in.
+   * @param {string} email
+   */
   function getUserName(email) {
+    var m = findMember(members(), clean(email).toLowerCase());
+    if (m && m.name) return m.name;
     var sh = ss.getSheetByName(C.SHEETS.users);
     if (!sh) return null;
     var data = sh.getDataRange().getDisplayValues();
@@ -1122,6 +1129,19 @@ function makeRepo(deps) {
         ]);
       }
       var out = { email: e, name: next.name, note: next.note, role: next.role, status: next.status };
+      if (deps.cache && next.name) {
+        var nowMs = deps.nowMs ? deps.nowMs() : Date.now();
+        deps.cache.put(
+          C.PRESENCE.NAME_KEY_PREFIX + e,
+          JSON.stringify({ name: next.name, at: nowMs }),
+          C.PRESENCE.CACHE_SECONDS,
+        );
+        var online = readPresence();
+        if (online[e]) {
+          online[e].name = next.name;
+          deps.cache.put(C.PRESENCE.CACHE_KEY, JSON.stringify(online), C.PRESENCE.CACHE_SECONDS);
+        }
+      }
       if (shared) /** @type {any} */ (out).shared = shared;
       return C.ok(out);
     });

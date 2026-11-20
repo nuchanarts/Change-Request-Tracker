@@ -76,7 +76,7 @@
 
     /**
      * Whose work นักพัฒนา (my-work) / งาน PM shows. A view only: it never changes who "me" is
-     * ("ฉันไม่ใช่กิ่ง", user 2026-11-18). Who I am is set in the account menu (setIdentity).
+     * ("ฉันไม่ใช่กิ่ง", user 2026-11-18). Who I am comes from the admin's team list.
      */
     function setMyName(name) {
       if (!name) return;
@@ -90,26 +90,9 @@
       render();
     }
 
-    /** Remember who "me" is (browser + server, best effort): the account menu's ชื่อของฉัน. */
-    function setIdentity(name) {
-      if (!name) return;
-      store(KEYS.name, name);
-      if (state.user) state.user.name = name;
-      render();
-      api('Api_setMyName', name).then(function (res) {
-        if (res.ok) return UI.toast('บันทึกชื่อของฉันแล้ว: ' + name);
-        if (res.code !== 'FORBIDDEN' && res.code !== 'NOT_ALLOWED') UI.toast(res.message, 'error');
-      });
-    }
-
-    function renderMyNamePick() {
-      var sel = document.getElementById('my-name');
-      var me = state.myName();
-      var people = ((state.options && state.options.person) || []).slice();
-      if (me && people.indexOf(me) === -1) people.unshift(me);
-      sel.innerHTML = '<option value="">— เลือกชื่อของคุณ —</option>' + people.map(function (n) {
-        return '<option value="' + UI.esc(n) + '"' + (n === me ? ' selected' : '') + '>' + UI.esc(n) + '</option>';
-      }).join('');
+    /** The account menu shows who I am; only an admin can change it (จัดการสิทธิ์, user decision 2026-11-20). */
+    function renderMyName() {
+      document.getElementById('my-name-text').textContent = state.myName() || 'ยังไม่ได้ตั้งชื่อ';
     }
 
     function setMwFilter(key, value) {
@@ -130,7 +113,8 @@
       return store(KEYS.devAll) === true ? D.ALL_DEVELOPERS : store(KEYS.devView) || state.myName();
     };
     state.myName = function () {
-      return (state.user && state.user.name) || store(KEYS.name) || '';
+      // the server's answer only: a name typed into this browser earlier no longer counts (2026-11-20)
+      return (state.user && state.user.name) || '';
     };
     state.domainFilters = function () {
       var f = state.filters;
@@ -279,8 +263,14 @@
     document.getElementById('user-menu').addEventListener('toggle', function (ev) {
       var menu = ev.currentTarget;
       if (!menu.open) return;
-      var rect = menu.getBoundingClientRect();
-      menu.classList.toggle('pop-left', rect.right < 290);
+      var pop = menu.querySelector('.user-pop');
+      pop.style.transform = '';
+      menu.classList.toggle('pop-left', menu.getBoundingClientRect().right < 290);
+      // still off screen (narrow phones): slide it back inside with an 8px margin
+      var r = pop.getBoundingClientRect();
+      var vw = document.documentElement.clientWidth;
+      var dx = r.right > vw - 8 ? vw - 8 - r.right : r.left < 8 ? 8 - r.left : 0;
+      if (dx) pop.style.transform = 'translateX(' + Math.round(dx) + 'px)';
     });
 
     // ------------------------------------------------------------------ remembered copy (speed, 2026-11-20)
@@ -403,7 +393,7 @@
       document.getElementById('user-email').textContent = b.user.email || '';
       document.getElementById('user-avatar').textContent = (b.user.email || '?').charAt(0).toUpperCase();
       document.getElementById('user-role').textContent = b.user.isAdmin ? 'ผู้ดูแล' : b.user.canEdit ? 'ผู้แก้ไข' : 'ดูอย่างเดียว';
-      renderMyNamePick();
+      renderMyName();
       state.access = null;
       setStale(stale);
       render();
@@ -1118,7 +1108,6 @@
     document.addEventListener('change', function (ev) {
       var form = ev.target.form;
       if (ev.target.id === 'mw-who') return setMyName(ev.target.value);
-      if (ev.target.id === 'my-name') return setIdentity(ev.target.value);
       if (ev.target.classList && ev.target.classList.contains('access-name')) {
         return saveAccess({ email: ev.target.getAttribute('data-email'), name: ev.target.value });
       }

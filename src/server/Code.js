@@ -228,16 +228,12 @@ function Api_repairChips() {
 }
 
 /** @param {string} name */
-function Api_setMyName(name) {
-  return guard_(function (ctx) {
-    var options = ctx.repo.options();
-    if (options.person.indexOf(String(name)) === -1) {
-      return Config.fail('VALIDATION', { fields: { name: 'กรุณาเลือกชื่อจากรายการ' } });
-    }
-    var denied = denied_(ctx);
-    if (denied) return denied;
-    return ctx.repo.setUserName(ctx.email, String(name));
-  });
+/**
+ * Closed (user decision 2026-11-20): people could pick someone else's name. Names are set by an admin in
+ * จัดการสิทธิ์. Kept so an old open page gets a clear answer instead of a missing-function error.
+ */
+function Api_setMyName() {
+  return Config.fail('NAME_BY_ADMIN');
 }
 
 /**
