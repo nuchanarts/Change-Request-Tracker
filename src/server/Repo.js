@@ -893,10 +893,10 @@ function makeRepo(deps) {
   }
 
   /** @param {string} email @param {string} ownerEmail */
-  function isAdmin(email, ownerEmail) {
+  function isAdmin(email, ownerEmail, preloaded) {
     var e = clean(email).toLowerCase();
     if (e && e === clean(ownerEmail).toLowerCase()) return true;
-    var m = findMember(members(), e);
+    var m = findMember(preloaded !== undefined ? preloaded : members(), e);
     return !!(m && m.role === C.ROLE.admin && m.status === C.ACCESS.allowed);
   }
 
@@ -911,13 +911,13 @@ function makeRepo(deps) {
    * Who may add/edit through the app: must be able to edit the sheet AND be an allowed member of the
    * team list. If the list does not exist yet, the first sheet editor creates it with the sheet owner and
    * themselves as admins (visible sheet so the PM can manage it); this is logged.
-   * @param {string} email @param {string} ownerEmail
+   * @param {string} email @param {string} ownerEmail @param {any[]|null} [preloaded] members(), if already read
    * @returns {{canEdit: boolean, reason: 'OK'|'SHEET_VIEW_ONLY'|'NOT_ALLOWED'|'PENDING'}}
    */
-  function editAccess(email, ownerEmail) {
+  function editAccess(email, ownerEmail, preloaded) {
     var e = clean(email).toLowerCase();
     if (!canEdit(e)) return { canEdit: false, reason: 'SHEET_VIEW_ONLY' };
-    var list = members();
+    var list = preloaded !== undefined ? preloaded : members();
     if (list === null) {
       var seeds = [clean(ownerEmail).toLowerCase(), e].filter(function (x, i, a) {
         return x && a.indexOf(x) === i;
@@ -934,6 +934,17 @@ function makeRepo(deps) {
     if (m && m.status === C.ACCESS.allowed) return { canEdit: true, reason: 'OK' };
     if (m && m.status === C.ACCESS.pending) return { canEdit: false, reason: 'PENDING' };
     return { canEdit: false, reason: 'NOT_ALLOWED' };
+  }
+
+  /**
+   * editAccess + isAdmin for opening the app, reading the team list once (speed, 2026-11-20).
+   * @param {string} email @param {string} ownerEmail
+   */
+  function bootstrapAccess(email, ownerEmail) {
+    var list = members();
+    var access = editAccess(email, ownerEmail, list);
+    if (list === null) list = members(); // editAccess may have just created the list (first run)
+    return { canEdit: access.canEdit, reason: access.reason, isAdmin: isAdmin(email, ownerEmail, list) };
   }
 
   /** A signed-in person asks to be added; stored as a pending editor. @param {string} email @param {string} name @param {string} note */
@@ -1146,6 +1157,7 @@ function makeRepo(deps) {
     restore: restore,
     enqueueNotify: enqueueNotify,
     getUserName: getUserName,
+    bootstrapAccess: bootstrapAccess,
     setUserName: setUserName,
     canEdit: canEdit,
     editAccess: editAccess,

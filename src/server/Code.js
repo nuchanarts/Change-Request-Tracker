@@ -58,14 +58,24 @@ function context_() {
   return { ok: true, ss: ss, repo: repo, email: Session.getActiveUser().getEmail() };
 }
 
-/** Sheet owner's email ('' when unavailable). @param {any} ctx */
+/**
+ * Sheet owner's email ('' when unavailable). getOwner() is a slow Drive call and the owner never changes,
+ * so it is kept per request and in the script cache for 6 hours (speed, 2026-11-20). @param {any} ctx
+ */
 function owner_(ctx) {
+  if (ctx.owner !== undefined) return ctx.owner;
+  var cache = CacheService.getScriptCache();
+  var key = 'bgs_owner:' + ctx.ss.getId();
+  var hit = cache.get(key);
+  if (hit !== null) return (ctx.owner = hit);
   try {
-    return ctx.ss.getOwner().getEmail();
+    ctx.owner = ctx.ss.getOwner().getEmail();
+    if (ctx.owner) cache.put(key, ctx.owner, 21600);
   } catch (err) {
     console.warn('getOwner failed (shared drive or no access)', err);
-    return '';
+    ctx.owner = '';
   }
+  return ctx.owner;
 }
 
 /** Sheet edit right + team allowlist (_app_allowed). @param {any} ctx */
@@ -100,13 +110,13 @@ function Api_bootstrap() {
       loadedAt: Utilities.formatDate(new Date(), Config.TZ, 'd/M/yyyy HH:mm'),
       today: today_(),
       user: (function () {
-        var access = editAccess_(ctx);
+        var access = ctx.repo.bootstrapAccess(ctx.email, owner_(ctx));
         return {
           email: ctx.email,
           name: ctx.repo.getUserName(ctx.email),
           canEdit: access.canEdit,
           editReason: access.reason,
-          isAdmin: ctx.repo.isAdmin(ctx.email, owner_(ctx)),
+          isAdmin: access.isAdmin,
         };
       })(),
       schema: { ok: data.missing.length === 0, missing: data.missing, absent: data.absent || [] },
