@@ -11,7 +11,7 @@ test.describe('Navigation order, Taiga link, access admin (2026-11-11)', () => {
       'หน้าหลัก',
       'มอบหมายงาน',
       'บอร์ดงาน',
-      'งานของฉัน',
+      'นักพัฒนา', // was งานของฉัน (user request 2026-11-20)
       'งาน PM',
       'รายการทั้งหมด',
       'รายงานปิดงาน',
@@ -155,7 +155,7 @@ test('งานของฉัน: developer menu with a week planner that moves
 }) => {
   await page.addInitScript(() => localStorage.setItem('ehp.myname.v1', JSON.stringify('นักพัฒนา แดง')));
   await open(page, '/#/my-work');
-  await expect(page.locator('h1')).toHaveText('งานของฉัน');
+  await expect(page.locator('h1')).toHaveText('งานนักพัฒนา');
   await expect(page.locator('#mw-urgent')).toHaveCount(1);
   const plan = page.locator('#mw-plan');
   await expect(plan).toContainText('สัปดาห์นี้');
@@ -226,11 +226,14 @@ test('งาน PM lists only PMs; งานของฉัน lists only develo
   await page.locator('.mw-name').first().click();
   await expect(page.locator('#mw-who')).toHaveValue(/พีเอ็ม/);
   await expect(page.getByRole('link', { name: 'งาน PM' })).toHaveAttribute('aria-current', 'page');
-  await page.getByRole('link', { name: 'งานของฉัน' }).click();
-  await expect(page.locator('h1')).toHaveText('งานของฉัน');
+  await page.getByRole('link', { name: 'นักพัฒนา', exact: true }).click();
+  await expect(page.locator('h1')).toHaveText('งานนักพัฒนา');
   const devNames = await page.locator('.mw-name').allTextContents();
   devNames.filter((n) => !n.includes('ทุกคน')).forEach((n) => expect(n).toContain('นักพัฒนา'));
-  await expect(page.getByRole('link', { name: 'งานของฉัน' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('link', { name: 'นักพัฒนา', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
   await expect(page.locator('.nav a[href="#/new"]')).toHaveCount(0);
   await expect(page.locator('.hero-add')).toHaveCount(0); // not on this page; it lives on ภาพรวม
 });
