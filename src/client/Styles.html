@@ -492,7 +492,45 @@
   .hero .stat .ico { width: 38px; height: 38px; }
   .hero .stat .value { font-size: clamp(22px, 2.4vw, 30px); }
   .hero-art .illus { max-width: 170px; }
-  @media (max-width: 1180px) { .hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); } .hero-art { display: none; } }
+  @media (max-width: 1180px) { .hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); } .hero-art { grid-column: 1 / -1; } }
+  /* หน้าหลัก mascots (2026-11-20) */
+  .hero { grid-template-columns: minmax(260px, 1.1fr) minmax(0, 1.6fr) 250px; }
+  @media (max-width: 1180px) { .hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); } }
+  @media (max-width: 760px) { .hero { grid-template-columns: 1fr; } }
+  .hero-art .mascots { width: 100%; max-width: 250px; height: auto; display: block; overflow: hidden; }
+  .mascots text { font-family: var(--font); }
+  .mascots .m-float { animation: il-float 4.5s ease-in-out infinite; }
+  .mascots .m-float-slow { animation: il-float 6.5s ease-in-out infinite; }
+  .mascots .m-typing { animation: m-type 0.45s ease-in-out infinite; }
+  .mascots .m-code { transform-box: fill-box; transform-origin: left; animation: m-code 4s ease-out infinite; animation-delay: var(--d, 0s); }
+  .mascots .m-caret { animation: m-blink 1s steps(1) infinite; }
+  .mascots .m-check { stroke-dasharray: 10; stroke-dashoffset: 10; animation: m-check 4s ease-out infinite; animation-delay: var(--d, 0s); }
+  .mascots .m-glass { transform-box: fill-box; transform-origin: 100% 60%; animation: m-glass 3s ease-in-out infinite; }
+  .mascots .m-bug { animation: m-bug 4s ease-in-out infinite; }
+  .mascots .m-bubble { animation: il-float 5s ease-in-out infinite; }
+  .mascots .m-bubble-2 { animation-delay: -2.5s; }
+  .mascots .m-cat-run { animation: m-run 14s linear infinite; }
+  .mascots .m-cat { transform-box: fill-box; transform-origin: center; animation: m-flip 14s linear infinite, m-hop 0.32s ease-in-out infinite; }
+  .mascots .m-legs-a { animation: m-step 0.32s ease-in-out infinite; }
+  .mascots .m-legs-b { animation: m-step 0.32s ease-in-out -0.16s infinite; }
+  .mascots .m-tail { transform-box: fill-box; transform-origin: 100% 100%; animation: m-tail 0.64s ease-in-out infinite; }
+  @keyframes m-type { 50% { transform: translateY(-2px); } }
+  @keyframes m-code { 0% { transform: scaleX(0); } 20%, 85% { transform: scaleX(1); } 100% { transform: scaleX(0); opacity: 0; } }
+  @keyframes m-blink { 50% { opacity: 0; } }
+  @keyframes m-check { 0%, 10% { stroke-dashoffset: 10; } 25%, 85% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+  @keyframes m-glass { 50% { transform: translate(14px, 10px) rotate(-6deg); } }
+  @keyframes m-bug { 0%, 60% { opacity: 1; } 75%, 100% { opacity: 0; } }
+  @keyframes m-run { 0% { transform: translateX(-70px); } 47% { transform: translateX(330px); } 50% { transform: translateX(330px); } 97% { transform: translateX(-70px); } 100% { transform: translateX(-70px); } }
+  @keyframes m-flip { 0%, 48.5% { transform: scaleX(1); } 48.6%, 98.5% { transform: scaleX(-1); } 98.6%, 100% { transform: scaleX(1); } }
+  @keyframes m-hop { 50% { translate: 0 -2px; } }
+  @keyframes m-step { 50% { transform: translateY(-3px); } }
+  @keyframes m-tail { 50% { transform: rotate(14deg); } }
+  /* reduced motion: everything rests; the cat sits beside the desk */
+  @media (prefers-reduced-motion: reduce) {
+    .mascots * { animation: none !important; }
+    .mascots .m-cat-run { transform: translateX(262px); }
+    .mascots .m-code, .mascots .m-check { stroke-dashoffset: 0; }
+  }
   @media (max-width: 760px) { .hero { grid-template-columns: 1fr; } }
   .export-btn { background: #ece6fb; border-color: #d9cff7; color: #4b2fa3; }
   .export-btn:hover { background: #e2d9fa; }

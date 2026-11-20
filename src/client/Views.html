@@ -192,7 +192,7 @@
         '<button class="btn small export-btn" data-action="export-open">' + UI.withIcon('report', 'สรุปรายงาน (Export)') + '</button>' +
         '<button class="btn small" data-action="reload">' + UI.withIcon('reload', 'โหลดข้อมูลใหม่') + '</button>' +
         '<span class="hero-meta">' + esc(filterSummary(state)) + ', ข้อมูล ณ ' + esc(state.loadedAt) + '</span></div></div>' +
-        '<div class="hero-art">' + UI.illustration() + '</div>' +
+        '<div class="hero-art">' + UI.mascots() + '</div>' +
         (count ? '<div class="hero-stats">' +
           stat(state, 'lead', 'open', m.openCount, 'งานค้าง', m.openIds, 'งานที่สถานะยังไม่ใช่ แก้ไขเรียบร้อย / ใช้งานได้อยู่แล้ว / ยกเลิก (รวมสถานะว่าง)', 'open') +
           stat(state, 'danger', 'overdue', m.overdueCount, 'เกินกำหนด', m.overdueIds, 'งานค้างที่วันกำหนดผ่านไปแล้ว โดยใช้วันที่เลื่อนก่อน ถ้าไม่มีจึงใช้วันที่ต้องได้', 'overdue') +

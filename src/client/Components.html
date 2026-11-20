@@ -103,6 +103,12 @@
       return tpl ? tpl.innerHTML : '';
     }
 
+    /** หน้าหลัก mascots: girl typing, boy testing, the running orange cat (Mascots.html, 2026-11-20). */
+    function mascots() {
+      var tpl = document.getElementById('tpl-mascots');
+      return tpl ? tpl.innerHTML : '';
+    }
+
     /** Small line icons for the headline numbers (decorative; the label carries the meaning). */
     var ICONS = {
       open: '<path d="M9 4h6v3H9z"/><path d="M8 5H6v15h12V5h-2"/><path d="M9 11h6M9 15h4"/>',
@@ -328,7 +334,7 @@
 
     return {
       esc: esc, statusLines: statusLines, statusBadge: statusBadge, statusClass: statusClass, urgency: urgency, due: due, ticket: ticket,
-      helpTip: helpTip, withIcon: withIcon, backButton: backButton, calendar: calendar, ticketLink: ticketLink, taigaButton: taigaButton, TAIGA_URL: TAIGA_URL, illustration: illustration, icon: icon, emptyState: emptyState, loading: loading, errorState: errorState,
+      helpTip: helpTip, withIcon: withIcon, backButton: backButton, calendar: calendar, ticketLink: ticketLink, taigaButton: taigaButton, TAIGA_URL: TAIGA_URL, illustration: illustration, mascots: mascots, icon: icon, emptyState: emptyState, loading: loading, errorState: errorState,
       select: select, multiPick: multiPick, statusGroups: statusGroups, input: input, textarea: textarea, combobox: combobox, dateField: dateField,
       toast: toast, confirm: confirm,
     };
