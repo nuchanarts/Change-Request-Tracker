@@ -110,7 +110,7 @@
         .sort(function (a, b) { return b.count - a.count; })[0];
       var parts = [];
       parts.push(m.overdueCount ? 'มีงานเกินกำหนด ' + m.overdueCount.toLocaleString('th-TH') + ' งานที่ควรตามก่อน' : 'ยังไม่มีงานเกินกำหนด');
-      if (top) parts.push('งานกองอยู่ที่ "' + top.value + '" มากที่สุด');
+      if (top) parts.push('งานกองอยู่ที่ "' + D.statusLabel(top.value) + '" มากที่สุด');
       return parts.join(' และ');
     }
 
@@ -173,16 +173,16 @@
         var cls = 'stage' + (s === maxStatus && c > 0 ? ' bottleneck' : '') + (c === 0 ? ' zero' : '');
         var key = state.registerDrill('สถานะ ' + D.statusLabel(s), counts[s] ? counts[s].ids : []);
         return '<button type="button" class="' + cls + '" data-action="drill" data-drill="' + key + '" aria-label="' + esc(D.statusLabel(s) + ' ' + c + ' รายการ') + '">' +
-          '<span class="fill" style="height:' + h + '%;--i:' + idx + '"></span><span class="count num">' + c + '</span><span class="name">' + esc(D.statusLabel(s)) + '</span></button>';
+          '<span class="fill" style="height:' + h + '%;--i:' + idx + '"></span><span class="count num">' + c + '</span><span class="name" title="' + esc(D.statusLabel(s)) + '">' + esc(D.statusLabel(s)) + '</span></button>';
       }).join('');
       var others = m.byStatus.filter(function (s) { return open.indexOf(s.value) === -1; });
       var extra = others.length
         ? '<div class="pipeline-extra">สถานะอื่นที่ยังเปิดอยู่: ' + others.map(function (s) {
-            return drillButton(state, 'สถานะ ' + s.status, s.ids, esc(s.status) + ' ' + s.count);
+            return drillButton(state, 'สถานะ ' + D.statusLabel(s.status), s.ids, esc(D.statusLabel(s.status)) + ' ' + s.count);
           }).join(', ') + '</div>'
         : '';
       var head = maxStatus
-        ? 'งานกองอยู่ที่ "' + esc(maxStatus) + '" มากที่สุด (' + max + ' งาน)'
+        ? 'งานกองอยู่ที่ "' + esc(D.statusLabel(maxStatus)) + '" มากที่สุด (' + max + ' งาน)'
         : 'ไม่มีงานค้าง';
       return '<section class="pipeline" aria-labelledby="pl-h"><div class="pipeline-head"><h2 id="pl-h">งานค้างแต่ละขั้นตอน ' +
         UI.helpTip('เรียงตามลำดับขั้นตอนจริง ขั้นที่ไฮไลต์คือขั้นที่มีงานรอมากที่สุด (คอขวด) กดที่ขั้นเพื่อดูรายการ') +

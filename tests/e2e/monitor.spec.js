@@ -19,6 +19,25 @@ test.describe('US1 Monitor', () => {
     await expect(page.locator('.stage.bottleneck')).toHaveCount(1);
   });
 
+  // "ตัวหนังสือมันตก" + "ตัด 0. ออก" (user, 2026-11-20)
+  test('stage numbers line up, names never overflow, and no "0." prefix is shown', async ({ page }, info) => {
+    await open(page);
+    const boxes = await page.locator('.stage').evaluateAll((els) =>
+      els.map((el) => {
+        const c = el.querySelector('.count').getBoundingClientRect();
+        const nm = el.querySelector('.name');
+        return { top: Math.round(c.top), over: nm.scrollWidth - nm.clientWidth, text: nm.textContent };
+      }),
+    );
+    if (info.project.name !== 'mobile-375') expect(new Set(boxes.map((b) => b.top)).size).toBe(1);
+    for (const b of boxes) {
+      expect(b.over, b.text).toBeLessThanOrEqual(1);
+      expect(b.text).not.toMatch(/^0./);
+    }
+    await expect(page.locator('.pipeline')).not.toContainText('"0.');
+    await expect(page.locator('.hero')).not.toContainText('"0.');
+  });
+
   test('drill-down list size equals the clicked number', async ({ page }) => {
     await open(page);
     const overdue = n(await statValue(page, 'overdue').textContent());
