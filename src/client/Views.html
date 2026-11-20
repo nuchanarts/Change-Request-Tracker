@@ -173,7 +173,7 @@
         var cls = 'stage' + (s === maxStatus && c > 0 ? ' bottleneck' : '') + (c === 0 ? ' zero' : '');
         var key = state.registerDrill('สถานะ ' + D.statusLabel(s), counts[s] ? counts[s].ids : []);
         return '<button type="button" class="' + cls + '" data-action="drill" data-drill="' + key + '" aria-label="' + esc(D.statusLabel(s) + ' ' + c + ' รายการ') + '">' +
-          '<span class="fill" style="height:' + h + '%;--i:' + idx + '"></span><span class="count num">' + c + '</span><span class="name" title="' + esc(D.statusLabel(s)) + '">' + esc(D.statusLabel(s)) + '</span></button>';
+          '<span class="fill" style="height:' + h + '%;--i:' + idx + '"></span><span class="count num">' + c + '</span><span class="name" title="' + esc(D.statusLabel(s)) + '">' + UI.statusLines(s).map(function (l) { return '<span class="line">' + esc(l) + '</span>'; }).join(' ') + '</span></button>';
       }).join('');
       var others = m.byStatus.filter(function (s) { return open.indexOf(s.value) === -1; });
       var extra = others.length

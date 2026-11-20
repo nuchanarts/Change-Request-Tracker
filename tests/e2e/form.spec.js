@@ -29,7 +29,7 @@ test.describe('US2 Add request', () => {
     await open(page, '/#/new');
     const labels = await page.locator('#f-status option').allTextContents();
     expect(labels[0]).toBe('1) จัดทำไฟล์แก้ไข');
-    expect(labels[3]).toBe('4) PM ส่งกลับแก้ไขไฟล์ Taiga');
+    expect(labels[3]).toBe('4) PM ส่งกลับแก้ไข Taiga');
     expect(labels[5]).toBe('6) dev ขอ Sourecode อจ.');
     expect(labels[11]).toBe('12) รอ Complie ต้องแจ้งอจ.');
     expect(labels.slice(12)).toEqual(['ยกเลิก', 'ใช้งานได้อยู่แล้ว', 'แก้ไขเรียบร้อย']);

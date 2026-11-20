@@ -49,7 +49,7 @@ var Domain = (function () {
   var PERSON_KEYS = ['pm', 'developer', 'tester'];
 
   var DONE = '0.แก้ไขเรียบร้อย';
-  var PM_RETURN = '0.PM ส่งกลับแก้ไขไฟล์ Taiga';
+  var PM_RETURN = '0.PM ส่งกลับแก้ไข Taiga';
   var PM_REVIEW = 'รอ PM ตรวจสอบ Taiga';
   var CANCELLED = '0.ยกเลิก';
   var CLOSED = [DONE, '0.ใช้งานได้อยู่แล้ว', CANCELLED];
