@@ -6,7 +6,10 @@
 
 /** Serve the single-page app. */
 function doGet() {
-  return HtmlService.createTemplateFromFile('Index')
+  var page = HtmlService.createTemplateFromFile('Index');
+  // who opened the page: a remembered copy of the data is shown only to the same account (security review 2026-11-20)
+  page.viewer = String(Session.getActiveUser().getEmail() || '').toLowerCase();
+  return page
     .evaluate()
     .setTitle('ติดตามรายการขอแก้ไขโปรแกรม')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')

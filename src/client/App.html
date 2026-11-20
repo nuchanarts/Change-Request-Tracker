@@ -252,11 +252,17 @@
     // and replaces it when the server answers. Writes wait for fresh data (api() refuses them meanwhile).
 
     var SNAP_KEY = 'ehp.snapshot.v1';
-    var SNAP_MAX_AGE_MS = 7 * 24 * 3600 * 1000;
+    var SNAP_MAX_AGE_MS = 3 * 24 * 3600 * 1000;
+
+    // The account that opened this page (set by doGet). A copy is shown only to the account that saved it,
+    // so switching Google accounts in the same browser never shows someone else's data.
+    var VIEWER = String(document.body.getAttribute('data-viewer') || '').toLowerCase();
 
     function saveSnapshot(b) {
+      var owner = String((b.user && b.user.email) || '').toLowerCase();
+      if (!owner || owner !== VIEWER) return clearSnapshot(); // unknown account: never remember
       try {
-        localStorage.setItem(SNAP_KEY, JSON.stringify({ at: Date.now(), data: b }));
+        localStorage.setItem(SNAP_KEY, JSON.stringify({ at: Date.now(), owner: owner, data: b }));
       } catch (e) {
         try { localStorage.removeItem(SNAP_KEY); } catch (e2) { /* storage blocked */ }
       }
@@ -266,7 +272,8 @@
     function readSnapshot() {
       try {
         var snap = JSON.parse(localStorage.getItem(SNAP_KEY) || 'null');
-        if (snap && snap.data && Date.now() - snap.at < SNAP_MAX_AGE_MS) return snap;
+        if (snap && snap.data && VIEWER && snap.owner === VIEWER && Date.now() - snap.at < SNAP_MAX_AGE_MS) return snap;
+        if (snap) clearSnapshot(); // another account's, too old, or from an older version
       } catch (e) { /* missing or corrupt */ }
       return null;
     }

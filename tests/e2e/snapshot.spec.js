@@ -31,3 +31,15 @@ test('a refused bootstrap clears the remembered data (shared computer, lost acce
   await expect(page.locator('[data-metric="open"]')).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('ehp.snapshot.v1'))).toBeNull();
 });
+
+test('a copy saved by another Google account is never shown', async ({ page }) => {
+  await open(page, '/');
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('ehp.snapshot.v1'));
+    s.owner = 'someone-else@example.com';
+    localStorage.setItem('ehp.snapshot.v1', JSON.stringify(s));
+  });
+  await page.goto('/?latency=2000&snapshot=1');
+  await expect(page.locator('.loading')).toBeVisible();
+  await expect(page.locator('body')).not.toHaveAttribute('data-stale', '1');
+});
