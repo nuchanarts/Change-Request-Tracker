@@ -27,6 +27,9 @@
     --s-5: 24px;
     --s-6: 32px;
     --font: 'IBM Plex Sans Thai', 'Sarabun', 'Noto Sans Thai', system-ui, sans-serif;
+    /* chart marks, checked with the dataviz palette validator (light on #ffffff, dark on #182225) */
+    --chart-1: #0d9488;
+    --chart-crit: #c8321f;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme='light']) {
@@ -47,6 +50,8 @@
       --ok-soft: #173325;
       --focus: #8ab4ff;
       --shadow: none;
+      --chart-1: #26a394;
+      --chart-crit: #e8604f;
     }
   }
 
@@ -578,6 +583,52 @@
   .access-table tr.st-off td { color: var(--muted); }
   .access-table tr.st-wait td:first-child { font-weight: 600; }
   .access-select { min-height: 34px; padding: 4px 8px; }
+
+  /* Monitor charts (2026-11-20) */
+  .charts { margin-bottom: var(--s-5); align-items: stretch; }
+  .charts > .panel + .panel { margin-top: 0; }
+  .chart { overflow: hidden; } /* hidden tooltips must never widen the page */
+  .chart .panel-head { flex-wrap: wrap; }
+  .cols { display: flex; align-items: flex-end; gap: 10px; height: 170px; padding-top: 18px; border-bottom: 1px solid var(--line); margin-bottom: 28px; }
+  .col { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: stretch; position: relative; }
+  .col-hit { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; border: 0; background: none; padding: 0; cursor: pointer; position: relative; font: inherit; color: var(--ink); }
+  .col-hit:disabled { cursor: default; }
+  .col-bar { width: min(44px, 100%); background: var(--chart-1); opacity: 0.55; border-radius: 4px 4px 0 0; transform-origin: bottom; }
+  .col.now .col-bar { opacity: 1; }
+  .col-hit:hover .col-bar, .col-hit:focus-visible .col-bar { opacity: 0.85; }
+  .col.now .col-hit:hover .col-bar { opacity: 1; }
+  .col-val { font-size: 13px; font-weight: 600; min-height: 1.2em; }
+  .col-lab { position: absolute; bottom: -24px; left: 0; right: 0; text-align: center; font-size: 12.5px; color: var(--muted); }
+  .intro .col-bar { animation: grow 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(0.3s + var(--i, 0) * 60ms); }
+  .legend { display: inline-flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--muted); }
+  .lg { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .sw.ok, .pseg.ok { background: var(--chart-1); }
+  .sw.over, .pseg.over { background: var(--chart-crit); }
+  .pbars { display: flex; flex-direction: column; gap: 12px; }
+  .pbar { display: grid; grid-template-columns: 7.5em 1fr 3ch; align-items: center; gap: 10px; }
+  .pname { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ptrack { height: 22px; background: var(--surface-2); border-radius: 4px; }
+  .pfill { display: flex; height: 100%; gap: 2px; }
+  .pseg { flex: 1 1 0; min-width: 4px; border: 0; padding: 0; cursor: pointer; position: relative; }
+  .pseg:first-child { border-radius: 4px 0 0 4px; }
+  .pseg:last-child { border-radius: 0 4px 4px 0; }
+  .pseg:only-child { border-radius: 4px; }
+  .pseg:hover, .pseg:focus-visible { filter: brightness(1.12); }
+  .ptotal { font-weight: 600; text-align: right; }
+  .intro .pfill { animation: growx 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; transform-origin: left; animation-delay: 0.35s; }
+  /* tooltip shared by both charts: on hover and on keyboard focus */
+  .ctip {
+    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 5;
+    background: var(--ink); color: var(--surface); font-size: 12.5px; font-weight: 500; white-space: nowrap;
+    padding: 4px 8px; border-radius: 6px; pointer-events: none; opacity: 0; transition: opacity 0.12s;
+  }
+  .col-hit:hover .ctip, .col-hit:focus-visible .ctip, .pseg:hover .ctip, .pseg:focus-visible .ctip { opacity: 1; }
+  .col-hit .ctip { bottom: auto; top: -8px; transform: translate(-50%, -100%); }
+  .col:first-child .ctip { left: 0; transform: translateY(-100%); }
+  .col:last-child .ctip { left: auto; right: 0; transform: translateY(-100%); }
+  .pseg:last-child .ctip { left: auto; right: 0; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .ctip { transition: none; } }
 
   /* Remembered copy shown while fresh data loads (speed, 2026-11-20) */
   #sync-pill {

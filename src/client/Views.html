@@ -91,9 +91,61 @@
       // Q2: pipeline (the signature element)
       html += pipeline(state, m);
 
+      // charts (user request 2026-11-20): finished work per month + open work per platform
+      html += '<div class="grid-2 charts">' + closedChart(state, rows) + platformChart(state, rows) + '</div>';
+
       // Q6 (left) + Q3/Q4 (right)
       html += '<div class="grid-2"><div>' + overduePanel(state, m) + '</div><div>' + developerPanel(state, m) + pmPanel(state, m) + qualityPanel(state) + '</div></div>';
       return html;
+    }
+
+    // ------------------------------------------------------------------ Monitor charts (2026-11-20)
+    // Plain HTML bars (each mark is a button: hover/focus shows a tooltip, click opens the items).
+
+    function closedChart(state, rows) {
+      var months = D.closedByMonth(rows, state.today, 6);
+      var max = months.reduce(function (a, b) { return Math.max(a, b.count); }, 0);
+      var best = max ? months.map(function (b) { return b.count; }).lastIndexOf(max) : -1;
+      var total = months.reduce(function (a, b) { return a + b.count; }, 0);
+      var cols = months.map(function (b, i) {
+        var h = max ? Math.max(b.count ? 4 : 0, Math.round((b.count / max) * 100)) : 0;
+        var name = D.THAI_MONTHS_LONG[b.m - 1] + ' ' + (b.y + 543);
+        var tip = name + ': ปิดงาน ' + b.count + ' งาน';
+        // direct labels only where they matter: this month and the best month
+        var showValue = b.count && (i === months.length - 1 || i === best);
+        var key = state.registerDrill('ปิดงานเดือน' + name, b.ids);
+        return '<div class="col' + (i === months.length - 1 ? ' now' : '') + '" data-count="' + b.count + '">' +
+          '<button type="button" class="col-hit" data-action="drill" data-drill="' + key + '" aria-label="' + esc(tip) + '"' + (b.count ? '' : ' disabled') + '>' +
+          '<span class="col-val num">' + (showValue ? b.count : '') + '</span>' +
+          '<span class="col-bar" style="height:' + h + '%;--i:' + i + '"></span>' +
+          '<span class="ctip" aria-hidden="true">' + esc(tip) + '</span></button>' +
+          '<span class="col-lab">' + esc(b.label) + '</span></div>';
+      }).join('');
+      return '<section class="panel chart" id="chart-closed" aria-labelledby="cc-h"><div class="panel-head"><h2 id="cc-h">ปิดงานรายเดือน</h2>' +
+        '<span class="muted">6 เดือนล่าสุด รวม <b class="num">' + total + '</b> งาน ' + UI.helpTip('นับงานที่ แก้ไขเรียบร้อย และ ใช้งานได้อยู่แล้ว ตามวันที่เสร็จ ไม่นับงานที่ยกเลิก กดแท่งเพื่อดูรายการ') + '</span></div>' +
+        (total ? '<div class="cols">' + cols + '</div>' : '<p class="muted">ยังไม่มีงานที่ปิดใน 6 เดือนนี้</p>') + '</section>';
+    }
+
+    function platformChart(state, rows) {
+      var plats = D.openByPlatform(rows);
+      var max = plats.reduce(function (a, b) { return Math.max(a, b.open); }, 0) || 1;
+      var seg = function (title, ids, n, cls) {
+        if (!n) return '';
+        var key = state.registerDrill(title, ids);
+        return '<button type="button" class="pseg ' + cls + '" style="flex-grow:' + n + '" data-action="drill" data-drill="' + key + '" aria-label="' + esc(title + ' ' + n + ' งาน') + '">' +
+          '<span class="ctip" aria-hidden="true">' + esc(title + ': ' + n + ' งาน') + '</span></button>';
+      };
+      var bars = plats.map(function (p) {
+        var ok = p.open - p.overdue;
+        var okIds = p.ids.filter(function (id) { return p.overdueIds.indexOf(id) === -1; });
+        return '<div class="pbar"><span class="pname">' + esc(p.platform) + '</span>' +
+          '<span class="ptrack"><span class="pfill" style="width:' + Math.round((p.open / max) * 100) + '%">' +
+          seg(p.platform + ' ยังไม่เกินกำหนด', okIds, ok, 'ok') + seg(p.platform + ' เกินกำหนด', p.overdueIds, p.overdue, 'over') +
+          '</span></span><span class="ptotal num">' + p.open + '</span></div>';
+      }).join('');
+      return '<section class="panel chart" id="chart-platform" aria-labelledby="cp-h"><div class="panel-head"><h2 id="cp-h">งานค้างแต่ละแพลตฟอร์ม</h2>' +
+        '<span class="legend"><span class="lg"><i class="sw ok" aria-hidden="true"></i>ยังไม่เกินกำหนด</span><span class="lg"><i class="sw over" aria-hidden="true"></i>เกินกำหนด</span></span></div>' +
+        (plats.length ? '<div class="pbars">' + bars + '</div>' : '<p class="muted">ไม่มีงานค้าง</p>') + '</section>';
     }
 
     function greetingName(state) {
