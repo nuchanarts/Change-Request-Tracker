@@ -126,6 +126,15 @@
   .field { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
   .field label { font-weight: 500; font-size: 14px; }
   .field .req { color: var(--danger); }
+  /* Fields marked * stand apart from optional ones (user request 2026-11-20): a bold label with a
+     "* จำเป็น" pill, a thick left stripe on the control, and a warm tint while still empty. */
+  .field-required label { font-weight: 700; }
+  .field-required .req {
+    display: inline-block; font-size: 11.5px; font-weight: 700; line-height: 1.4; vertical-align: 1px;
+    background: var(--danger-soft); color: var(--danger); border-radius: 999px; padding: 0 7px; margin-left: 2px;
+  }
+  .field-required input, .field-required select, .field-required textarea { border-left: 4px solid var(--danger); }
+  .field-required input:invalid, .field-required select:invalid, .field-required textarea:invalid { background: var(--warn-soft); }
   .field .hint { font-size: 13px; color: var(--muted); }
   .field .err { font-size: 13px; color: var(--danger); }
   .field .warn { font-size: 13px; color: var(--warn); }
@@ -702,6 +711,12 @@
   /* Closed-work report */
   .dr-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-4); margin: var(--s-3) 0; }
   .dr-chip { display: inline-flex; align-items: center; gap: var(--s-1); }
+  /* ทะเบียน Taiga progress (2026-11-20): one thin bar per row, the step as text beside it */
+  .tg-prog { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+  .tg-track { flex: 1; height: 8px; border-radius: 999px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+  .tg-fill { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+  .tg-lab { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+  .tg-nolink { font-size: 12.5px; font-weight: 600; color: var(--warn); background: var(--warn-soft); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
 
   /* Export dialog */
   dialog.export-dialog { width: min(760px, calc(100% - 32px)); max-width: none; }
