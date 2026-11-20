@@ -14,7 +14,7 @@ test.describe('Navigation inside the Apps Script sandbox', () => {
       await expect(check).toBeVisible();
     };
     await visit('บอร์ดงาน', page.getByRole('heading', { name: 'บอร์ดงาน', level: 1 }));
-    await visit('งานของฉัน', page.getByRole('heading', { name: 'งานของฉัน', level: 1 }));
+    await visit(/^นักพัฒนา$/, page.getByRole('heading', { name: 'งานนักพัฒนา', level: 1 }));
     await visit('รายการทั้งหมด', page.getByRole('heading', { name: 'รายการทั้งหมด', level: 1 }));
     await visit('งาน PM', page.getByRole('heading', { name: 'งาน PM', level: 1 }));
     await visit('มอบหมายงาน', page.getByRole('heading', { name: 'มอบหมายงาน', level: 1 }));
