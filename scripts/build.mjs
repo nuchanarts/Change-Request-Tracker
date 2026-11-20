@@ -64,10 +64,13 @@ if (args.has('--preview')) {
   for (const f of readdirSync(join(root, 'src/client')))
     files[f.replace(/\.html$/, '')] = stamp(read(`src/client/${f}`));
   const mock = '<script src="fixture.js"></script>\n<script src="mock-gas.js"></script>\n';
-  const html = files.Index.replace(/<\?!=\s*include\('([^']+)'\);?\s*\?>/g, (_, name) => {
-    if (!(name in files)) throw new Error(`include('${name}') not found`);
-    return (name === 'App' ? mock : '') + files[name];
-  });
+  const html = files.Index.replace('<?= viewer ?>', 'tester@example.com').replace(
+    /<\?!=\s*include\('([^']+)'\);?\s*\?>/g,
+    (_, name) => {
+      if (!(name in files)) throw new Error(`include('${name}') not found`);
+      return (name === 'App' ? mock : '') + files[name];
+    },
+  );
   writeFileSync(join(preview, 'index.html'), html);
   writeFileSync(join(preview, 'version.txt'), version);
   copyFileSync(join(root, 'tests/e2e/mock-gas.js'), join(preview, 'mock-gas.js'));

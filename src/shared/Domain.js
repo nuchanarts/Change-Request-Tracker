@@ -1180,6 +1180,65 @@ var Domain = (function () {
     return lines.join('\n');
   }
 
+  // ---------------------------------------------------------------- monitor charts (2026-11-20)
+
+  var NO_PLATFORM = 'ไม่ระบุแพลตฟอร์ม';
+
+  /**
+   * Finished work per month for the last `n` months (this month last). Cancelled items are not finished
+   * work, so only 0.แก้ไขเรียบร้อย and 0.ใช้งานได้อยู่แล้ว with a readable วันที่เสร็จ count.
+   * @param {any[]} rows enriched rows @param {SheetDate} today @param {number} n
+   */
+  function closedByMonth(rows, today, n) {
+    var out = [];
+    for (var k = n - 1; k >= 0; k--) {
+      var idx = today.y * 12 + (today.m - 1) - k;
+      out.push({
+        y: Math.floor(idx / 12),
+        m: (idx % 12) + 1,
+        label: THAI_MONTHS[idx % 12],
+        count: 0,
+        ids: [],
+      });
+    }
+    rows.forEach(function (r) {
+      if (r.isOpen || r.status === CANCELLED || !r.doneDate.date) return;
+      var dt = r.doneDate.date;
+      var hit = out.filter(function (b) {
+        return b.y === dt.y && b.m === dt.m;
+      })[0];
+      if (hit) {
+        hit.count++;
+        hit.ids.push(r.id);
+      }
+    });
+    return out;
+  }
+
+  /** Open and overdue items per platform, biggest first; items without a platform last. @param {any[]} rows */
+  function openByPlatform(rows) {
+    var g = groupBy(
+      rows.filter(function (r) {
+        return r.isOpen;
+      }),
+      function (r) {
+        return r.platform || NO_PLATFORM;
+      },
+    );
+    return Object.keys(g)
+      .map(function (p) {
+        var od = g[p].filter(function (r) {
+          return r.isOverdue;
+        });
+        return { platform: p, open: g[p].length, overdue: od.length, ids: ids(g[p]), overdueIds: ids(od) };
+      })
+      .sort(function (a, b) {
+        if ((a.platform === NO_PLATFORM) !== (b.platform === NO_PLATFORM))
+          return a.platform === NO_PLATFORM ? 1 : -1;
+        return b.open - a.open || b.overdue - a.overdue || (a.platform < b.platform ? -1 : 1);
+      });
+  }
+
   // ---------------------------------------------------------------- closed-work report (2026-11-20)
 
   /**
@@ -1548,6 +1607,8 @@ var Domain = (function () {
     overdueBuckets: overdueBuckets,
     itemRef: itemRef,
     buildReport: buildReport,
+    closedByMonth: closedByMonth,
+    openByPlatform: openByPlatform,
     doneRange: doneRange,
     doneReport: doneReport,
     doneYears: doneYears,

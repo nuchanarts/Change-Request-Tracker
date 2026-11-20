@@ -56,3 +56,29 @@ test('custom วันที่เสร็จ range', async ({ page }) => {
   const total = await expected(page, '0.แก้ไขเรียบร้อย', { mode: 'all' });
   await expect(page.locator('#dr-count')).toHaveText(String(total));
 });
+
+// "รายงานงานที่ปิด ให้ใส่ผู้ทดสอบด้วย" + "ให้มี แพลตฟอร์ม … PM" (user, 2026-11-20)
+test('has a ผู้ทดสอบ column and แพลตฟอร์ม / PM filters', async ({ page }) => {
+  await open(page, '/#/done-report');
+  await page.locator('#f-dr-mode').selectOption('all');
+  await expect(page.locator('#dr-table thead')).toContainText('ผู้ทดสอบ');
+
+  const count = (platform, pms) =>
+    page.evaluate(
+      ([p, list]) => {
+        const D = window.Domain;
+        const fx = window.__FIXTURE__;
+        let rows = fx.rows.filter((r) => String(r.detail).trim()).map((r) => D.enrich(r, fx.today));
+        rows = D.applyFilters(rows, { platform: p ? [p] : [], pm: list });
+        return D.doneReport(rows, { statuses: [D.DONE], period: { mode: 'all' } }).total;
+      },
+      [platform, pms],
+    );
+
+  await page.locator('#f-dr-platform').selectOption('EHP');
+  await expect(page.locator('#dr-count')).toHaveText(String(await count('EHP', [])));
+  const pm = await page.locator('#f-dr-pm option').nth(3).getAttribute('value');
+  await page.locator('#f-dr-pm').selectOption(pm);
+  const pms = await page.evaluate((v) => window.Domain.pmFilter(v, window.__FIXTURE__.options.pm), pm);
+  await expect(page.locator('#dr-count')).toHaveText(String(await count('EHP', pms)));
+});

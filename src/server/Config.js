@@ -83,7 +83,14 @@ var Config = (function () {
     CACHE_KEYS: { options: 'options:v4' }, // v4: + tester list (2026-11-18)
     // Who is online (2026-11-18): one JSON map in the script cache, never a sheet. Short lock: a busy
     // lock skips the write so heartbeats never slow down real saves.
-    PRESENCE: { CACHE_KEY: 'bgs_presence', CACHE_SECONDS: 600, LOCK_MS: 1500 },
+    // NAME_TTL_MS: how long the online list trusts a remembered name before re-reading _app_users (2026-11-20)
+    PRESENCE: {
+      CACHE_KEY: 'bgs_presence',
+      CACHE_SECONDS: 600,
+      LOCK_MS: 1500,
+      NAME_KEY_PREFIX: 'bgs_pname:',
+      NAME_TTL_MS: 300000,
+    },
     EDIT_PROBE_KEY: 'bgs_app_edit_probe',
     EDIT_PROBE_CACHE_SECONDS: 21600,
     EDIT_CACHE_PREFIX: 'canEdit:v3:',

@@ -82,3 +82,29 @@ describe('editAccess', () => {
     expect(repo.editAccess('pm@x.com', '').canEdit).toBe(true);
   });
 });
+
+// "ปรับปรุงหน้าแอปให้ไวขึ้น" (user, 2026-11-20): opening the app reads the team list once, not twice.
+describe('bootstrapAccess', () => {
+  it('gives the same answers as editAccess + isAdmin with one read of _app_allowed', () => {
+    build({
+      allowed: [
+        ['boss@hospital.org', 'Boss', '', 'ผู้ดูแล', 'อนุญาต'],
+        ['dev@hospital.org', 'Dev', '', 'ผู้แก้ไข', 'อนุญาต'],
+      ],
+    });
+    const allowed = ss.getSheetByName(Config.SHEETS.allowed);
+    for (const email of ['boss@hospital.org', 'dev@hospital.org', 'stranger@x.com']) {
+      effective = email;
+      const want = { ...repo.editAccess(email, 'owner@x.com'), isAdmin: repo.isAdmin(email, 'owner@x.com') };
+      const before = allowed.reads || 0;
+      expect(repo.bootstrapAccess(email, 'owner@x.com')).toEqual(want);
+      expect((allowed.reads || 0) - before).toBe(1);
+    }
+  });
+
+  it('the owner is an admin even before the list exists', () => {
+    build({ allowed: null });
+    effective = 'owner@x.com';
+    expect(repo.bootstrapAccess('owner@x.com', 'owner@x.com').isAdmin).toBe(true);
+  });
+});

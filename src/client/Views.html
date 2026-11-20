@@ -28,11 +28,11 @@
     }
 
     /** PM filter: the two PM teams first (user request 2026-11-16), then each PM. */
-    function pmFilterSelect(pms, value) {
+    function pmFilterSelect(pms, value, name) {
       var teams = D.pmTeams(pms).map(function (t) { return { value: t.label, label: t.label }; });
       var people = pms.map(function (p) { return { value: p, label: p }; });
       return UI.select({
-        name: 'pm', label: 'PM', icon: 'pm', value: value, emptyLabel: 'ทั้งหมด',
+        name: name || 'pm', label: 'PM', icon: 'pm', value: value, emptyLabel: 'ทั้งหมด',
         options: teams.map(function (t) { return t.value; }).concat(pms),
         groups: (teams.length ? [{ label: 'ทีม PM', options: teams }] : []).concat([{ label: 'รายคน', options: people }]),
       });
@@ -91,9 +91,61 @@
       // Q2: pipeline (the signature element)
       html += pipeline(state, m);
 
+      // charts (user request 2026-11-20): finished work per month + open work per platform
+      html += '<div class="grid-2 charts">' + closedChart(state, rows) + platformChart(state, rows) + '</div>';
+
       // Q6 (left) + Q3/Q4 (right)
       html += '<div class="grid-2"><div>' + overduePanel(state, m) + '</div><div>' + developerPanel(state, m) + pmPanel(state, m) + qualityPanel(state) + '</div></div>';
       return html;
+    }
+
+    // ------------------------------------------------------------------ Monitor charts (2026-11-20)
+    // Plain HTML bars (each mark is a button: hover/focus shows a tooltip, click opens the items).
+
+    function closedChart(state, rows) {
+      var months = D.closedByMonth(rows, state.today, 6);
+      var max = months.reduce(function (a, b) { return Math.max(a, b.count); }, 0);
+      var best = max ? months.map(function (b) { return b.count; }).lastIndexOf(max) : -1;
+      var total = months.reduce(function (a, b) { return a + b.count; }, 0);
+      var cols = months.map(function (b, i) {
+        var h = max ? Math.max(b.count ? 4 : 0, Math.round((b.count / max) * 100)) : 0;
+        var name = D.THAI_MONTHS_LONG[b.m - 1] + ' ' + (b.y + 543);
+        var tip = name + ': ปิดงาน ' + b.count + ' งาน';
+        // direct labels only where they matter: this month and the best month
+        var showValue = b.count && (i === months.length - 1 || i === best);
+        var key = state.registerDrill('ปิดงานเดือน' + name, b.ids);
+        return '<div class="col' + (i === months.length - 1 ? ' now' : '') + '" data-count="' + b.count + '">' +
+          '<button type="button" class="col-hit" data-action="drill" data-drill="' + key + '" aria-label="' + esc(tip) + '"' + (b.count ? '' : ' disabled') + '>' +
+          '<span class="col-val num">' + (showValue ? b.count : '') + '</span>' +
+          '<span class="col-bar" style="height:' + h + '%;--i:' + i + '"></span>' +
+          '<span class="ctip" aria-hidden="true">' + esc(tip) + '</span></button>' +
+          '<span class="col-lab">' + esc(b.label) + '</span></div>';
+      }).join('');
+      return '<section class="panel chart" id="chart-closed" aria-labelledby="cc-h"><div class="panel-head"><h2 id="cc-h">ปิดงานรายเดือน</h2>' +
+        '<span class="muted">6 เดือนล่าสุด รวม <b class="num">' + total + '</b> งาน ' + UI.helpTip('นับงานที่ แก้ไขเรียบร้อย และ ใช้งานได้อยู่แล้ว ตามวันที่เสร็จ ไม่นับงานที่ยกเลิก กดแท่งเพื่อดูรายการ') + '</span></div>' +
+        (total ? '<div class="cols">' + cols + '</div>' : '<p class="muted">ยังไม่มีงานที่ปิดใน 6 เดือนนี้</p>') + '</section>';
+    }
+
+    function platformChart(state, rows) {
+      var plats = D.openByPlatform(rows);
+      var max = plats.reduce(function (a, b) { return Math.max(a, b.open); }, 0) || 1;
+      var seg = function (title, ids, n, cls) {
+        if (!n) return '';
+        var key = state.registerDrill(title, ids);
+        return '<button type="button" class="pseg ' + cls + '" style="flex-grow:' + n + '" data-action="drill" data-drill="' + key + '" aria-label="' + esc(title + ' ' + n + ' งาน') + '">' +
+          '<span class="ctip" aria-hidden="true">' + esc(title + ': ' + n + ' งาน') + '</span></button>';
+      };
+      var bars = plats.map(function (p) {
+        var ok = p.open - p.overdue;
+        var okIds = p.ids.filter(function (id) { return p.overdueIds.indexOf(id) === -1; });
+        return '<div class="pbar"><span class="pname">' + esc(p.platform) + '</span>' +
+          '<span class="ptrack"><span class="pfill" style="width:' + Math.round((p.open / max) * 100) + '%">' +
+          seg(p.platform + ' ยังไม่เกินกำหนด', okIds, ok, 'ok') + seg(p.platform + ' เกินกำหนด', p.overdueIds, p.overdue, 'over') +
+          '</span></span><span class="ptotal num">' + p.open + '</span></div>';
+      }).join('');
+      return '<section class="panel chart" id="chart-platform" aria-labelledby="cp-h"><div class="panel-head"><h2 id="cp-h">งานค้างแต่ละแพลตฟอร์ม</h2>' +
+        '<span class="legend"><span class="lg"><i class="sw ok" aria-hidden="true"></i>ยังไม่เกินกำหนด</span><span class="lg"><i class="sw over" aria-hidden="true"></i>เกินกำหนด</span></span></div>' +
+        (plats.length ? '<div class="pbars">' + bars + '</div>' : '<p class="muted">ไม่มีงานค้าง</p>') + '</section>';
     }
 
     function greetingName(state) {
@@ -388,7 +440,7 @@
       }
       if (col.type === 'date') return UI.dateField(o);
       if (col.type === 'number') return UI.input(Object.assign(o, { inputmode: 'decimal' }));
-      if (key === 'detail') return UI.textarea(Object.assign(o, { wide: true, hint: 'อธิบายสิ่งที่ต้องการให้แก้ไข ให้คนอื่นอ่านแล้วเข้าใจ' }));
+      if (key === 'detail') return UI.textarea(Object.assign(o, { wide: true, feature: true, icon: 'report', hint: 'อธิบายสิ่งที่ต้องการให้แก้ไข ให้คนอื่นอ่านแล้วเข้าใจ' }));
       if (key === 'ticket') {
         // links embedded in the sheet cell (rich text / =HYPERLINK) + a URL typed as text (2026-11-11)
         var urls = ((row && row.ticketLinks) || []).slice();
@@ -477,8 +529,11 @@
             return '<li><form class="as-row' + (r.isOverdue ? ' over' : '') + '" data-id="' + esc(r.id) + '">' +
               '<div class="as-info"><div class="as-top"><span class="kseq num">#' + esc(r.seq === null ? '–' : r.seq) + '</span><span class="kplat">' + esc(r.platform) + '</span>' +
               '<span class="muted">' + esc(r.system) + '</span>' + (D.urgencyRank(r.urgency) < 2 ? UI.urgency(r.urgency) : '') + '<span>' + UI.due(r, state.today) + '</span></div>' +
-              '<a href="#/items/' + encodeURIComponent(r.id) + '" class="as-title">' + esc(r.detail) + '</a>' +
-              '<div class="as-sub muted">' + UI.statusBadge(r.status) + ' PM: ' + esc(r.pm || '–') + '</div></div>' +
+              // status right after the title, on the same line (user request 2026-11-20)
+              '<div class="as-head"><a href="#/items/' + encodeURIComponent(r.id) + '" class="as-title">' + esc(r.detail) + '</a>' + UI.statusBadge(r.status) + '</div>' +
+              '<div class="as-sub muted">PM: ' + esc(r.pm || '–') +
+                // Taiga/MANTIS one click away (user request 2026-11-20); a plain number has no link to follow
+                (r.ticketUrl ? ' ' + UI.ticketLink(r) : r.ticket ? ' <span class="num">#' + esc(r.ticket) + '</span>' : '') + '</div></div>' +
               '<div class="as-pick"><label for="' + esc(fid) + '" class="sr-only">นักพัฒนาสำหรับรายการ #' + esc(r.seq) + '</label>' +
               '<input id="' + esc(fid) + '" name="developer" list="as-devs" autocomplete="off" placeholder="พิมพ์หรือเลือกชื่อ" required>' +
               '<button type="submit" class="btn primary small">มอบหมาย</button></div></form></li>';
@@ -751,9 +806,19 @@
       return 'ทุกช่วงเวลา';
     }
 
+    /** แพลตฟอร์ม / PM (incl. PM teams) narrow the rows first, then status + วันที่เสร็จ (user request 2026-11-20). */
+    function drReport(state) {
+      var dr = state.dr;
+      var rows = D.applyFilters(state.rows, {
+        platform: dr.platform ? [dr.platform] : [],
+        pm: D.pmFilter(dr.pm, (state.options && state.options.pm) || []),
+      });
+      return D.doneReport(rows, drQuery(dr));
+    }
+
     function doneReport(state) {
       var dr = state.dr;
-      var rep = D.doneReport(state.rows, drQuery(dr));
+      var rep = drReport(state);
       var statusOpts = { name: 'dr-status', label: 'สถานะ', icon: 'report', value: dr.status, emptyLabel: 'ทุกสถานะ',
         options: ['closed'].concat(D.WORKFLOW),
         groups: [{ label: 'ปิดงาน', options: [{ value: 'closed', label: 'ปิดแล้วทั้งหมด (3 สถานะ)' }] }].concat(UI.statusGroups()) };
@@ -774,7 +839,9 @@
       var html = '<div class="page-head"><h1>รายงานงานที่ปิด</h1><span class="muted">' + esc(drPeriodLabel(dr, rep.range)) + '</span>' +
         '<span class="spacer"></span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button>' +
         '<button class="btn small primary" data-action="dr-export"' + (rep.total ? '' : ' disabled') + '>' + UI.withIcon('download', 'Export CSV (Excel)') + '</button></div>';
-      html += '<form class="filters dr-filters" id="dr-form" aria-label="ตัวเลือกรายงาน">' + UI.select(statusOpts) + modeSel + period + '</form>';
+      var platformSel = UI.select({ name: 'dr-platform', label: 'แพลตฟอร์ม', icon: 'platform', options: state.options.platform, value: dr.platform, emptyLabel: 'ทั้งหมด' });
+      var pmSel = pmFilterSelect(state.options.pm || [], dr.pm, 'dr-pm');
+      html += '<form class="filters dr-filters" id="dr-form" aria-label="ตัวเลือกรายงาน">' + UI.select(statusOpts) + platformSel + pmSel + modeSel + period + '</form>';
       html += '<div class="dr-summary" role="status"><span>พบ <strong id="dr-count" class="num">' + rep.total + '</strong> รายการ</span>' +
         rep.byStatus.map(function (s) { return '<span class="dr-chip">' + UI.statusBadge(s.status) + ' <span class="num">' + s.count + '</span></span>'; }).join('') + '</div>';
       if (rep.noDoneDate) {
@@ -783,11 +850,13 @@
       }
       if (!rep.total) return html + UI.emptyState('ไม่มีรายการในช่วงนี้', 'ลองเปลี่ยนสถานะ หรือช่วงวันที่เสร็จ', '');
       html += '<div class="table-wrap"><table class="responsive" id="dr-table"><thead><tr>' +
-        '<th>ลำดับ</th><th data-hide-mobile>แพลตฟอร์ม</th><th data-hide-mobile>ระบบงาน</th><th>รายละเอียด</th><th>Taiga/MANTIS</th><th>สถานะ</th><th>นักพัฒนา</th><th data-hide-mobile>PM</th><th>วันที่เสร็จ</th><th data-hide-mobile>วันที่ Deploy</th>' +
+        '<th>ลำดับ</th><th data-hide-mobile>แพลตฟอร์ม</th><th data-hide-mobile>ระบบงาน</th><th>รายละเอียด</th><th>Taiga/MANTIS</th><th>สถานะ</th><th>นักพัฒนา</th><th>ผู้ทดสอบ</th><th data-hide-mobile>PM</th><th>วันที่เสร็จ</th><th data-hide-mobile>วันที่ Deploy</th>' +
         '</tr></thead><tbody>' + rep.rows.map(function (r) {
           return '<tr class="clickable" data-action="open-item" data-id="' + esc(r.id) + '">' +
-            ['seq', 'platform', 'system', 'detail', 'ticket', 'status', 'developer', 'pm'].map(function (k) {
-              return k === 'seq' ? '<td class="num" data-hide-mobile>' + esc(r.seq === null ? '–' : r.seq) + '</td>' : ITEM_COLS[k].cell(r, state);
+            ['seq', 'platform', 'system', 'detail', 'ticket', 'status', 'developer', 'tester', 'pm'].map(function (k) {
+              if (k === 'seq') return '<td class="num" data-hide-mobile>' + esc(r.seq === null ? '–' : r.seq) + '</td>';
+              if (k === 'tester') return '<td>' + (r.tester ? esc(r.tester) : '<span class="muted">–</span>') + '</td>';
+              return ITEM_COLS[k].cell(r, state);
             }).join('') +
             '<td class="num">' + (r.doneDate.date ? esc(D.formatThai(r.doneDate.date)) : '<span class="muted">–</span>') + '</td>' +
             '<td class="num" data-hide-mobile>' + (r.deployDate.date ? esc(D.formatThai(r.deployDate.date)) : '<span class="muted">–</span>') + '</td></tr>';
@@ -995,6 +1064,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>

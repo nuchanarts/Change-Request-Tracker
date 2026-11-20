@@ -44,6 +44,8 @@
     return '11/11/2026 10:' + String(10 + log.length).slice(-2) + ':00';
   };
   var latency = Number(params.get('latency') || 250);
+  // the remembered-copy start (App.html showSnapshot) is off unless a test asks for it
+  window.__mockNoSnapshot = params.get('snapshot') !== '1';
   var MSG = {
     FORBIDDEN: 'บัญชีของคุณมีสิทธิ์ดูอย่างเดียว จึงเพิ่มหรือแก้ไขรายการไม่ได้',
     VALIDATION: 'กรุณาตรวจสอบข้อมูลที่กรอกอีกครั้ง',
