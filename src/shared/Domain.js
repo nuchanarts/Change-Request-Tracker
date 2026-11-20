@@ -1174,6 +1174,128 @@ var Domain = (function () {
     return lines.join('\n');
   }
 
+  // ---------------------------------------------------------------- closed-work report (2026-11-20)
+
+  /**
+   * วันที่เสร็จ range for the report. null = no date filter.
+   * @param {any} p {mode:'month',y,m} | {mode:'year',y} | {mode:'range',from,to} | {mode:'all'}
+   * @returns {{from:SheetDate|null,to:SheetDate|null}|null}
+   */
+  function doneRange(p) {
+    if (!p) return null;
+    if (p.mode === 'month') return monthRange({ y: p.y, m: p.m, d: 1 });
+    if (p.mode === 'year') return { from: { y: p.y, m: 1, d: 1 }, to: { y: p.y, m: 12, d: 31 } };
+    if (p.mode === 'range' && (p.from || p.to)) return { from: p.from || null, to: p.to || null };
+    return null;
+  }
+
+  /**
+   * Items of the chosen statuses whose วันที่เสร็จ falls in the period, oldest first.
+   * @param {any[]} rows enriched rows
+   * @param {{statuses?: string[], period?: any}} opts statuses: exact values, empty = every status
+   */
+  function doneReport(rows, opts) {
+    opts = opts || {};
+    var statuses = opts.statuses || [];
+    var range = doneRange(opts.period);
+    var ofStatus = rows.filter(function (r) {
+      return !statuses.length || statuses.indexOf(r.status) !== -1;
+    });
+    var list = ofStatus
+      .filter(function (r) {
+        return !range || inRange(r.doneDate.date, range);
+      })
+      .sort(function (a, b) {
+        var x = a.doneDate.date;
+        var y = b.doneDate.date;
+        if (x && y && compareDate(x, y) !== 0) return compareDate(x, y);
+        if (!x !== !y) return x ? -1 : 1;
+        return (a.seq === null ? Infinity : a.seq) - (b.seq === null ? Infinity : b.seq);
+      });
+    var counts = groupBy(list, function (r) {
+      return r.status;
+    });
+    var order = Object.keys(counts).sort(function (a, b) {
+      var ia = statuses.indexOf(a);
+      var ib = statuses.indexOf(b);
+      if (ia !== ib) return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib);
+      return statusRank(a) - statusRank(b) || (a < b ? -1 : 1);
+    });
+    return {
+      rows: list,
+      total: list.length,
+      range: range,
+      byStatus: order.map(function (s) {
+        return { status: s, count: counts[s].length };
+      }),
+      // matching status but no readable วันที่เสร็จ: left out by a date filter, the PM should fill it in
+      noDoneDate: range
+        ? ofStatus.filter(function (r) {
+            return !r.doneDate.date;
+          }).length
+        : 0,
+    };
+  }
+
+  /** Years found in วันที่เสร็จ plus this year, newest first. @param {any[]} rows @param {SheetDate} today */
+  function doneYears(rows, today) {
+    /** @type {Object<string, boolean>} */
+    var seen = {};
+    seen[today.y] = true;
+    rows.forEach(function (r) {
+      if (r.doneDate && r.doneDate.date) seen[r.doneDate.date.y] = true;
+    });
+    return Object.keys(seen)
+      .map(Number)
+      .sort(function (a, b) {
+        return b - a;
+      });
+  }
+
+  var CSV_KEYS = [
+    'seq',
+    'platform',
+    'issueType',
+    'urgency',
+    'status',
+    'system',
+    'detail',
+    'pm',
+    'ticket',
+    'developer',
+    'tester',
+    'dueDate',
+    'postponedDate',
+    'doneDate',
+    'deployDate',
+    'devHours',
+  ];
+
+  /** @param {any} v */
+  function csvCell(v) {
+    var s = str(v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // never let Excel/Sheets run cell text as a formula
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  /** CSV (CRLF lines, sheet headers) of report rows; the caller adds the UTF-8 BOM for Excel. @param {any[]} rows */
+  function doneReportCsv(rows) {
+    var lines = [
+      CSV_KEYS.map(function (k) {
+        return csvCell(COLUMN_BY_KEY[k].header);
+      }).join(','),
+    ];
+    rows.forEach(function (r) {
+      lines.push(
+        CSV_KEYS.map(function (k) {
+          if (k === 'ticket') return csvCell(r.ticketUrl || r.raw.ticket);
+          return csvCell(r.raw[k]);
+        }).join(','),
+      );
+    });
+    return lines.join('\r\n');
+  }
+
   /** @param {any[]} rows @param {string} query */
   function search(rows, query) {
     var q = clean(query).toLowerCase();
@@ -1420,6 +1542,10 @@ var Domain = (function () {
     overdueBuckets: overdueBuckets,
     itemRef: itemRef,
     buildReport: buildReport,
+    doneRange: doneRange,
+    doneReport: doneReport,
+    doneYears: doneYears,
+    doneReportCsv: doneReportCsv,
     search: search,
     validateCreate: validateCreate,
     validateUpdate: validateUpdate,

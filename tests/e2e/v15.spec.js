@@ -14,6 +14,7 @@ test.describe('Navigation order, Taiga link, access admin (2026-11-11)', () => {
       'งานของฉัน',
       'งาน PM',
       'รายการทั้งหมด',
+      'รายงานปิดงาน',
       'จัดการสิทธิ์',
       'วิธีใช้งาน', // icon only; the name is for screen readers
       'Taiga ↗',

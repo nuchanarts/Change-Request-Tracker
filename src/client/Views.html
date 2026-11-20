@@ -727,6 +727,74 @@
         '<button class="btn" data-action="digest-now">ส่งสรุปตอนนี้ (ทดสอบ)</button></section>';
     }
 
+    // ------------------------------------------------------------------ Closed-work report (2026-11-20)
+
+    var DR_MODES = [['month', 'รายเดือน'], ['year', 'ทั้งปี'], ['range', 'กำหนดช่วงวันที่เอง'], ['all', 'ไม่กรองวันที่เสร็จ']];
+
+    /** The status choice: "closed" = every closing status, "" = every status, else one exact value. */
+    function drStatuses(value) {
+      if (value === 'closed') return D.CLOSED.slice();
+      return value ? [value] : [];
+    }
+
+    /** {statuses, period} for Domain.doneReport from the page's choices. */
+    function drQuery(dr) {
+      var period = { mode: dr.mode, y: dr.y, m: dr.m };
+      if (dr.mode === 'range') period = { mode: 'range', from: D.parseDate(dr.from).date, to: D.parseDate(dr.to).date };
+      return { statuses: drStatuses(dr.status), period: period };
+    }
+
+    function drPeriodLabel(dr, range) {
+      if (dr.mode === 'month') return D.THAI_MONTHS_LONG[dr.m - 1] + ' ' + (dr.y + 543);
+      if (dr.mode === 'year') return 'ปี ' + (dr.y + 543);
+      if (dr.mode === 'range' && range) return (range.from ? D.formatThai(range.from) : '…') + ' ถึง ' + (range.to ? D.formatThai(range.to) : '…');
+      return 'ทุกช่วงเวลา';
+    }
+
+    function doneReport(state) {
+      var dr = state.dr;
+      var rep = D.doneReport(state.rows, drQuery(dr));
+      var statusOpts = { name: 'dr-status', label: 'สถานะ', icon: 'report', value: dr.status, emptyLabel: 'ทุกสถานะ',
+        options: ['closed'].concat(D.WORKFLOW),
+        groups: [{ label: 'ปิดงาน', options: [{ value: 'closed', label: 'ปิดแล้วทั้งหมด (3 สถานะ)' }] }].concat(UI.statusGroups()) };
+      var modeSel = UI.select({ name: 'dr-mode', label: 'กรองจากวันที่เสร็จ', icon: 'calendar', value: dr.mode, allowEmpty: false,
+        options: DR_MODES.map(function (x) { return x[0]; }),
+        groups: [{ label: 'ช่วงเวลา', options: DR_MODES.map(function (x) { return { value: x[0], label: x[1] }; }) }] });
+      var years = D.doneYears(state.rows, state.today);
+      if (years.indexOf(dr.y) === -1) years.push(dr.y);
+      var yearSel = UI.select({ name: 'dr-year', label: 'ปี (พ.ศ.)', value: String(dr.y), allowEmpty: false, options: years.map(String),
+        groups: [{ label: 'ปี', options: years.map(function (y) { return { value: String(y), label: String(y + 543) }; }) }] });
+      var monthSel = UI.select({ name: 'dr-month', label: 'เดือน', value: String(dr.m), allowEmpty: false,
+        options: D.THAI_MONTHS_LONG.map(function (_, i) { return String(i + 1); }),
+        groups: [{ label: 'เดือน', options: D.THAI_MONTHS_LONG.map(function (n, i) { return { value: String(i + 1), label: n }; }) }] });
+      var period = dr.mode === 'month' ? monthSel + yearSel :
+        dr.mode === 'year' ? yearSel :
+        dr.mode === 'range' ? UI.dateField({ name: 'dr-from', label: 'วันที่เสร็จตั้งแต่', icon: 'calendar', value: dr.from }) + UI.dateField({ name: 'dr-to', label: 'ถึง', icon: 'calendar', value: dr.to }) : '';
+
+      var html = '<div class="page-head"><h1>รายงานงานที่ปิด</h1><span class="muted">' + esc(drPeriodLabel(dr, rep.range)) + '</span>' +
+        '<span class="spacer"></span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button>' +
+        '<button class="btn small primary" data-action="dr-export"' + (rep.total ? '' : ' disabled') + '>' + UI.withIcon('download', 'Export CSV (Excel)') + '</button></div>';
+      html += '<form class="filters dr-filters" id="dr-form" aria-label="ตัวเลือกรายงาน">' + UI.select(statusOpts) + modeSel + period + '</form>';
+      html += '<div class="dr-summary" role="status"><span>พบ <strong id="dr-count" class="num">' + rep.total + '</strong> รายการ</span>' +
+        rep.byStatus.map(function (s) { return '<span class="dr-chip">' + UI.statusBadge(s.status) + ' <span class="num">' + s.count + '</span></span>'; }).join('') + '</div>';
+      if (rep.noDoneDate) {
+        html += '<div class="banner warn" role="note">มี ' + rep.noDoneDate + ' รายการในสถานะที่เลือกที่ยังไม่มีวันที่เสร็จ จึงไม่อยู่ในรายงานนี้ ' +
+          'เลือก "ไม่กรองวันที่เสร็จ" เพื่อดูและเติมวันที่</div>';
+      }
+      if (!rep.total) return html + UI.emptyState('ไม่มีรายการในช่วงนี้', 'ลองเปลี่ยนสถานะ หรือช่วงวันที่เสร็จ', '');
+      html += '<div class="table-wrap"><table class="responsive" id="dr-table"><thead><tr>' +
+        '<th>ลำดับ</th><th data-hide-mobile>แพลตฟอร์ม</th><th data-hide-mobile>ระบบงาน</th><th>รายละเอียด</th><th>Taiga/MANTIS</th><th>สถานะ</th><th>นักพัฒนา</th><th data-hide-mobile>PM</th><th>วันที่เสร็จ</th><th data-hide-mobile>วันที่ Deploy</th>' +
+        '</tr></thead><tbody>' + rep.rows.map(function (r) {
+          return '<tr class="clickable" data-action="open-item" data-id="' + esc(r.id) + '">' +
+            ['seq', 'platform', 'system', 'detail', 'ticket', 'status', 'developer', 'pm'].map(function (k) {
+              return k === 'seq' ? '<td class="num" data-hide-mobile>' + esc(r.seq === null ? '–' : r.seq) + '</td>' : ITEM_COLS[k].cell(r, state);
+            }).join('') +
+            '<td class="num">' + (r.doneDate.date ? esc(D.formatThai(r.doneDate.date)) : '<span class="muted">–</span>') + '</td>' +
+            '<td class="num" data-hide-mobile>' + (r.deployDate.date ? esc(D.formatThai(r.deployDate.date)) : '<span class="muted">–</span>') + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+      return html;
+    }
+
     // ------------------------------------------------------------------ Text report export
 
     function exportDialog(state, opts, text) {
@@ -927,6 +995,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>

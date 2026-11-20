@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { open } from './helpers.js';
 
-const pages = ['/#/monitor', '/#/kanban', '/#/items', '/#/new', '/#/my-work', '/#/help'];
+const pages = ['/#/monitor', '/#/kanban', '/#/items', '/#/new', '/#/my-work', '/#/done-report', '/#/help'];
 
 for (const path of pages) {
   test(`no serious accessibility issues and no sideways scroll: ${path}`, async ({ page }) => {
