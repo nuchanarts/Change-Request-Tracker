@@ -864,6 +864,62 @@
       return html;
     }
 
+    // ------------------------------------------------------------------ Taiga register (user request 2026-11-20)
+
+    var TG_SCOPES = [['open', 'งานที่ยังไม่ปิด'], ['closed', 'ปิดแล้ว'], ['all', 'ทั้งหมด']];
+
+    /** แพลตฟอร์ม / PM / search narrow the rows, then the register picks the Taiga items. */
+    function tgReport(state) {
+      var tg = state.tg;
+      var rows = D.applyFilters(state.rows, {
+        platform: tg.platform ? [tg.platform] : [],
+        pm: D.pmFilter(tg.pm, (state.options && state.options.pm) || []),
+      });
+      if (tg.q) rows = D.search(rows, tg.q);
+      return D.taigaRegister(rows, { scope: tg.scope });
+    }
+
+    function tgProgress(r) {
+      var p = D.progressOf(r.status);
+      if (p.pct === null) return '<span class="muted">' + esc(p.label) + '</span>';
+      return '<div class="tg-prog tg-' + p.state + '" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + p.pct + '" aria-label="ความคืบหน้า ' + esc(p.label) + '">' +
+        '<span class="tg-track"><span class="tg-fill" style="width:' + p.pct + '%"></span></span><span class="tg-lab num">' + esc(p.label) + '</span></div>';
+    }
+
+    function taigaRegister(state) {
+      var tg = state.tg;
+      var rep = tgReport(state);
+      var scopeSel = UI.select({ name: 'tg-scope', label: 'แสดง', icon: 'list', value: tg.scope, allowEmpty: false,
+        options: TG_SCOPES.map(function (x) { return x[0]; }),
+        groups: [{ label: 'ขอบเขต', options: TG_SCOPES.map(function (x) { return { value: x[0], label: x[1] }; }) }] });
+      var platformSel = UI.select({ name: 'tg-platform', label: 'แพลตฟอร์ม', icon: 'platform', options: state.options.platform, value: tg.platform, emptyLabel: 'ทั้งหมด' });
+      var pmSel = pmFilterSelect(state.options.pm || [], tg.pm, 'tg-pm');
+      var search = UI.input({ name: 'tg-q', label: 'ค้นหา', value: tg.q, placeholder: 'ลำดับ เลข ticket หรือคำในรายละเอียด' });
+
+      var html = '<div class="page-head"><h1>ทะเบียน Taiga</h1><span class="muted">ความคืบหน้าของงานที่มีลิงก์ Taiga หรืออยู่ในขั้นตอน Taiga</span>' +
+        '<span class="spacer"></span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button>' +
+        '<button class="btn small primary" data-action="tg-export"' + (rep.total ? '' : ' disabled') + '>' + UI.withIcon('download', 'Export CSV (Excel)') + '</button></div>';
+      html += '<form class="filters dr-filters" id="tg-form" aria-label="ตัวเลือกทะเบียน Taiga">' + scopeSel + platformSel + pmSel + search + '</form>';
+      html += '<div class="dr-summary" role="status"><span>พบ <strong id="tg-count" class="num">' + rep.total + '</strong> รายการ</span>' +
+        rep.byStatus.map(function (s) { return '<span class="dr-chip">' + UI.statusBadge(s.status) + ' <span class="num">' + s.count + '</span></span>'; }).join('') + '</div>';
+      if (rep.noLink) {
+        html += '<div class="banner warn" role="note">มี ' + rep.noLink + ' รายการที่อยู่ในขั้นตอน Taiga แต่ยังไม่มีลิงก์ Taiga ในช่อง "ข้อมูลลิงค์ Taiga หรือ MANTIS" กดที่แถวเพื่อเปิดแล้ววางลิงก์ได้เลย</div>';
+      }
+      if (!rep.total) return html + UI.emptyState('ไม่มีรายการ Taiga', 'ลองเปลี่ยนขอบเขต ตัวกรอง หรือคำค้นหา', '');
+      html += '<div class="table-wrap"><table class="responsive" id="tg-table"><thead><tr>' +
+        '<th>ลำดับ</th><th data-hide-mobile>แพลตฟอร์ม</th><th data-hide-mobile>ระบบงาน</th><th>รายละเอียด</th><th>Taiga</th><th>สถานะ</th><th>ความคืบหน้า</th><th>นักพัฒนา</th><th>ผู้ทดสอบ</th><th data-hide-mobile>PM</th><th>กำหนดส่ง</th>' +
+        '</tr></thead><tbody>' + rep.rows.map(function (r) {
+          var link = D.taigaLink(r);
+          var linkCell = link ? '<td>' + UI.ticketLink(Object.assign({}, r, { ticketUrl: link })) + '</td>' : '<td><span class="tg-nolink">ยังไม่มีลิงก์</span></td>';
+          return '<tr class="clickable" data-action="open-item" data-id="' + esc(r.id) + '">' +
+            ITEM_COLS.seq.cell(r, state) + ITEM_COLS.platform.cell(r, state) + ITEM_COLS.system.cell(r, state) + ITEM_COLS.detail.cell(r, state) +
+            linkCell + ITEM_COLS.status.cell(r, state) + '<td class="tg-prog-cell">' + tgProgress(r) + '</td>' +
+            ITEM_COLS.developer.cell(r, state) + '<td>' + (r.tester ? esc(r.tester) : '<span class="muted">–</span>') + '</td>' +
+            ITEM_COLS.pm.cell(r, state) + ITEM_COLS.due.cell(r, state) + '</tr>';
+        }).join('') + '</tbody></table></div>';
+      return html;
+    }
+
     // ------------------------------------------------------------------ Text report export
 
     function exportDialog(state, opts, text) {
@@ -1064,6 +1120,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, taigaRegister: taigaRegister, tgReport: tgReport, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>

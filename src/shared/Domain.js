@@ -1361,6 +1361,179 @@ var Domain = (function () {
     return lines.join('\r\n');
   }
 
+  // ---------------------------------------------------------------- Taiga register (user request 2026-11-20)
+
+  var TAIGA_STEPS = ['0.จัดทำ Taiga', PM_REVIEW, PM_RETURN];
+  var OPEN_STEPS = WORKFLOW.filter(function (s) {
+    return CLOSED.indexOf(s) === -1;
+  });
+
+  /** The item's Taiga link (cell links first, then a URL typed in the cell); MANTIS links do not count. @param {any} r */
+  function taigaLink(r) {
+    var all = (r.ticketLinks || []).concat(r.ticketUrl ? [r.ticketUrl] : []);
+    for (var i = 0; i < all.length; i++) if (/taiga/i.test(all[i])) return all[i];
+    return null;
+  }
+
+  /**
+   * How far along the workflow a status is: open steps count 1..n (never 100%), the two "done" closings are
+   * 100%, cancelled has no bar, and an empty/unknown status is flagged.
+   * @param {any} status
+   */
+  function progressOf(status) {
+    var s = clean(status);
+    var n = OPEN_STEPS.length;
+    if (s === CANCELLED) return { step: null, total: n, pct: null, state: 'cancelled', label: 'ยกเลิก' };
+    if (CLOSED.indexOf(s) !== -1) return { step: n, total: n, pct: 100, state: 'done', label: 'ปิดแล้ว' };
+    var i = OPEN_STEPS.indexOf(s);
+    if (i === -1) return { step: null, total: n, pct: 0, state: 'unknown', label: 'ไม่อยู่ในขั้นตอน' };
+    return {
+      step: i + 1,
+      total: n,
+      pct: Math.round(((i + 1) / (n + 1)) * 100),
+      state: 'open',
+      label: 'ขั้น ' + (i + 1) + '/' + n,
+    };
+  }
+
+  /**
+   * Items with a Taiga link or in a Taiga step, newest first. scope: 'open' (default) | 'closed' | 'all'.
+   * @param {any[]} rows @param {{scope?: string}} q
+   */
+  function taigaRegister(rows, q) {
+    var scope = (q && q.scope) || 'open';
+    var out = rows.filter(function (r) {
+      if (scope === 'open' && !r.isOpen) return false;
+      if (scope === 'closed' && r.isOpen) return false;
+      return !!taigaLink(r) || TAIGA_STEPS.indexOf(r.status) !== -1;
+    });
+    out.sort(function (a, b) {
+      return (b.seq === null ? -1 : b.seq) - (a.seq === null ? -1 : a.seq);
+    });
+    /** @type {Object<string, number>} */
+    var counts = {};
+    out.forEach(function (r) {
+      counts[r.status] = (counts[r.status] || 0) + 1;
+    });
+    var byStatus = Object.keys(counts)
+      .sort(function (a, b) {
+        return statusRank(a) - statusRank(b);
+      })
+      .map(function (s) {
+        return { status: s, count: counts[s] };
+      });
+    return {
+      rows: out,
+      total: out.length,
+      noLink: out.filter(function (r) {
+        return !taigaLink(r);
+      }).length,
+      byStatus: byStatus,
+    };
+  }
+
+  /** CSV of the register (CRLF lines); the caller adds the UTF-8 BOM for Excel. @param {any[]} rows */
+  function taigaRegisterCsv(rows) {
+    var cols = [
+      [
+        'ลำดับ',
+        function (r) {
+          return r.raw.seq;
+        },
+      ],
+      [
+        'แพลตฟอร์ม',
+        function (r) {
+          return r.raw.platform;
+        },
+      ],
+      [
+        'ระบบงาน',
+        function (r) {
+          return r.raw.system;
+        },
+      ],
+      [
+        'รายละเอียด',
+        function (r) {
+          return r.raw.detail;
+        },
+      ],
+      [
+        'ลิงก์ Taiga',
+        function (r) {
+          return taigaLink(r) || '';
+        },
+      ],
+      [
+        'สถานะ',
+        function (r) {
+          return r.raw.status;
+        },
+      ],
+      [
+        'ความคืบหน้า',
+        function (r) {
+          var p = progressOf(r.status);
+          return p.label + (p.pct === null ? '' : ' (' + p.pct + '%)');
+        },
+      ],
+      [
+        'นักพัฒนา',
+        function (r) {
+          return r.raw.developer;
+        },
+      ],
+      [
+        'ผู้ทดสอบ',
+        function (r) {
+          return r.raw.tester;
+        },
+      ],
+      [
+        'PM',
+        function (r) {
+          return r.raw.pm;
+        },
+      ],
+      [
+        'วันที่ต้องได้',
+        function (r) {
+          return r.raw.dueDate;
+        },
+      ],
+      [
+        'วันที่เลื่อน',
+        function (r) {
+          return r.raw.postponedDate;
+        },
+      ],
+      [
+        'วันที่เสร็จ',
+        function (r) {
+          return r.raw.doneDate;
+        },
+      ],
+    ];
+    var lines = [
+      cols
+        .map(function (c) {
+          return csvCell(c[0]);
+        })
+        .join(','),
+    ];
+    rows.forEach(function (r) {
+      lines.push(
+        cols
+          .map(function (c) {
+            return csvCell(c[1](r));
+          })
+          .join(','),
+      );
+    });
+    return lines.join('\r\n');
+  }
+
   /** @param {any[]} rows @param {string} query */
   function search(rows, query) {
     var q = clean(query).toLowerCase();
@@ -1579,6 +1752,11 @@ var Domain = (function () {
     statusRank: statusRank,
     nextStatus: nextStatus,
     ticketUrl: ticketUrl,
+    taigaLink: taigaLink,
+    progressOf: progressOf,
+    taigaRegister: taigaRegister,
+    taigaRegisterCsv: taigaRegisterCsv,
+    TAIGA_STEPS: TAIGA_STEPS,
     enrich: enrich,
     countSeq: countSeq,
     detectIssues: detectIssues,

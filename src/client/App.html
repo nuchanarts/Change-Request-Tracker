@@ -462,6 +462,7 @@
         html = Views.access(state);
       }
       else if (r.name === 'done-report') html = Views.doneReport(doneReportState());
+      else if (r.name === 'taiga') html = Views.taigaRegister(taigaState());
       else if (r.name === 'help') html = Views.help(state);
       else html = Views.monitor(state);
       if (state.tourStep !== null) html += Views.tour(state.tourStep);
@@ -784,6 +785,46 @@
       UI.toast('ดาวน์โหลด ' + rep.total + ' รายการแล้ว เปิดด้วย Excel หรือ Google Sheets ได้');
     }
 
+    // ------------------------------------------------------------------ Taiga register (2026-11-20)
+
+    var TG_KEY = 'ehp.taiga.v1'; // remembers scope, platform and PM; the search box starts empty
+    function taigaState() {
+      if (!state.tg) {
+        var saved = store(TG_KEY) || {};
+        state.tg = { scope: saved.scope || 'open', platform: saved.platform || '', pm: saved.pm || '', q: '' };
+      }
+      return state;
+    }
+    function readTaigaForm(form) {
+      var tg = state.tg;
+      var el = form.elements;
+      tg.scope = el['tg-scope'].value;
+      tg.platform = el['tg-platform'].value;
+      tg.pm = el['tg-pm'].value;
+      tg.q = el['tg-q'].value;
+      store(TG_KEY, { scope: tg.scope, platform: tg.platform, pm: tg.pm });
+      var active = document.activeElement;
+      var focusId = active && active.id;
+      var pos = active && active.tagName === 'INPUT' ? active.selectionStart : null;
+      render();
+      var again = focusId && document.getElementById(focusId);
+      if (again) {
+        again.focus();
+        if (pos !== null && again.setSelectionRange) again.setSelectionRange(pos, pos);
+      }
+    }
+    function exportTaiga() {
+      var rep = Views.tgReport(state);
+      var blob = new Blob(['\ufeff' + D.taigaRegisterCsv(rep.rows)], { type: 'text/csv;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'ทะเบียน-Taiga-' + D.formatDate(state.today).split('/').join('-') + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      UI.toast('ดาวน์โหลด ' + rep.total + ' รายการแล้ว เปิดด้วย Excel หรือ Google Sheets ได้');
+    }
+
     // ------------------------------------------------------------------ text report export
 
     var REPORT_KEY = 'ehp.report.since.v1';
@@ -1043,6 +1084,7 @@
         saveAccess(input);
       },
       'dr-export': exportDoneReport,
+      'tg-export': exportTaiga,
       'pick-skin': function (el) {
         var id = applySkin(el.getAttribute('data-skin'));
         store(SKIN_KEY, id);
@@ -1118,6 +1160,8 @@
       }
       if (form && form.id === 'export-form') return refreshExport();
       if (form && form.id === 'dr-form') return readDoneReportForm(form);
+      // the search box re-renders on input (debounced); its change event on blur must not re-render under a click
+      if (form && form.id === 'tg-form') return ev.target.id === 'f-tg-q' ? undefined : readTaigaForm(form);
       if (form && form.id === 'filters') {
         ['platform', 'pm', 'developer', 'urgency', 'from', 'to'].forEach(function (k) { state.filters[k] = form.elements[k].value; });
         store(KEYS.filters, state.filters);
@@ -1147,6 +1191,11 @@
           q.focus();
           q.setSelectionRange(pos, pos);
         }, 150);
+        return;
+      }
+      if (ev.target.id === 'f-tg-q') {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () { readTaigaForm(ev.target.form); }, 200);
         return;
       }
       if (ev.target.id !== 'q') return;
