@@ -7,7 +7,7 @@ test.describe('US8 Kanban board', () => {
     await expect(page.locator('.kcol[data-status="0.รอแจ้งทีมพัฒนา"]')).toHaveCount(1);
     await expect(page.locator('.kcol.closed')).toHaveCount(1);
     // 11 working steps (PM-approved order) + closed this week, plus the "other" column when needed
-    await expect(page.locator('.kcol:not(.other):not(.closed)')).toHaveCount(11);
+    await expect(page.locator('.kcol:not(.other):not(.closed)')).toHaveCount(12);
     await expect(page.locator('.kcol:not(.other)').first()).toHaveAttribute(
       'data-status',
       '0.จัดทำไฟล์แก้ไข',

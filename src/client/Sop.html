@@ -25,7 +25,7 @@
 
   <h3>2. Workflow</h3>
   <ol class="sop-flow">
-    <li>จัดทำไฟล์แก้ไข → จัดทำ Taiga → รอ PM ตรวจสอบ Taiga → รอแจ้งทีมพัฒนา</li>
+    <li>จัดทำไฟล์แก้ไข → จัดทำ Taiga → รอ PM ตรวจสอบ Taiga (ไม่ผ่าน → PM ส่งกลับแก้ไขไฟล์ Taiga) → รอแจ้งทีมพัฒนา</li>
     <li>(ถ้าต้องใช้) dev ขอ Sourecode อจ. → รอทีมพัฒนา → กำลังพัฒนา → กำลังทดสอบ</li>
     <li>ทดสอบไม่ผ่าน → ส่งกลับนักพัฒนาแก้ไข → กำลังทดสอบ (วนจนผ่าน)</li>
     <li>ทดสอบผ่าน → รอ compile หรือ รอ Complie ต้องแจ้งอจ. → แก้ไขเรียบร้อย</li>
@@ -41,18 +41,19 @@
       <tbody>
         <tr><td>1</td><td><code>0.จัดทำไฟล์แก้ไข</code></td><td>PM</td><td>รายละเอียดครบ อ่านเข้าใจ มีภาพหน้าจอหรือตัวอย่าง</td><td>2</td></tr>
         <tr><td>2</td><td><code>0.จัดทำ Taiga</code></td><td>PM</td><td>สร้าง Taiga แล้ว ใส่เลข/ลิงก์ในช่อง <strong>ข้อมูลลิงค์ Taiga หรือ MANTIS</strong></td><td>3</td></tr>
-        <tr><td>3</td><td><code>รอ PM ตรวจสอบ Taiga</code></td><td>PM</td><td>Taiga ถูกต้อง ใส่ <strong>ความเร่งด่วน</strong> และ <strong>วันที่ต้องได้</strong> แล้ว</td><td>4</td></tr>
-        <tr><td>4</td><td><code>0.รอแจ้งทีมพัฒนา</code></td><td>PM</td><td>แจ้ง Senior Dev แล้ว</td><td>5 หรือ 6</td></tr>
-        <tr><td>5</td><td><code>dev ขอ Sourecode อจ.</code></td><td>Dev / Senior Dev</td><td>ได้ source code จาก อจ. แล้ว</td><td>6</td></tr>
-        <tr><td>6</td><td><code>รอทีมพัฒนา</code></td><td>Senior Dev</td><td>ใส่ <strong>นักพัฒนา</strong> และ <strong>ลำดับการแก้ไข Dev</strong> แล้ว</td><td>7</td></tr>
-        <tr><td>7</td><td><code>กำลังพัฒนา</code></td><td>Dev</td><td>ตอนเริ่มใส่ <strong>เริ่มพัฒนา</strong> · ตอนส่งทดสอบใส่ <strong>พัฒนาเสร็จ</strong> และ <strong>ระยะเวลาพัฒนา(ชม.)</strong> · Senior Dev ตรวจโค้ด</td><td>9</td></tr>
-        <tr><td>8</td><td><code>ส่งกลับนักพัฒนาแก้ไข</code></td><td>Tester</td><td>บันทึกจุดที่ไม่ผ่านใน Taiga แล้ว · Dev แก้เสร็จ ส่งทดสอบใหม่</td><td>9</td></tr>
-        <tr><td>9</td><td><code>กำลังทดสอบ</code></td><td>Dev (ตอนส่งทดสอบ)</td><td>Tester ทดสอบครบทุกข้อใน Taiga · ผ่าน → 10 หรือ 11 · ไม่ผ่าน → 8</td><td>8, 10, 11</td></tr>
-        <tr><td>10</td><td><code>รอ compile</code></td><td>Tester</td><td>Senior Dev compile/deploy แล้ว ใส่ <strong>วันที่ Deploy</strong></td><td>13</td></tr>
-        <tr><td>11</td><td><code>รอ Complie ต้องแจ้งอจ.</code></td><td>Tester / Senior Dev</td><td>แจ้ง อจ. แล้ว และ อจ. compile เสร็จ ใส่ <strong>วันที่ Deploy</strong></td><td>13</td></tr>
-        <tr><td>12</td><td><code>0.ยกเลิก</code></td><td>PM</td><td>เขียนเหตุผลที่ยกเลิกไว้ใน Taiga หรือรายละเอียด</td><td>ปิดงาน</td></tr>
-        <tr><td>13</td><td><code>0.แก้ไขเรียบร้อย</code></td><td>Senior Dev หรือ PM</td><td><strong>ต้องมีวันที่เสร็จ (แอปบังคับ)</strong> · PM ยืนยันกับผู้แจ้งแล้ว</td><td>ปิดงาน</td></tr>
-        <tr><td>14</td><td><code>0.ใช้งานได้อยู่แล้ว</code></td><td>PM (หรือ Dev ที่ตรวจพบ โดยแจ้ง PM)</td><td>ยืนยันแล้วว่าไม่ต้องแก้ จดวิธีใช้ไว้ใน Taiga</td><td>ปิดงาน</td></tr>
+        <tr><td>3</td><td><code>รอ PM ตรวจสอบ Taiga</code></td><td>PM</td><td>Taiga ถูกต้อง ใส่ <strong>ความเร่งด่วน</strong> และ <strong>วันที่ต้องได้</strong> แล้ว · ไม่ถูกต้อง → 4</td><td>4, 5</td></tr>
+        <tr><td>4</td><td><code>0.PM ส่งกลับแก้ไขไฟล์ Taiga</code></td><td>PM</td><td>เขียนจุดที่ต้องแก้ไว้ใน Taiga · ผู้จัดทำแก้ไฟล์/Taiga เสร็จ ส่งให้ PM ตรวจใหม่</td><td>3</td></tr>
+        <tr><td>5</td><td><code>0.รอแจ้งทีมพัฒนา</code></td><td>PM</td><td>แจ้ง Senior Dev แล้ว</td><td>6 หรือ 7</td></tr>
+        <tr><td>6</td><td><code>dev ขอ Sourecode อจ.</code></td><td>Dev / Senior Dev</td><td>ได้ source code จาก อจ. แล้ว</td><td>7</td></tr>
+        <tr><td>7</td><td><code>รอทีมพัฒนา</code></td><td>Senior Dev</td><td>ใส่ <strong>นักพัฒนา</strong> และ <strong>ลำดับการแก้ไข Dev</strong> แล้ว</td><td>8</td></tr>
+        <tr><td>8</td><td><code>กำลังพัฒนา</code></td><td>Dev</td><td>ตอนเริ่มใส่ <strong>เริ่มพัฒนา</strong> · ตอนส่งทดสอบใส่ <strong>พัฒนาเสร็จ</strong> และ <strong>ระยะเวลาพัฒนา(ชม.)</strong> · Senior Dev ตรวจโค้ด</td><td>10</td></tr>
+        <tr><td>9</td><td><code>ส่งกลับนักพัฒนาแก้ไข</code></td><td>Tester</td><td>บันทึกจุดที่ไม่ผ่านใน Taiga แล้ว · Dev แก้เสร็จ ส่งทดสอบใหม่</td><td>10</td></tr>
+        <tr><td>10</td><td><code>กำลังทดสอบ</code></td><td>Dev (ตอนส่งทดสอบ)</td><td>Tester ทดสอบครบทุกข้อใน Taiga · ผ่าน → 11 หรือ 12 · ไม่ผ่าน → 9</td><td>9, 11, 12</td></tr>
+        <tr><td>11</td><td><code>รอ compile</code></td><td>Tester</td><td>Senior Dev compile/deploy แล้ว ใส่ <strong>วันที่ Deploy</strong></td><td>14</td></tr>
+        <tr><td>12</td><td><code>รอ Complie ต้องแจ้งอจ.</code></td><td>Tester / Senior Dev</td><td>แจ้ง อจ. แล้ว และ อจ. compile เสร็จ ใส่ <strong>วันที่ Deploy</strong></td><td>14</td></tr>
+        <tr><td>13</td><td><code>0.ยกเลิก</code></td><td>PM</td><td>เขียนเหตุผลที่ยกเลิกไว้ใน Taiga หรือรายละเอียด</td><td>ปิดงาน</td></tr>
+        <tr><td>14</td><td><code>0.แก้ไขเรียบร้อย</code></td><td>Senior Dev หรือ PM</td><td><strong>ต้องมีวันที่เสร็จ (แอปบังคับ)</strong> · PM ยืนยันกับผู้แจ้งแล้ว</td><td>ปิดงาน</td></tr>
+        <tr><td>15</td><td><code>0.ใช้งานได้อยู่แล้ว</code></td><td>PM (หรือ Dev ที่ตรวจพบ โดยแจ้ง PM)</td><td>ยืนยันแล้วว่าไม่ต้องแก้ จดวิธีใช้ไว้ใน Taiga</td><td>ปิดงาน</td></tr>
       </tbody>
     </table>
   </div>
