@@ -388,7 +388,7 @@
       }
       if (col.type === 'date') return UI.dateField(o);
       if (col.type === 'number') return UI.input(Object.assign(o, { inputmode: 'decimal' }));
-      if (key === 'detail') return UI.textarea(Object.assign(o, { wide: true, hint: 'อธิบายสิ่งที่ต้องการให้แก้ไข ให้คนอื่นอ่านแล้วเข้าใจ' }));
+      if (key === 'detail') return UI.textarea(Object.assign(o, { wide: true, feature: true, icon: 'report', hint: 'อธิบายสิ่งที่ต้องการให้แก้ไข ให้คนอื่นอ่านแล้วเข้าใจ' }));
       if (key === 'ticket') {
         // links embedded in the sheet cell (rich text / =HYPERLINK) + a URL typed as text (2026-11-11)
         var urls = ((row && row.ticketLinks) || []).slice();

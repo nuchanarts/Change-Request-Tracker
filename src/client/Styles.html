@@ -320,6 +320,20 @@
   .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--s-3); }
   .form-grid .wide { grid-column: 1 / -1; }
   .form textarea { min-height: 72px; }
+  /* รายละเอียด is the heart of a request: a tinted card, bigger label and text (user request 2026-11-20) */
+  .form .field-feature {
+    background: var(--accent-soft); border-left: 4px solid var(--accent); border-radius: var(--r-s);
+    padding: var(--s-3); margin: var(--s-1) 0;
+  }
+  .form .field-feature label { font-size: 16px; font-weight: 700; color: var(--accent); }
+  .form .field-feature .li { color: var(--accent); }
+  .form .field-feature textarea {
+    min-height: 140px; font-size: 16px; line-height: 1.6; background: var(--surface);
+    border: 1.5px solid var(--accent);
+  }
+  .form .field-feature textarea:focus { box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 5px var(--accent); outline: none; }
+  .form .field-feature textarea[aria-invalid="true"] { border-color: var(--danger); }
+  .form .field-feature .hint { color: var(--ink); opacity: 0.75; }
   .form .field .hint { font-size: 12.5px; }
 
   /* Date field + calendar popover */
