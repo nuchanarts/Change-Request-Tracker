@@ -53,7 +53,8 @@ describe('nextStatus', () => {
   it('suggests the next workflow step for open statuses', () => {
     expect(D.nextStatus('กำลังพัฒนา')).toBe('ส่งกลับนักพัฒนาแก้ไข');
     expect(D.nextStatus('0.รอแจ้งทีมพัฒนา')).toBe('dev ขอ Sourecode อจ.');
-    expect(D.nextStatus('รอ PM ตรวจสอบ Taiga')).toBe('0.รอแจ้งทีมพัฒนา');
+    expect(D.nextStatus('รอ PM ตรวจสอบ Taiga')).toBe('0.รอแจ้งทีมพัฒนา'); // passing review skips the return step
+    expect(D.nextStatus('0.PM ส่งกลับแก้ไขไฟล์ Taiga')).toBe('รอ PM ตรวจสอบ Taiga'); // fixed → reviewed again
     // the last working step finishes the item (never jumps to 0.ยกเลิก)
     expect(D.nextStatus('รอ Complie ต้องแจ้งอจ.')).toBe('0.แก้ไขเรียบร้อย');
     expect(D.nextStatus('')).toBe('0.รอแจ้งทีมพัฒนา');

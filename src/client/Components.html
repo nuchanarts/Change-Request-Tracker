@@ -17,7 +17,7 @@
       var s = String(status || '').trim();
       if (s === D.DONE) return 's-done';
       if (!D.isOpen(s)) return 's-closed';
-      if (s === 'ส่งกลับนักพัฒนาแก้ไข') return 's-back';
+      if (s === 'ส่งกลับนักพัฒนาแก้ไข' || s === '0.PM ส่งกลับแก้ไขไฟล์ Taiga') return 's-back';
       if (s === 'กำลังทดสอบ' || s === 'รอ PM ตรวจสอบ Taiga') return 's-test';
       if (s === 'กำลังพัฒนา' || s === '0.จัดทำไฟล์แก้ไข' || s === 'รอ compile' || s === 'รอ Complie ต้องแจ้งอจ.') return 's-dev';
       return 's-wait';

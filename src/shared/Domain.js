@@ -49,6 +49,8 @@ var Domain = (function () {
   var PERSON_KEYS = ['pm', 'developer', 'tester'];
 
   var DONE = '0.แก้ไขเรียบร้อย';
+  var PM_RETURN = '0.PM ส่งกลับแก้ไขไฟล์ Taiga';
+  var PM_REVIEW = 'รอ PM ตรวจสอบ Taiga';
   var CANCELLED = '0.ยกเลิก';
   var CLOSED = [DONE, '0.ใช้งานได้อยู่แล้ว', CANCELLED];
   // Order approved by the PM on 2026-11-11 (constitution v3.0.0 Data Contract). Spellings are kept exactly
@@ -57,6 +59,7 @@ var Domain = (function () {
     '0.จัดทำไฟล์แก้ไข',
     '0.จัดทำ Taiga',
     'รอ PM ตรวจสอบ Taiga',
+    PM_RETURN, // added to the sheet 2026-11-20
     '0.รอแจ้งทีมพัฒนา',
     'dev ขอ Sourecode อจ.',
     'รอทีมพัฒนา',
@@ -263,9 +266,12 @@ var Domain = (function () {
     var s = clean(status);
     if (s === '') return DEFAULT_STATUS;
     if (!isOpen(s)) return null;
+    // PM sent the Taiga file back: once fixed it goes to PM review again; passing review skips the return step
+    if (s === PM_RETURN) return PM_REVIEW;
     var i = WORKFLOW.indexOf(s);
     if (i === -1) return null;
     var next = WORKFLOW[i + 1];
+    if (next === PM_RETURN) next = WORKFLOW[i + 2];
     // after the last working step the item is finished (never "next" into 0.ยกเลิก)
     return isOpen(next) ? next : DONE;
   }

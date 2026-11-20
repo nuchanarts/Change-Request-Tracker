@@ -178,11 +178,13 @@ test('My Work: pick any status from the card, not only the next step (2026-11-11
   await open(page, '/#/my-work');
   const form = page.locator('.qs-form').first();
   const id = await form.getAttribute('data-id');
-  await form.locator('select').selectOption('ส่งกลับนักพัฒนาแก้ไข');
+  const before = await page.evaluate((s) => window.__mockSheet.rows.find((r) => r.seq === s).status, id);
+  const target = before === 'ส่งกลับนักพัฒนาแก้ไข' ? 'กำลังทดสอบ' : 'ส่งกลับนักพัฒนาแก้ไข';
+  await form.locator('select').selectOption(target);
   await form.getByRole('button', { name: 'เปลี่ยนสถานะ' }).click();
   await expect(page.locator('.toast').first()).toContainText('บันทึกการแก้ไขแล้ว (สถานะ)');
   const row = await page.evaluate((s) => window.__mockSheet.rows.find((r) => r.seq === s), id);
-  expect(row.status).toBe('ส่งกลับนักพัฒนาแก้ไข');
+  expect(row.status).toBe(target);
   // labels hide "0." but values stay exact
   const values = await page
     .locator('.qs-form')
