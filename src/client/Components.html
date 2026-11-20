@@ -220,8 +220,8 @@
 
     function fieldWrap(o, control, autoWarn) {
       return (
-        '<div class="field' + (o.wide ? ' wide' : '') + (o.feature ? ' field-feature' : '') + '"><label for="f-' + esc(o.name) + '">' + (o.icon ? '<span class="li">' + icon(o.icon) + '</span>' : '') + esc(o.label) +
-        (o.required ? ' <span class="req" aria-hidden="true">*</span>' : '') + (o.tip ? ' ' + helpTip(o.tip) : '') + '</label>' +
+        '<div class="field' + (o.wide ? ' wide' : '') + (o.feature ? ' field-feature' : '') + (o.required ? ' field-required' : '') + '"><label for="f-' + esc(o.name) + '">' + (o.icon ? '<span class="li">' + icon(o.icon) + '</span>' : '') + esc(o.label) +
+        (o.required ? ' <span class="req" aria-hidden="true">* จำเป็น</span>' : '') + (o.tip ? ' ' + helpTip(o.tip) : '') + '</label>' +
         control +
         '<div id="h-' + esc(o.name) + '">' +
         (o.hint ? '<div class="hint">' + esc(o.hint) + '</div>' : '') +
