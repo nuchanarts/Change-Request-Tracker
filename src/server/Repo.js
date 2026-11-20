@@ -627,6 +627,26 @@ function makeRepo(deps) {
   }
 
   /**
+   * The caller's name for the online list. It is remembered in the cache so a heartbeat does not read
+   * _app_users every minute, but only for NAME_TTL_MS: a name fixed by hand in the sheet shows up within
+   * minutes (user report 2026-11-20). setUserName refreshes it at once.
+   * @param {string} e lower-case email @param {number} nowMs
+   */
+  function presenceName(e, nowMs) {
+    var key = C.PRESENCE.NAME_KEY_PREFIX + e;
+    try {
+      var hit = JSON.parse(deps.cache.get(key) || 'null');
+      if (hit && typeof hit.name === 'string' && hit.name && nowMs - hit.at < C.PRESENCE.NAME_TTL_MS)
+        return hit.name;
+    } catch (_err) {
+      // corrupt entry: read the sheet again
+    }
+    var name = getUserName(e) || e.split('@')[0];
+    deps.cache.put(key, JSON.stringify({ name: name, at: nowMs }), C.PRESENCE.CACHE_SECONDS);
+    return name;
+  }
+
+  /**
    * Record that `email` is on `view` (and editing `seq`) and return who is online. Never writes a sheet.
    * If the short lock is busy the write is skipped and the current list is still returned.
    * @param {string} email @param {string} view @param {number|null} seq
@@ -636,10 +656,8 @@ function makeRepo(deps) {
     var e = clean(email).toLowerCase();
     var map = readPresence();
     if (e && deps.cache) {
-      // The name rarely changes: reuse it so a heartbeat does not read _app_users every minute
-      // (setUserName refreshes it). Looked up before the lock, so real saves never wait on this read.
-      var prev = map[e];
-      var name = (prev && prev.name) || getUserName(e) || e.split('@')[0];
+      // Looked up before the lock, so real saves never wait on this read.
+      var name = presenceName(e, nowMs);
       var lock = deps.getLock();
       if (lock.tryLock(C.PRESENCE.LOCK_MS)) {
         try {
@@ -679,9 +697,17 @@ function makeRepo(deps) {
       writeLog([[now, e, 'MAP_USER', '', '', C.USER_NAME_LABEL, old, name]]);
       // presence shows the new name from the next heartbeat (review fix 2026-11-18)
       var online = readPresence();
-      if (online[e] && deps.cache) {
-        online[e].name = name;
-        deps.cache.put(C.PRESENCE.CACHE_KEY, JSON.stringify(online), C.PRESENCE.CACHE_SECONDS);
+      if (deps.cache) {
+        var nowMs = deps.nowMs ? deps.nowMs() : Date.now();
+        deps.cache.put(
+          C.PRESENCE.NAME_KEY_PREFIX + e,
+          JSON.stringify({ name: name, at: nowMs }),
+          C.PRESENCE.CACHE_SECONDS,
+        );
+        if (online[e]) {
+          online[e].name = name;
+          deps.cache.put(C.PRESENCE.CACHE_KEY, JSON.stringify(online), C.PRESENCE.CACHE_SECONDS);
+        }
       }
       return C.ok({ name: name });
     });

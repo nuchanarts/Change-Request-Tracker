@@ -131,6 +131,7 @@ export class FakeSheet {
     return this.cells.reduce((m, r) => Math.max(m, r.length), 0);
   }
   getDataRange() {
+    this.reads = (this.reads || 0) + 1;
     return new FakeRange(this, 1, 1, Math.max(this.getLastRow(), 1), Math.max(this.getLastColumn(), 1));
   }
   getRange(row, col, numRows = 1, numCols = 1) {

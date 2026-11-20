@@ -103,3 +103,25 @@ describe('Repo.heartbeat name refresh (review fix 2026-11-18)', () => {
     expect(repo.heartbeat('somchai@x.com', 'monitor', null).online[0].name).toBe('สมชาย');
   });
 });
+
+// "จับจากอะไร เพราะชื่อผิด … _app_users ฉันคือแก๊สตอนนี้" (user, 2026-11-20): a name fixed directly in
+// _app_users must reach the online list without signing out.
+describe('Repo.heartbeat picks up a name edited in the sheet', () => {
+  it('re-reads _app_users once the remembered name is 5 minutes old', () => {
+    users.getRange(2, 2).setValue('กิ่ง');
+    expect(repo.heartbeat('a@x.com', 'monitor', null).online[0].name).toBe('กิ่ง');
+    users.getRange(2, 2).setValue('นุชนารถ (แก๊ส)'); // fixed by hand in the sheet
+    now += 60000;
+    expect(repo.heartbeat('a@x.com', 'monitor', null).online[0].name).toBe('กิ่ง'); // still remembered
+    now += Config.PRESENCE.NAME_TTL_MS;
+    expect(repo.heartbeat('a@x.com', 'monitor', null).online[0].name).toBe('นุชนารถ (แก๊ส)');
+  });
+
+  it('does not read _app_users on every heartbeat', () => {
+    repo.heartbeat('a@x.com', 'monitor', null);
+    const reads = users.reads || 0;
+    now += 60000;
+    repo.heartbeat('a@x.com', 'monitor', null);
+    expect(users.reads || 0).toBe(reads);
+  });
+});
