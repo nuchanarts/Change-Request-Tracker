@@ -877,7 +877,21 @@
       });
       if (tg.q) rows = D.search(rows, tg.q);
       if (tg.sync && state.taiga && state.taiga.available) rows = rows.filter(function (r) { return tgCompare(state, r).state === tg.sync; });
-      return D.taigaRegister(rows, { scope: tg.scope });
+      var rep = D.taigaRegister(rows, { scope: tg.scope });
+      var early = rep.rows.filter(function (r) { return tgReview(state, r); });
+      if (tg.review && early.length) rep = D.taigaRegister(early, { scope: tg.scope });
+      rep.earlyCount = early.length;
+      return rep;
+    }
+
+    /** Developed before the PM passed the Taiga item (2026-11-24); works from the sheet alone when there is no Taiga log. */
+    function tgReview(state, r) {
+      return D.devBeforeReview(r, tgCompare(state, r), state.today);
+    }
+    function tgStatusCell(state, r) {
+      var f = tgReview(state, r);
+      return '<td>' + UI.statusBadge(r.status) + (f ? '<div class="tg-review"><strong>⚠ PM ยังไม่ตรวจ Taiga แต่เริ่มพัฒนาแล้ว</strong>' +
+        '<span>ยังไม่ผ่าน: ' + esc(f.pending.join(' · ')) + '</span><span>เริ่มแล้ว: ' + esc(f.dev.join(' · ')) + '</span></div>' : '') + '</td>';
     }
 
     /** Compare a row with Taiga; duplicates are counted over every row, not only the filtered ones. */
@@ -971,6 +985,10 @@
         html += '<p class="muted" id="tg-nolog">' + esc(state.taiga.error || 'ยังไม่มีข้อมูลความเคลื่อนไหวจาก Taiga ให้เทียบ') + '</p>';
       }
       if (hasTaiga && state.user.isAdmin) html += tgMapPanel(state);
+      if (rep.earlyCount) {
+        html += '<div class="banner danger banner-row" role="note"><span>⚠ PM ยังไม่ตรวจ Taiga แต่เริ่มพัฒนาแล้ว <strong id="tg-review-count" class="num">' + rep.earlyCount + '</strong> รายการ</span>' +
+          '<button type="button" class="btn small" id="tg-review-btn" data-action="tg-review">' + (tg.review ? 'แสดงทั้งหมด' : 'ดูเฉพาะรายการนี้') + '</button></div>';
+      }
       if (rep.noLink) {
         html += '<div class="banner warn" role="note">มี ' + rep.noLink + ' รายการที่อยู่ในขั้นตอน Taiga แต่ยังไม่มีลิงก์ Taiga ในช่อง "ข้อมูลลิงค์ Taiga หรือ MANTIS" กดที่แถวเพื่อเปิดแล้ววางลิงก์ได้เลย</div>';
       }
@@ -982,7 +1000,7 @@
           var linkCell = link ? '<td>' + UI.ticketLink(Object.assign({}, r, { ticketUrl: link })) + '</td>' : '<td><span class="tg-nolink">ยังไม่มีลิงก์</span></td>';
           return '<tr class="clickable" data-action="open-item" data-id="' + esc(r.id) + '">' +
             ITEM_COLS.seq.cell(r, state) + ITEM_COLS.platform.cell(r, state) + ITEM_COLS.system.cell(r, state) + ITEM_COLS.detail.cell(r, state) +
-            linkCell + ITEM_COLS.status.cell(r, state) + (hasTaiga ? tgTaigaCell(state, r) : '') + '<td class="tg-prog-cell">' + tgProgress(r) + '</td>' +
+            linkCell + tgStatusCell(state, r) + (hasTaiga ? tgTaigaCell(state, r) : '') + '<td class="tg-prog-cell">' + tgProgress(r) + '</td>' +
             ITEM_COLS.developer.cell(r, state) + '<td>' + (r.tester ? esc(r.tester) : '<span class="muted">–</span>') + '</td>' +
             ITEM_COLS.pm.cell(r, state) + ITEM_COLS.due.cell(r, state) + '</tr>';
         }).join('') + '</tbody></table></div>';
@@ -1189,6 +1207,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, taigaRegister: taigaRegister, tgReport: tgReport, tgCompare: tgCompare, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, taigaRegister: taigaRegister, tgReport: tgReport, tgReview: tgReview, tgCompare: tgCompare, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>

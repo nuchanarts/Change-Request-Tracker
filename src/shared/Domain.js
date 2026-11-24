@@ -1559,6 +1559,34 @@ var Domain = (function () {
     return out;
   }
 
+  // Steps before the PM passes the Taiga item, and steps where development has begun (user request 2026-11-24).
+  var BEFORE_REVIEW = WORKFLOW.slice(0, WORKFLOW.indexOf(PM_RETURN) + 1);
+  var DEV_STEPS = WORKFLOW.slice(WORKFLOW.indexOf('กำลังพัฒนา'), WORKFLOW.indexOf(CANCELLED)).concat(DONE);
+
+  /**
+   * Development has begun while the PM has not passed the Taiga item, from what the sheet and Taiga say now.
+   * Null when there is nothing to say. Only open items; a future date is a plan, not a start.
+   * @param {any} r @param {any} cmp taigaCompare() or null @param {any} today
+   * @returns {{pending: string[], dev: string[]} | null}
+   */
+  function devBeforeReview(r, cmp, today) {
+    if (!r.isOpen) return null;
+    var inTaiga = cmp ? cmp.expected : ''; // only an exactly paired status counts
+    /** @type {string[]} */
+    var pending = [];
+    /** @type {string[]} */
+    var dev = [];
+    if (BEFORE_REVIEW.indexOf(r.status) !== -1) pending.push('ชีต: ' + statusLabel(r.status));
+    if (BEFORE_REVIEW.indexOf(inTaiga) !== -1) pending.push('Taiga: ' + cmp.taiga.status);
+    if (DEV_STEPS.indexOf(r.status) !== -1) dev.push('ชีต: ' + statusLabel(r.status));
+    if (DEV_STEPS.indexOf(inTaiga) !== -1) dev.push('Taiga: ' + cmp.taiga.status);
+    ['devStart', 'devEnd'].forEach(function (key) {
+      var date = r[key].date;
+      if (date && compareDate(date, today) <= 0) dev.push(COLUMN_BY_KEY[key].header + ' ' + formatDate(date));
+    });
+    return pending.length && dev.length ? { pending: pending, dev: dev } : null;
+  }
+
   /** CSV of the register (CRLF lines); the caller adds the UTF-8 BOM for Excel. @param {any[]} rows */
   function taigaRegisterCsv(rows) {
     var cols = [
@@ -1890,6 +1918,8 @@ var Domain = (function () {
     taigaLatest: taigaLatest,
     taigaKeyCounts: taigaKeyCounts,
     taigaCompare: taigaCompare,
+    DEV_STEPS: DEV_STEPS,
+    devBeforeReview: devBeforeReview,
     TAIGA_STEPS: TAIGA_STEPS,
     enrich: enrich,
     countSeq: countSeq,

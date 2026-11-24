@@ -795,7 +795,7 @@
     function taigaState() {
       if (!state.tg) {
         var saved = store(TG_KEY) || {};
-        state.tg = { scope: saved.scope || 'open', platform: saved.platform || '', pm: saved.pm || '', q: '', sync: '' };
+        state.tg = { scope: saved.scope || 'open', platform: saved.platform || '', pm: saved.pm || '', q: '', sync: '', review: false };
       }
       return state;
     }
@@ -853,8 +853,9 @@
       var c = row && Views.tgCompare(state, row);
       if (!c || !c.canApply) return;
       var close = !D.isOpen(c.expected) ? ' การปรับครั้งนี้จะปิดงาน' + (c.expected === D.DONE && !row.doneDate.date ? 'และใส่วันที่เสร็จเป็นวันนี้' : '') : '';
+      var skips = Views.tgReview(state, row) && D.DEV_STEPS.indexOf(c.expected) !== -1 ? ' ⚠ PM ยังไม่ตรวจ Taiga ของรายการนี้ การปรับจะข้ามขั้นตอนนี้' : '';
       UI.confirm('ปรับสถานะรายการ #' + row.seq + ' ตาม Taiga?',
-        'Taiga: "' + c.taiga.status + '" · สถานะจะเปลี่ยนจาก "' + (row.status ? D.statusLabel(row.status) : 'ว่าง') + '" เป็น "' + D.statusLabel(c.expected) + '"' + close,
+        'Taiga: "' + c.taiga.status + '" · สถานะจะเปลี่ยนจาก "' + (row.status ? D.statusLabel(row.status) : 'ว่าง') + '" เป็น "' + D.statusLabel(c.expected) + '"' + close + skips,
         'ปรับสถานะ').then(function (yes) { if (yes) moveStatus(id, c.expected); });
     }
     function exportTaiga() {
@@ -1129,6 +1130,7 @@
       },
       'dr-export': exportDoneReport,
       'tg-export': exportTaiga,
+      'tg-review': function () { state.tg.review = !state.tg.review; renderTaiga(); },
       'tg-apply': function (el) { applyTaiga(el.getAttribute('data-id')); },
       'pick-skin': function (el) {
         var id = applySkin(el.getAttribute('data-skin'));

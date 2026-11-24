@@ -134,3 +134,62 @@ describe('taigaEffectiveMap: the team table (user, 2026-11-24) unless an admin c
     expect(D.taigaEffectiveMap(['done'], [{ taiga: 'Done', app: '' }])).not.toHaveProperty('done');
   });
 });
+
+describe('devBeforeReview: developed while the PM has not passed the Taiga item (user, 2026-11-24)', () => {
+  const today = d(2026, 11, 24);
+  const check = (o, taigaStatus, kind = 'สถานะ') => {
+    const r = row(1, o);
+    const l = taigaStatus ? D.taigaLatest([ev({ to: taigaStatus, kind })]) : {};
+    const c = D.taigaCompare(r, l, D.taigaEffectiveMap([], []), D.taigaKeyCounts([r]));
+    return D.devBeforeReview(r, c, today);
+  };
+
+  it('sheet waits for the PM but Taiga is already in development', () => {
+    const f = check({ status: 'รอ PM ตรวจสอบ Taiga' }, 'In progress');
+    expect(f.pending).toEqual(['ชีต: รอ PM ตรวจสอบ Taiga']);
+    expect(f.dev).toEqual(['Taiga: In progress']);
+  });
+
+  it('every step before the PM passes it counts, and every step from development on', () => {
+    ['0.จัดทำไฟล์แก้ไข', '0.จัดทำ Taiga', 'รอ PM ตรวจสอบ Taiga', '0.PM ส่งกลับแก้ไข Taiga'].forEach(
+      (status) =>
+        ['In progress', 'Rework', 'Ready for test', 'Waiting Compile', 'compile from dev', 'Done'].forEach(
+          (t) => expect(check({ status }, t)).not.toBeNull(),
+        ),
+    );
+  });
+
+  it('Taiga waits for the PM but the sheet is already in development', () => {
+    const f = check({ status: 'กำลังทดสอบ' }, 'PM Reviewing');
+    expect(f.pending).toEqual(['Taiga: PM Reviewing']);
+    expect(f.dev).toEqual(['ชีต: กำลังทดสอบ']);
+  });
+
+  it('a start or finish date in the sheet counts, even without Taiga data', () => {
+    expect(check({ status: 'รอ PM ตรวจสอบ Taiga', devStart: '20/11/2026' }).dev).toEqual([
+      'เริ่มพัฒนา 20/11/2026',
+    ]);
+    expect(check({ status: 'รอ PM ตรวจสอบ Taiga', devEnd: '24/11/2026' }).dev).toEqual([
+      'พัฒนาเสร็จ 24/11/2026',
+    ]);
+    expect(
+      D.devBeforeReview(row(1, { status: '0.จัดทำ Taiga', devStart: '1/11/2026' }), null, today),
+    ).not.toBeNull();
+  });
+
+  it('a planned (future) or unreadable date is not development', () => {
+    expect(check({ status: 'รอ PM ตรวจสอบ Taiga', devStart: '25/11/2026' })).toBeNull();
+    expect(check({ status: 'รอ PM ตรวจสอบ Taiga', devStart: 'ปลายเดือน' })).toBeNull();
+  });
+
+  it('is quiet when reviewed, not started, cancelled, closed or unknown', () => {
+    expect(check({ status: 'กำลังพัฒนา' }, 'In progress')).toBeNull();
+    expect(check({ status: 'รอ PM ตรวจสอบ Taiga' }, 'PM Reviewing')).toBeNull();
+    expect(check({ status: 'รอ PM ตรวจสอบ Taiga' }, 'Ready for DEV')).toBeNull();
+    expect(check({ status: 'รอ PM ตรวจสอบ Taiga' }, 'Archived')).toBeNull();
+    expect(check({ status: 'รอ PM ตรวจสอบ Taiga' }, 'Strange')).toBeNull();
+    expect(check({ status: 'รอ PM ตรวจสอบ Taiga' }, 'In progress', 'ลบ')).toBeNull();
+    expect(check({ status: '0.แก้ไขเรียบร้อย' }, 'PM Reviewing')).toBeNull();
+    expect(check({ status: '' }, 'In progress')).toBeNull();
+  });
+});

@@ -155,3 +155,48 @@ test('applying a status that closes the item says so before saving', async ({ pa
     .click();
   await expect(page.locator('#dialog')).toContainText('จะปิดงาน');
 });
+
+// "PM ยังไม่ตรวจสอบ Taiga แต่มีการพัฒนาแล้ว" (user request 2026-11-24)
+const waitForPm = (page, seq) =>
+  page.evaluate((x) => {
+    window.__mockSheet.rows.find((r) => r.seq === x).status = 'รอ PM ตรวจสอบ Taiga';
+  }, seq);
+const reload = (page) => page.getByRole('button', { name: 'โหลดข้อมูลใหม่' }).click();
+
+test('flags items developed before the PM reviewed them and can show only those', async ({ page }) => {
+  const [a, b] = await setup(page);
+  await expect(rowOf(page, a).locator('.tg-review')).toHaveCount(0);
+  await waitForPm(page, a);
+  await reload(page);
+  await expect(rowOf(page, a).locator('.tg-review')).toContainText('PM ยังไม่ตรวจ Taiga แต่เริ่มพัฒนาแล้ว');
+  await expect(rowOf(page, a).locator('.tg-review')).toContainText('Taiga: In progress');
+  await expect(rowOf(page, b).locator('.tg-review')).toHaveCount(0);
+  const n = Number(await page.locator('#tg-review-count').textContent());
+  await page.getByRole('button', { name: 'ดูเฉพาะรายการนี้' }).click();
+  await expect(page.locator('#tg-table tbody tr')).toHaveCount(n);
+  await expect(rowOf(page, a)).toBeVisible();
+  await page.getByRole('button', { name: 'แสดงทั้งหมด' }).click();
+  await expect(rowOf(page, b)).toBeVisible();
+});
+
+test('"ปรับตาม Taiga" says when it would skip the PM review', async ({ page }) => {
+  const [a] = await setup(page);
+  await waitForPm(page, a);
+  await reload(page);
+  await expect(rowOf(page, a).locator('.tg-review')).toBeVisible();
+  await rowOf(page, a)
+    .getByRole('button', { name: /ปรับตาม Taiga/ })
+    .click();
+  await expect(page.locator('#dialog')).toContainText('PM ยังไม่ตรวจ Taiga');
+});
+
+test('works from the sheet dates when there is no Taiga log', async ({ page }) => {
+  await setup(page, { query: '?notaiga=1' });
+  const [a] = await page.evaluate(() => window.__taigaSeqs);
+  await waitForPm(page, a);
+  await page.evaluate((x) => {
+    window.__mockSheet.rows.find((r) => r.seq === x).devStart = '1/1/2026';
+  }, a);
+  await reload(page);
+  await expect(rowOf(page, a).locator('.tg-review')).toContainText('เริ่มพัฒนา 1/1/2026');
+});
