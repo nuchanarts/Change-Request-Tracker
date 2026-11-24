@@ -24,7 +24,8 @@ var Domain = (function () {
     { key: 'detail', header: 'รายละเอียด', type: 'text', required: true },
     { key: 'pm', header: 'PM รับผิดชอบ', type: 'person', required: true },
     { key: 'ticket', header: 'ข้อมูลลิงค์ Taiga หรือ MANTIS', type: 'text' },
-    { key: 'dueDate', header: 'วันที่ต้องได้', type: 'date', required: true },
+    // Still marked "* จำเป็น" on the form, but an empty value does not block saving (user request 2026-11-24).
+    { key: 'dueDate', header: 'วันที่ต้องได้', type: 'date', required: true, allowEmpty: true },
     { key: 'developer', header: 'นักพัฒนา', type: 'freePerson' }, // pick or type a new name (2026-11-11)
     { key: 'postponedDate', header: 'วันที่เลื่อน', type: 'date' },
     { key: 'doneDate', header: 'วันที่เสร็จ', type: 'date' },
@@ -1570,7 +1571,7 @@ var Domain = (function () {
   function validateField(key, value, options, warnings) {
     var col = COLUMN_BY_KEY[key];
     var v = clean(value);
-    if (v === '') return col.required ? 'กรุณากรอก "' + col.header + '"' : null;
+    if (v === '') return col.required && !col.allowEmpty ? 'กรุณากรอก "' + col.header + '"' : null;
     if (key === 'pm') {
       var pmList = optionList(options, key);
       var unknown = splitPm(v).filter(function (p) {

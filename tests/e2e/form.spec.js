@@ -17,6 +17,22 @@ test.describe('US2 Add request', () => {
     await expect(page.locator('h1')).toHaveText('รายการ #721');
   });
 
+  test('วันที่ต้องได้ keeps its "* จำเป็น" mark but may be left empty (user request 2026-11-24)', async ({
+    page,
+  }) => {
+    await open(page, '/#/new');
+    await expect(page.locator('label[for="f-dueDate"]')).toContainText('วันที่ต้องได้ * จำเป็น');
+    await page.selectOption('#f-platform', 'NHIP');
+    await page.selectOption('#f-issueType', 'Requement');
+    await page.selectOption('#f-urgency', 'ด่วน');
+    await page.fill('#f-system', 'เวชระเบียน');
+    await page.fill('#f-detail', 'ทดสอบเพิ่มรายการโดยไม่ใส่วันที่ต้องได้');
+    await page.locator('input[name="pm-pick"]').first().check();
+    await page.getByRole('button', { name: 'บันทึกรายการใหม่' }).click();
+    await expect(page.locator('.toast')).toContainText('บันทึกรายการใหม่แล้ว');
+    await expect(page.locator('#f-dueDate')).toHaveValue('');
+  });
+
   test('shows Thai errors on required fields and saves nothing', async ({ page }) => {
     await open(page, '/#/new');
     await page.getByRole('button', { name: 'บันทึกรายการใหม่' }).click();
