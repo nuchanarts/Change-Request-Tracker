@@ -108,3 +108,9 @@ The function returns `Index.html` evaluated as a template, with the title `à¸•à¸
 
 - **Filters** are stored in `localStorage` under the key `ehp.filters.v1`. The "tour done" flag uses the key `ehp.tour.v1`. All storage access is wrapped in try/catch.
 - **Testing hooks**: every interactive element has an accessible name. Stat cards expose `data-metric="<name>"`, which Playwright uses.
+
+## Api_taiga() / Api_saveTaigaMap({ taiga, app }) (2026-11-24)
+
+- `Api_taiga`: `{ available, latest: { [key]: { status, from, by, at, deleted } }, statuses, map }`. Reads only.
+- `Api_saveTaigaMap`: admins only (`NOT_ADMIN`). `app` = a workflow status or '' to clear. Runs in the lock and is logged. Changes no item.
+- A status is changed from Taiga only when a person confirms it, through `Api_updateRequest`.

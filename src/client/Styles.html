@@ -717,6 +717,20 @@
   .dr-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-4); margin: var(--s-3) 0; }
   .dr-chip { display: inline-flex; align-items: center; gap: var(--s-1); }
   /* ทะเบียน Taiga progress (2026-11-20): one thin bar per row, the step as text beside it */
+  /* Taiga status vs sheet status (2026-11-24): words carry the meaning, colour only helps */
+  .tg-taiga { min-width: 150px; }
+  .tg-who, .tg-cap { font-size: 12.5px; }
+  .tg-cap { color: var(--muted); }
+  @media (min-width: 641px) { .tg-cap { display: none; } }
+  .tg-sync { font-size: 13px; font-weight: 600; }
+  .tg-sync-match { color: var(--ok); }
+  .tg-sync-diff { color: var(--danger); }
+  .tg-sync-unmapped, .tg-sync-deleted { color: var(--warn); }
+  .tg-taiga .btn { margin-top: 4px; }
+  .tg-map { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-m); padding: var(--s-2) var(--s-3); margin-bottom: var(--s-3); }
+  .tg-map summary { cursor: pointer; font-weight: 600; min-height: 32px; line-height: 32px; }
+  .tg-map-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--s-2) var(--s-3); align-items: center; max-width: 720px; }
+  .tg-map-grid label { overflow-wrap: anywhere; font-weight: 500; }
   .tg-prog { display: flex; align-items: center; gap: 8px; min-width: 120px; }
   .tg-track { flex: 1; height: 8px; border-radius: 999px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
   .tg-fill { display: block; height: 100%; border-radius: 999px; background: var(--accent); }

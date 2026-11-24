@@ -2,3 +2,4 @@
 # NEVER push or deploy to these IDs (clasp push would delete the bot).
 # One script ID per line. Add the real sheet's bound project ID when known.
 1LK5KdJECkre8soT6FxLOaTe7Zq6A05Gk0io9M9eB6HKWpwbHrClw8Fjn  # [TEST] copy's bound project
+1Z6No-Hov8Bp6T6hUOxiAZlNbO9X1vEjaScbMzHpbnLupR2028CJ-6B3m  # live แมวส้ม bot (2026-11-24): never modify

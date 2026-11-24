@@ -163,3 +163,9 @@ Values are trimmed for comparison only. Writes always use the exact option strin
 - The sheet is **visible** (not hidden), so the PM manages it directly in Google Sheets.
 - If the sheet does not exist yet, the first sheet editor who opens the app creates it with the sheet owner and themselves, and logs `ALLOW_INIT` in `_app_log`.
 - All changes through the app are logged in `_app_log` with the editor's email.
+
+## Taiga status (2026-11-24)
+
+- `_แมวส้ม_Taiga` (owned by the bot): **read only**. Columns found by header: เวลา, ชนิด, จาก, เป็น, โดย, ลิงก์. Missing sheet or columns → the feature is hidden. At most the newest 5000 events are read.
+- `_app_taiga_map` (owned by the app): สถานะใน Taiga | สถานะในแอป | แก้โดย | แก้เมื่อ. One row per Taiga status name; a target outside `WORKFLOW` is ignored. Changes are logged as `TAIGA_MAP`.
+- Items are matched by full Taiga link (site/project/type/ref), never by number alone.
