@@ -17,11 +17,11 @@ test.describe('US2 Add request', () => {
     await expect(page.locator('h1')).toHaveText('รายการ #721');
   });
 
-  test('วันที่ต้องได้ keeps its "* จำเป็น" mark but may be left empty (user request 2026-11-24)', async ({
+  test('วันที่ต้องได้ has no "* จำเป็น" mark and may be left empty (user request 2026-11-24)', async ({
     page,
   }) => {
     await open(page, '/#/new');
-    await expect(page.locator('label[for="f-dueDate"]')).toContainText('วันที่ต้องได้ * จำเป็น');
+    await expect(page.locator('label[for="f-dueDate"]')).toHaveText('วันที่ต้องได้');
     await page.selectOption('#f-platform', 'NHIP');
     await page.selectOption('#f-issueType', 'Requement');
     await page.selectOption('#f-urgency', 'ด่วน');

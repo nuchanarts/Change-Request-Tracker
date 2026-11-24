@@ -426,7 +426,7 @@
 
     function formField(state, key, value, errors, warnings, readOnly, row) {
       var col = D.COLUMN_BY_KEY[key];
-      var o = { name: key, label: col.header, value: value, required: !!col.required, error: errors[key], warn: warnings[key], tip: TIPS[key], disabled: readOnly, readonly: readOnly };
+      var o = { name: key, label: col.header, value: value, required: !!col.required, pmFills: !!col.pmFills, error: errors[key], warn: warnings[key], tip: TIPS[key], disabled: readOnly, readonly: readOnly };
       var opts = state.options;
       if (col.type === 'option') return UI.select(Object.assign(o, { options: opts[key] }));
       if (col.type === 'status') {

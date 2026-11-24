@@ -1,8 +1,8 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 4.2.0 → 5.0.0 (MAJOR: Data Contract: "วันที่ต้องได้" keeps its "* จำเป็น" mark on the form but is no
-longer enforced; an item may be saved without it. User request 2026-11-24.)
+Version change: 4.2.0 → 5.0.0 (MAJOR: Data Contract: "วันที่ต้องได้" is no longer required; an item may be saved
+without it, the PM fills it in later, and the form frames it in its own colour. User request 2026-11-24.)
 Previous: 4.1.0 → 4.2.0 (MINOR: Data Contract gains the open status "0.PM ส่งกลับแก้ไข Taiga", which the
 team added to the sheet (first spelled "…แก้ไขไฟล์ Taiga", renamed in the sheet the same day); it sits after "รอ PM ตรวจสอบ Taiga" and is open despite its "0." prefix. User request 2026-11-20.)
 Previous: 4.0.0 → 4.1.0 (MINOR: Data Contract gains the optional column "ผู้ทดสอบ", which already exists in
@@ -243,7 +243,7 @@ Follow-up TODOs: none.
 | รายละเอียด | ข้อความยาว | ✅ | |
 | PM รับผิดชอบ | dropdown | ✅ (ค่าเริ่มต้นคือผู้ใช้ที่ล็อกอิน ถ้า map ได้) | จากชีต `รายชื่อ` |
 | ข้อมูลลิงค์ Taiga หรือ MANTIS | ข้อความ | | อาจเป็นเลข ticket หรือ URL ถ้าเป็น URL ให้แสดงเป็นลิงก์ |
-| วันที่ต้องได้ | วันที่ | แสดงป้าย "* จำเป็น" แต่ไม่บังคับ (2026-11-24) | เว้นว่างแล้วบันทึกได้ |
+| วันที่ต้องได้ | วันที่ | | ไม่บังคับ PM ใส่ภายหลัง แสดงกรอบสีต่างจากช่องอื่น (2026-11-24) |
 | นักพัฒนา | dropdown | | จากชีต `รายชื่อ` |
 | วันที่เลื่อน | วันที่ | | ถ้ามีค่า ให้ใช้แทนวันที่ต้องได้ |
 | วันที่เสร็จ | วันที่ | บังคับเมื่อเปลี่ยนเป็น `0.แก้ไขเรียบร้อย` | ค่าเริ่มต้น = วันนี้ |

@@ -37,8 +37,9 @@ describe('validateCreate (FR-015..FR-017)', () => {
     expect(res.errors.detail).toMatch(/กรุณา/);
   });
 
-  it('marks วันที่ต้องได้ as required but does not block saving without it (user request 2026-11-24)', () => {
-    expect(D.COLUMN_BY_KEY.dueDate.required).toBe(true);
+  it('does not require วันที่ต้องได้: the PM fills it in later (user request 2026-11-24)', () => {
+    expect(D.COLUMN_BY_KEY.dueDate.required).toBeFalsy();
+    expect(D.COLUMN_BY_KEY.dueDate.pmFills).toBe(true);
     const res = D.validateCreate({ ...valid, dueDate: '' }, options);
     expect(res).toEqual({ ok: true, errors: {}, warnings: {} });
   });

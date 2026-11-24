@@ -38,3 +38,27 @@ test('required fields look different from optional ones', async ({ page }) => {
   );
   expect(filledBg).toBe(css.optBg);
 });
+
+// "เอาคำว่า * จำเป็นออก แล้วเปลี่ยนกรอบเป็นสีที่แตกต่าง เดี๋ยว PM จะมาใส่เอง" (user, 2026-11-24)
+test('วันที่ต้องได้ has its own frame colour, unlike required and optional fields', async ({ page }) => {
+  await open(page, '/#/new');
+  const css = await page.evaluate(() => {
+    const border = (id) => getComputedStyle(document.getElementById(id)).borderTopColor;
+    const left = (id) => getComputedStyle(document.getElementById(id)).borderLeftColor;
+    return {
+      due: ['Top', 'Right', 'Bottom', 'Left'].map(
+        (side) => getComputedStyle(document.getElementById('f-dueDate'))['border' + side + 'Color'],
+      ),
+      optional: border('f-postponedDate'),
+      required: left('f-system'),
+    };
+  });
+  expect(new Set(css.due).size).toBe(1); // the whole frame, not only one side
+  expect(css.due[0]).not.toBe(css.optional);
+  expect(css.due[0]).not.toBe(css.required);
+  // a wrong date is still shown as an error (red frame)
+  await page.fill('#f-dueDate', 'ไม่ใช่วันที่');
+  await page.getByRole('button', { name: 'บันทึกรายการใหม่' }).click();
+  await expect(page.locator('#f-dueDate')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#f-dueDate')).toHaveCSS('border-top-color', css.required);
+});

@@ -221,7 +221,7 @@
 
     function fieldWrap(o, control, autoWarn) {
       return (
-        '<div class="field' + (o.wide ? ' wide' : '') + (o.feature ? ' field-feature' : '') + (o.required ? ' field-required' : '') + '"><label for="f-' + esc(o.name) + '">' + (o.icon ? '<span class="li">' + icon(o.icon) + '</span>' : '') + esc(o.label) +
+        '<div class="field' + (o.wide ? ' wide' : '') + (o.feature ? ' field-feature' : '') + (o.required ? ' field-required' : '') + (o.pmFills ? ' field-pm' : '') + '"><label for="f-' + esc(o.name) + '">' + (o.icon ? '<span class="li">' + icon(o.icon) + '</span>' : '') + esc(o.label) +
         (o.required ? ' <span class="req" aria-hidden="true">* จำเป็น</span>' : '') + (o.tip ? ' ' + helpTip(o.tip) : '') + '</label>' +
         control +
         '<div id="h-' + esc(o.name) + '">' +

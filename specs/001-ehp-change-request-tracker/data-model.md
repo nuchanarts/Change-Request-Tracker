@@ -27,7 +27,7 @@ Columns are located **by header text in row 1**, never by position (II). The aut
 | `detail` | รายละเอียด | long text | ✅ | Rows with an empty value are **not items** |
 | `pm` | PM รับผิดชอบ | person | ✅ | Default = mapped current user |
 | `ticket` | ข้อมูลลิงค์ Taiga หรือ MANTIS | text | | Shown as a link when it is a URL |
-| `dueDate` | วันที่ต้องได้ | date | ✅ (marked, not enforced) | May be saved empty (2026-11-24) |
+| `dueDate` | วันที่ต้องได้ | date | | Optional; the PM fills it in later, own frame colour on the form (2026-11-24) |
 | `developer` | นักพัฒนา | person | | |
 | `postponedDate` | วันที่เลื่อน | date | | Overrides `dueDate` when it parses |
 | `doneDate` | วันที่เสร็จ | date | required when status = `0.แก้ไขเรียบร้อย` | Default = today |

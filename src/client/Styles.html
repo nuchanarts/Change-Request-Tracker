@@ -21,6 +21,7 @@
     --ok: #256b41;
     --ok-soft: #e1f2e7;
     --focus: #1d4ed8;
+    --pm-field: #7c3aed;
     --shadow: 0 1px 2px rgba(28, 43, 47, 0.06);
     --r-s: 6px;
     --r-m: 10px;
@@ -53,6 +54,7 @@
       --ok: #6fcf97;
       --ok-soft: #173325;
       --focus: #8ab4ff;
+      --pm-field: #b79cff;
       --shadow: none;
       --chart-1: #26a394;
       --chart-crit: #e8604f;
@@ -144,6 +146,9 @@
   }
   textarea { min-height: 96px; resize: vertical; }
   [aria-invalid='true'] { border-color: var(--danger); }
+  /* Filled in later by the PM (วันที่ต้องได้): a frame of its own colour, no "* จำเป็น" (user request 2026-11-24). */
+  .field-pm input { border-width: 2px; }
+  .field-pm input:not([aria-invalid='true']) { border-color: var(--pm-field); }
   input[readonly], select[disabled], textarea[readonly] { background: var(--surface-2); }
 
   /* ---------- filter bar */
