@@ -32,9 +32,16 @@ describe('validateCreate (FR-015..FR-017)', () => {
     const res = D.validateCreate({}, options);
     expect(res.ok).toBe(false);
     expect(Object.keys(res.errors).sort()).toEqual(
-      ['detail', 'dueDate', 'issueType', 'platform', 'pm', 'status', 'system', 'urgency'].sort(),
+      ['detail', 'issueType', 'platform', 'pm', 'status', 'system', 'urgency'].sort(),
     );
     expect(res.errors.detail).toMatch(/กรุณา/);
+  });
+
+  it('does not require วันที่ต้องได้: the PM fills it in later (user request 2026-11-24)', () => {
+    expect(D.COLUMN_BY_KEY.dueDate.required).toBeFalsy();
+    expect(D.COLUMN_BY_KEY.dueDate.pmFills).toBe(true);
+    const res = D.validateCreate({ ...valid, dueDate: '' }, options);
+    expect(res).toEqual({ ok: true, errors: {}, warnings: {} });
   });
 
   it('rejects option values that are not exactly in the option set', () => {
@@ -100,6 +107,10 @@ describe('validateUpdate (FR-019..FR-021)', () => {
 
   it('forbids clearing a required field', () => {
     expect(D.validateUpdate({ detail: { from: 'x', to: '' } }, current, options).errors.detail).toBeDefined();
+  });
+
+  it('allows clearing วันที่ต้องได้ (user request 2026-11-24)', () => {
+    expect(D.validateUpdate({ dueDate: { from: '30/11/2026', to: '' } }, current, options).ok).toBe(true);
   });
 
   it('requires a done date when moving to 0.แก้ไขเรียบร้อย, using the change or the current value', () => {

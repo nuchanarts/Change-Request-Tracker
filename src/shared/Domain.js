@@ -24,7 +24,8 @@ var Domain = (function () {
     { key: 'detail', header: 'รายละเอียด', type: 'text', required: true },
     { key: 'pm', header: 'PM รับผิดชอบ', type: 'person', required: true },
     { key: 'ticket', header: 'ข้อมูลลิงค์ Taiga หรือ MANTIS', type: 'text' },
-    { key: 'dueDate', header: 'วันที่ต้องได้', type: 'date', required: true },
+    // Not required: the PM fills it in later, so the form gives it its own frame colour (user request 2026-11-24).
+    { key: 'dueDate', header: 'วันที่ต้องได้', type: 'date', pmFills: true },
     { key: 'developer', header: 'นักพัฒนา', type: 'freePerson' }, // pick or type a new name (2026-11-11)
     { key: 'postponedDate', header: 'วันที่เลื่อน', type: 'date' },
     { key: 'doneDate', header: 'วันที่เสร็จ', type: 'date' },

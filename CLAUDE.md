@@ -2,7 +2,7 @@
 
 This is a Google Apps Script Web App for recording and monitoring EHP / NHIP / INV change requests. The Google Sheet is the single source of truth.
 
-- **Constitution (highest authority)**: `.specify/memory/constitution.md` (v4.2.0)
+- **Constitution (highest authority)**: `.specify/memory/constitution.md` (v5.0.0)
 - **Active feature**: `specs/001-ehp-change-request-tracker/` (spec, plan, research, data-model, contracts, quickstart)
 
 ## Communication
