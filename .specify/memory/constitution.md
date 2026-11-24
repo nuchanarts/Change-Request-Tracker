@@ -2,7 +2,8 @@
 SYNC IMPACT REPORT
 ==================
 Version change: 4.2.0 → 5.0.0 (MAJOR: Data Contract: "วันที่ต้องได้" is no longer required; an item may be saved
-without it, the PM fills it in later, and the form frames it in its own colour. User request 2026-11-24.)
+without it, the PM fills it in later, and the form frames it in its own colour. User request 2026-11-24;
+approval by the PM (sheet owner side) confirmed by the user on 2026-11-24, as required by Governance.)
 Previous: 4.1.0 → 4.2.0 (MINOR: Data Contract gains the open status "0.PM ส่งกลับแก้ไข Taiga", which the
 team added to the sheet (first spelled "…แก้ไขไฟล์ Taiga", renamed in the sheet the same day); it sits after "รอ PM ตรวจสอบ Taiga" and is open despite its "0." prefix. User request 2026-11-20.)
 Previous: 4.0.0 → 4.1.0 (MINOR: Data Contract gains the optional column "ผู้ทดสอบ", which already exists in
