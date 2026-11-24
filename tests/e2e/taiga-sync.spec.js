@@ -168,7 +168,9 @@ test('flags items developed before the PM reviewed them and can show only those'
   await expect(rowOf(page, a).locator('.tg-review')).toHaveCount(0);
   await waitForPm(page, a);
   await reload(page);
-  await expect(rowOf(page, a).locator('.tg-review')).toContainText('PM ยังไม่ตรวจ Taiga แต่เริ่มพัฒนาแล้ว');
+  await expect(rowOf(page, a).locator('.tg-review')).toContainText(
+    'PM ยังไม่ตรวจผ่าน Taiga แต่เริ่มพัฒนาแล้ว',
+  );
   await expect(rowOf(page, a).locator('.tg-review')).toContainText('Taiga: In progress');
   await expect(rowOf(page, b).locator('.tg-review')).toHaveCount(0);
   const n = Number(await page.locator('#tg-review-count').textContent());
@@ -187,7 +189,7 @@ test('"ปรับตาม Taiga" says when it would skip the PM review', asyn
   await rowOf(page, a)
     .getByRole('button', { name: /ปรับตาม Taiga/ })
     .click();
-  await expect(page.locator('#dialog')).toContainText('PM ยังไม่ตรวจ Taiga');
+  await expect(page.locator('#dialog')).toContainText('PM ยังไม่ตรวจผ่าน Taiga');
 });
 
 test('works from the sheet dates when there is no Taiga log', async ({ page }) => {

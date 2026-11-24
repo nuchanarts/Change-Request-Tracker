@@ -890,8 +890,8 @@
     }
     function tgStatusCell(state, r) {
       var f = tgReview(state, r);
-      return '<td>' + UI.statusBadge(r.status) + (f ? '<div class="tg-review"><strong>⚠ PM ยังไม่ตรวจ Taiga แต่เริ่มพัฒนาแล้ว</strong>' +
-        '<span>ยังไม่ผ่าน: ' + esc(f.pending.join(' · ')) + '</span><span>เริ่มแล้ว: ' + esc(f.dev.join(' · ')) + '</span></div>' : '') + '</td>';
+      return '<td>' + UI.statusBadge(r.status) + (f ? '<div class="tg-review"><strong>⚠ PM ยังไม่ตรวจผ่าน Taiga แต่เริ่มพัฒนาแล้ว</strong>' +
+        '<span>' + esc(f.join(' · ')) + '</span></div>' : '') + '</td>';
     }
 
     /** Compare a row with Taiga; duplicates are counted over every row, not only the filtered ones. */
@@ -986,7 +986,7 @@
       }
       if (hasTaiga && state.user.isAdmin) html += tgMapPanel(state);
       if (rep.earlyCount) {
-        html += '<div class="banner danger banner-row" role="note"><span>⚠ PM ยังไม่ตรวจ Taiga แต่เริ่มพัฒนาแล้ว <strong id="tg-review-count" class="num">' + rep.earlyCount + '</strong> รายการ</span>' +
+        html += '<div class="banner danger banner-row" role="note"><span>⚠ PM ยังไม่ตรวจผ่าน Taiga แต่เริ่มพัฒนาแล้ว <strong id="tg-review-count" class="num">' + rep.earlyCount + '</strong> รายการ</span>' +
           '<button type="button" class="btn small" id="tg-review-btn" data-action="tg-review">' + (tg.review ? 'แสดงทั้งหมด' : 'ดูเฉพาะรายการนี้') + '</button></div>';
       }
       if (rep.noLink) {

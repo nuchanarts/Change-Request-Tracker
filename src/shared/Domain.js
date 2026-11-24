@@ -1559,32 +1559,28 @@ var Domain = (function () {
     return out;
   }
 
-  // Steps before the PM passes the Taiga item, and steps where development has begun (user request 2026-11-24).
-  var BEFORE_REVIEW = WORKFLOW.slice(0, WORKFLOW.indexOf(PM_RETURN) + 1);
+  // The PM has not passed the Taiga item: exactly these two sheet statuses (user, 2026-11-24).
+  var WAIT_PM = [PM_REVIEW, PM_RETURN];
+  // Development has begun: from กำลังพัฒนา to the compile steps, and done.
   var DEV_STEPS = WORKFLOW.slice(WORKFLOW.indexOf('กำลังพัฒนา'), WORKFLOW.indexOf(CANCELLED)).concat(DONE);
 
   /**
-   * Development has begun while the PM has not passed the Taiga item, from what the sheet and Taiga say now.
-   * Null when there is nothing to say. Only open items; a future date is a plan, not a start.
+   * Signs that development has begun although the sheet still waits for the PM to pass the Taiga item, or null.
+   * A future date is a plan, not a start.
    * @param {any} r @param {any} cmp taigaCompare() or null @param {any} today
-   * @returns {{pending: string[], dev: string[]} | null}
+   * @returns {string[] | null}
    */
   function devBeforeReview(r, cmp, today) {
-    if (!r.isOpen) return null;
-    var inTaiga = cmp ? cmp.expected : ''; // only an exactly paired status counts
+    if (WAIT_PM.indexOf(r.status) === -1) return null;
     /** @type {string[]} */
-    var pending = [];
-    /** @type {string[]} */
-    var dev = [];
-    if (BEFORE_REVIEW.indexOf(r.status) !== -1) pending.push('ชีต: ' + statusLabel(r.status));
-    if (BEFORE_REVIEW.indexOf(inTaiga) !== -1) pending.push('Taiga: ' + cmp.taiga.status);
-    if (DEV_STEPS.indexOf(r.status) !== -1) dev.push('ชีต: ' + statusLabel(r.status));
-    if (DEV_STEPS.indexOf(inTaiga) !== -1) dev.push('Taiga: ' + cmp.taiga.status);
+    var signs = [];
+    if (cmp && DEV_STEPS.indexOf(cmp.expected) !== -1) signs.push('Taiga: ' + cmp.taiga.status);
     ['devStart', 'devEnd'].forEach(function (key) {
       var date = r[key].date;
-      if (date && compareDate(date, today) <= 0) dev.push(COLUMN_BY_KEY[key].header + ' ' + formatDate(date));
+      if (date && compareDate(date, today) <= 0)
+        signs.push(COLUMN_BY_KEY[key].header + ' ' + formatDate(date));
     });
-    return pending.length && dev.length ? { pending: pending, dev: dev } : null;
+    return signs.length ? signs : null;
   }
 
   /** CSV of the register (CRLF lines); the caller adds the UTF-8 BOM for Excel. @param {any[]} rows */
