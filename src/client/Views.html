@@ -876,7 +876,82 @@
         pm: D.pmFilter(tg.pm, (state.options && state.options.pm) || []),
       });
       if (tg.q) rows = D.search(rows, tg.q);
-      return D.taigaRegister(rows, { scope: tg.scope });
+      if (tg.sync && state.taiga && state.taiga.available) rows = rows.filter(function (r) { return tgCompare(state, r).state === tg.sync; });
+      var rep = D.taigaRegister(rows, { scope: tg.scope });
+      var early = rep.rows.filter(function (r) { return tgReview(state, r); });
+      if (tg.review && early.length) rep = D.taigaRegister(early, { scope: tg.scope });
+      rep.earlyCount = early.length;
+      return rep;
+    }
+
+    /** Developed before the PM passed the Taiga item (2026-11-24); works from the sheet alone when there is no Taiga log. */
+    function tgReview(state, r) {
+      return D.devBeforeReview(r, tgCompare(state, r), state.today);
+    }
+    function tgStatusCell(state, r) {
+      var f = tgReview(state, r);
+      return '<td>' + UI.statusBadge(r.status) + (f ? '<div class="tg-review"><strong>⚠ PM ยังไม่ตรวจผ่าน Taiga แต่เริ่มพัฒนาแล้ว</strong>' +
+        '<span>' + esc(f.join(' · ')) + '</span></div>' : '') + '</td>';
+    }
+
+    /** Compare a row with Taiga; duplicates are counted over every row, not only the filtered ones. */
+    function tgCompare(state, r) {
+      if (!state.taiga || !state.taiga.available) return null;
+      if (state.tgCounts === undefined || state.tgCountsOf !== state.rows) {
+        state.tgCounts = D.taigaKeyCounts(state.rows);
+        state.tgCountsOf = state.rows;
+      }
+      return D.taigaCompare(r, state.taiga.latest, state.taiga.map, state.tgCounts);
+    }
+
+    var TG_SYNC = [['diff', 'ไม่ตรงกับ Taiga'], ['match', 'ตรงกับ Taiga'], ['unmapped', 'ยังไม่จับคู่สถานะ'], ['deleted', 'ถูกลบใน Taiga'], ['none', 'ยังไม่มีข้อมูลจาก Taiga']];
+
+    /** 24/11/2026 10:05 in Bangkok time. @param {number|null} ms */
+    function tgTime(ms) {
+      if (!ms) return '';
+      var p = {};
+      new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+        .formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+      return Number(p.day) + '/' + Number(p.month) + '/' + p.year + ' ' + p.hour + ':' + p.minute;
+    }
+
+    function tgTaigaCell(state, r) {
+      var c = tgCompare(state, r);
+      if (!c || c.state === 'none') return '<td><span class="muted">–</span></td>';
+      var t = c.taiga;
+      var who = [t.by, tgTime(t.at)].filter(Boolean).join(' · ');
+      var html = '<td class="tg-taiga"><span class="tg-cap">ใน Taiga: </span><strong>' + esc(t.status || '–') + '</strong>' + (who ? '<div class="muted tg-who">' + esc(who) + '</div>' : '');
+      if (c.state === 'match') html += '<div class="tg-sync tg-sync-match">✓ ตรงกัน</div>';
+      else if (c.state === 'deleted') html += '<div class="tg-sync tg-sync-deleted">ถูกลบใน Taiga</div>';
+      else if (c.state === 'unmapped') html += '<div class="tg-sync tg-sync-unmapped">ยังไม่จับคู่สถานะ</div>';
+      else {
+        html += '<div class="tg-sync tg-sync-diff">⚠ ควรเป็น ' + esc(D.statusLabel(c.expected)) + '</div>';
+        if (c.duplicate) html += '<div class="muted tg-who">ลิงก์ Taiga นี้อยู่หลายรายการ ปรับเองทีละรายการ</div>';
+        else if (c.canApply && state.user.canEdit && state.schema.ok) {
+          html += '<button type="button" class="btn small" data-action="tg-apply" data-id="' + esc(r.id) + '" aria-label="ปรับตาม Taiga รายการ #' + esc(r.seq) + '">ปรับตาม Taiga</button>';
+        }
+      }
+      return html + '</td>';
+    }
+
+    /** Admins pair Taiga statuses with app statuses. Saving a pair changes no item. */
+    function tgMapPanel(state) {
+      var t = state.taiga;
+      var names = t.statuses.slice();
+      var seen = names.map(D.taigaName);
+      Object.keys(t.map).concat(Object.keys(D.TAIGA_DEFAULT_MAP)).forEach(function (n) {
+        if (seen.indexOf(D.taigaName(n)) === -1) { seen.push(D.taigaName(n)); names.push(n); }
+      });
+      names.sort();
+      var left = names.filter(function (n) { return !Object.prototype.hasOwnProperty.call(t.map, n); }).length;
+      var html = '<details class="tg-map" id="tg-map"' + (state.tg.mapOpen ? ' open' : '') + '><summary>จับคู่สถานะ Taiga กับสถานะในแอป' + (left ? ' (ยังไม่จับคู่ ' + left + ')' : '') + '</summary>';
+      if (!names.length) return html + '<p class="muted">ยังไม่มีสถานะจาก Taiga ให้จับคู่</p></details>';
+      html += '<p class="muted">การจับคู่ใช้บอกว่างานตรงกับ Taiga หรือไม่ ไม่เปลี่ยนสถานะงานเอง</p><div class="tg-map-grid">' + names.map(function (n, i) {
+        var cur = Object.prototype.hasOwnProperty.call(t.map, n) ? t.map[n] : '';
+        return '<label for="tg-map-' + i + '">' + esc(n) + '</label><select id="tg-map-' + i + '" class="tg-map-select" data-taiga="' + esc(n) + '"><option value="">— ไม่จับคู่ —</option>' +
+          D.WORKFLOW.map(function (s) { return '<option value="' + esc(s) + '"' + (s === cur ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join('') + '</select>';
+      }).join('') + '</div></details>';
+      return html;
     }
 
     function tgProgress(r) {
@@ -895,25 +970,37 @@
       var platformSel = UI.select({ name: 'tg-platform', label: 'แพลตฟอร์ม', icon: 'platform', options: state.options.platform, value: tg.platform, emptyLabel: 'ทั้งหมด' });
       var pmSel = pmFilterSelect(state.options.pm || [], tg.pm, 'tg-pm');
       var search = UI.input({ name: 'tg-q', label: 'ค้นหา', value: tg.q, placeholder: 'ลำดับ เลข ticket หรือคำในรายละเอียด' });
+      var hasTaiga = !!(state.taiga && state.taiga.available); // the bot's log is there and readable (2026-11-24)
+      var syncSel = hasTaiga ? UI.select({ name: 'tg-sync', label: 'เทียบกับ Taiga', icon: 'taiga', value: tg.sync, emptyLabel: 'ทั้งหมด',
+        options: TG_SYNC.map(function (x) { return x[0]; }),
+        groups: [{ label: 'เทียบกับ Taiga', options: TG_SYNC.map(function (x) { return { value: x[0], label: x[1] }; }) }] }) : '';
 
       var html = '<div class="page-head"><h1>ทะเบียน Taiga</h1><span class="muted">ความคืบหน้าของงานที่มีลิงก์ Taiga หรืออยู่ในขั้นตอน Taiga</span>' +
         '<span class="spacer"></span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button>' +
         '<button class="btn small primary" data-action="tg-export"' + (rep.total ? '' : ' disabled') + '>' + UI.withIcon('download', 'Export CSV (Excel)') + '</button></div>';
-      html += '<form class="filters dr-filters" id="tg-form" aria-label="ตัวเลือกทะเบียน Taiga">' + scopeSel + platformSel + pmSel + search + '</form>';
+      html += '<form class="filters dr-filters" id="tg-form" aria-label="ตัวเลือกทะเบียน Taiga">' + scopeSel + platformSel + pmSel + syncSel + search + '</form>';
       html += '<div class="dr-summary" role="status"><span>พบ <strong id="tg-count" class="num">' + rep.total + '</strong> รายการ</span>' +
         rep.byStatus.map(function (s) { return '<span class="dr-chip">' + UI.statusBadge(s.status) + ' <span class="num">' + s.count + '</span></span>'; }).join('') + '</div>';
+      if (state.taiga && !hasTaiga) {
+        html += '<p class="muted" id="tg-nolog">' + esc(state.taiga.error || 'ยังไม่มีข้อมูลความเคลื่อนไหวจาก Taiga ให้เทียบ') + '</p>';
+      }
+      if (hasTaiga && state.user.isAdmin) html += tgMapPanel(state);
+      if (rep.earlyCount) {
+        html += '<div class="banner danger banner-row" role="note"><span>⚠ PM ยังไม่ตรวจผ่าน Taiga แต่เริ่มพัฒนาแล้ว <strong id="tg-review-count" class="num">' + rep.earlyCount + '</strong> รายการ</span>' +
+          '<button type="button" class="btn small" id="tg-review-btn" data-action="tg-review">' + (tg.review ? 'แสดงทั้งหมด' : 'ดูเฉพาะรายการนี้') + '</button></div>';
+      }
       if (rep.noLink) {
         html += '<div class="banner warn" role="note">มี ' + rep.noLink + ' รายการที่อยู่ในขั้นตอน Taiga แต่ยังไม่มีลิงก์ Taiga ในช่อง "ข้อมูลลิงค์ Taiga หรือ MANTIS" กดที่แถวเพื่อเปิดแล้ววางลิงก์ได้เลย</div>';
       }
       if (!rep.total) return html + UI.emptyState('ไม่มีรายการ Taiga', 'ลองเปลี่ยนขอบเขต ตัวกรอง หรือคำค้นหา', '');
       html += '<div class="table-wrap"><table class="responsive" id="tg-table"><thead><tr>' +
-        '<th>ลำดับ</th><th data-hide-mobile>แพลตฟอร์ม</th><th data-hide-mobile>ระบบงาน</th><th>รายละเอียด</th><th>Taiga</th><th>สถานะ</th><th>ความคืบหน้า</th><th>นักพัฒนา</th><th>ผู้ทดสอบ</th><th data-hide-mobile>PM</th><th>กำหนดส่ง</th>' +
+        '<th>ลำดับ</th><th data-hide-mobile>แพลตฟอร์ม</th><th data-hide-mobile>ระบบงาน</th><th>รายละเอียด</th><th>Taiga</th><th>สถานะ</th>' + (hasTaiga ? '<th>สถานะใน Taiga</th>' : '') + '<th>ความคืบหน้า</th><th>นักพัฒนา</th><th>ผู้ทดสอบ</th><th data-hide-mobile>PM</th><th>กำหนดส่ง</th>' +
         '</tr></thead><tbody>' + rep.rows.map(function (r) {
           var link = D.taigaLink(r);
           var linkCell = link ? '<td>' + UI.ticketLink(Object.assign({}, r, { ticketUrl: link })) + '</td>' : '<td><span class="tg-nolink">ยังไม่มีลิงก์</span></td>';
           return '<tr class="clickable" data-action="open-item" data-id="' + esc(r.id) + '">' +
             ITEM_COLS.seq.cell(r, state) + ITEM_COLS.platform.cell(r, state) + ITEM_COLS.system.cell(r, state) + ITEM_COLS.detail.cell(r, state) +
-            linkCell + ITEM_COLS.status.cell(r, state) + '<td class="tg-prog-cell">' + tgProgress(r) + '</td>' +
+            linkCell + tgStatusCell(state, r) + (hasTaiga ? tgTaigaCell(state, r) : '') + '<td class="tg-prog-cell">' + tgProgress(r) + '</td>' +
             ITEM_COLS.developer.cell(r, state) + '<td>' + (r.tester ? esc(r.tester) : '<span class="muted">–</span>') + '</td>' +
             ITEM_COLS.pm.cell(r, state) + ITEM_COLS.due.cell(r, state) + '</tr>';
         }).join('') + '</tbody></table></div>';
@@ -1120,6 +1207,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, taigaRegister: taigaRegister, tgReport: tgReport, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, taigaRegister: taigaRegister, tgReport: tgReport, tgReview: tgReview, tgCompare: tgCompare, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>

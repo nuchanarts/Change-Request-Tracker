@@ -1433,6 +1433,156 @@ var Domain = (function () {
     };
   }
 
+  // ---------------------------------------------------------------- Taiga status vs sheet status (2026-11-24)
+
+  /** Team table: Taiga board column → sheet status (user, 2026-11-24). An admin may override it in _app_taiga_map. */
+  var TAIGA_DEFAULT_MAP = {
+    New: '0.จัดทำ Taiga',
+    'PM Reviewing': PM_REVIEW,
+    'Ready for DEV': 'รอทีมพัฒนา',
+    'In progress': 'กำลังพัฒนา',
+    'Ready for test': 'กำลังทดสอบ',
+    Rework: 'ส่งกลับนักพัฒนาแก้ไข',
+    'Waiting Compile': 'รอ compile',
+    'compile from dev': 'รอ compile',
+    Done: DONE,
+    Archived: CANCELLED,
+  };
+
+  /** Same Taiga status name, ignoring only letter case and extra spaces. @param {any} s */
+  function taigaName(s) {
+    return clean(s).toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  /**
+   * Taiga status → app status, keyed by the names Taiga really uses. A saved pair wins over the team table;
+   * a saved pair that is empty or not a workflow status means "not paired".
+   * @param {string[]} statuses names seen in Taiga @param {Array<{taiga:string, app:string}>} pairs saved by an admin
+   */
+  function taigaEffectiveMap(statuses, pairs) {
+    /** @type {Object<string,string>} */
+    var byName = Object.create(null);
+    Object.keys(TAIGA_DEFAULT_MAP).forEach(function (k) {
+      byName[taigaName(k)] = /** @type {any} */ (TAIGA_DEFAULT_MAP)[k];
+    });
+    pairs.forEach(function (p) {
+      if (taigaName(p.taiga)) byName[taigaName(p.taiga)] = p.app;
+    });
+    var names = statuses.slice();
+    /** @type {Object<string,boolean>} */
+    var seen = Object.create(null);
+    names.forEach(function (n) {
+      seen[taigaName(n)] = true;
+    });
+    pairs
+      .map(function (p) {
+        return p.taiga;
+      })
+      .concat(Object.keys(TAIGA_DEFAULT_MAP))
+      .forEach(function (n) {
+        if (!taigaName(n) || seen[taigaName(n)]) return;
+        seen[taigaName(n)] = true;
+        names.push(n);
+      });
+    /** @type {Object<string,string>} */
+    var out = {};
+    names.forEach(function (n) {
+      var app = byName[taigaName(n)];
+      if (WORKFLOW.indexOf(app) !== -1) out[n] = app;
+    });
+    return out;
+  }
+
+  /** 'site/project/type/ref' of a full Taiga item link, or null. @param {any} url */
+  function taigaKey(url) {
+    var m = /^https?:\/\/([^/\s?#]+)\/project\/([^/\s?#]+)\/(us|task|issue|epic)\/(\d+)/i.exec(clean(url));
+    return m ? (m[1] + '/' + m[2] + '/' + m[3]).toLowerCase() + '/' + Number(m[4]) : null;
+  }
+
+  /**
+   * Newest state of every Taiga item. Every event carries the item's status; only a status move says who and when.
+   * @param {Array<{kind:string, link:string, from:string, to:string, by:string, at:number|null}>} events oldest first
+   */
+  function taigaLatest(events) {
+    /** @type {Object<string, {status:string, from:string, by:string, at:number|null, deleted:boolean}>} */
+    var out = {};
+    events.forEach(function (e) {
+      var key = e.kind === 'ทดสอบ' ? null : taigaKey(e.link);
+      if (!key) return;
+      var cur = out[key] || (out[key] = { status: '', from: '', by: '', at: null, deleted: false });
+      cur.deleted = e.kind === 'ลบ';
+      if (clean(e.to)) cur.status = clean(e.to);
+      if (e.kind === 'สถานะ' || e.kind === 'เสร็จ') {
+        cur.from = clean(e.from);
+        cur.by = clean(e.by);
+        cur.at = e.at;
+      }
+    });
+    return out;
+  }
+
+  /** How many rows point at each Taiga item. @param {any[]} rows */
+  function taigaKeyCounts(rows) {
+    /** @type {Object<string, number>} */
+    var counts = {};
+    rows.forEach(function (r) {
+      var key = taigaKey(taigaLink(r));
+      if (key) counts[key] = (counts[key] || 0) + 1;
+    });
+    return counts;
+  }
+
+  /**
+   * Compare one row with Taiga. state: none (nothing known) | deleted | unmapped | match | diff.
+   * Never guesses a status: only an exact map entry that is a workflow status counts. canApply = a person may
+   * press "ปรับตาม Taiga" (one row per Taiga item, and the row has a ลำดับ).
+   * @param {any} r @param {any} latest taigaLatest() @param {Object<string,string>} map @param {Object<string,number>} counts
+   */
+  function taigaCompare(r, latest, map, counts) {
+    var key = taigaKey(taigaLink(r));
+    var t = key && Object.prototype.hasOwnProperty.call(latest, key) ? latest[key] : null;
+    var out = { state: 'none', taiga: t, expected: '', duplicate: false, canApply: false };
+    if (!key || !t || (!t.status && !t.deleted)) return out;
+    out.duplicate = counts[key] > 1;
+    if (t.deleted) {
+      out.state = 'deleted';
+      return out;
+    }
+    var want = Object.prototype.hasOwnProperty.call(map, t.status) ? map[t.status] : '';
+    if (WORKFLOW.indexOf(want) === -1) {
+      out.state = 'unmapped';
+      return out;
+    }
+    out.expected = want;
+    out.state = r.status === want ? 'match' : 'diff';
+    out.canApply = out.state === 'diff' && !out.duplicate && r.seq !== null;
+    return out;
+  }
+
+  // The PM has not passed the Taiga item: exactly these two sheet statuses (user, 2026-11-24).
+  var WAIT_PM = [PM_REVIEW, PM_RETURN];
+  // Development has begun: from กำลังพัฒนา to the compile steps, and done.
+  var DEV_STEPS = WORKFLOW.slice(WORKFLOW.indexOf('กำลังพัฒนา'), WORKFLOW.indexOf(CANCELLED)).concat(DONE);
+
+  /**
+   * Signs that development has begun although the sheet still waits for the PM to pass the Taiga item, or null.
+   * A future date is a plan, not a start.
+   * @param {any} r @param {any} cmp taigaCompare() or null @param {any} today
+   * @returns {string[] | null}
+   */
+  function devBeforeReview(r, cmp, today) {
+    if (WAIT_PM.indexOf(r.status) === -1) return null;
+    /** @type {string[]} */
+    var signs = [];
+    if (cmp && DEV_STEPS.indexOf(cmp.expected) !== -1) signs.push('Taiga: ' + cmp.taiga.status);
+    ['devStart', 'devEnd'].forEach(function (key) {
+      var date = r[key].date;
+      if (date && compareDate(date, today) <= 0)
+        signs.push(COLUMN_BY_KEY[key].header + ' ' + formatDate(date));
+    });
+    return signs.length ? signs : null;
+  }
+
   /** CSV of the register (CRLF lines); the caller adds the UTF-8 BOM for Excel. @param {any[]} rows */
   function taigaRegisterCsv(rows) {
     var cols = [
@@ -1757,6 +1907,15 @@ var Domain = (function () {
     progressOf: progressOf,
     taigaRegister: taigaRegister,
     taigaRegisterCsv: taigaRegisterCsv,
+    TAIGA_DEFAULT_MAP: TAIGA_DEFAULT_MAP,
+    taigaName: taigaName,
+    taigaEffectiveMap: taigaEffectiveMap,
+    taigaKey: taigaKey,
+    taigaLatest: taigaLatest,
+    taigaKeyCounts: taigaKeyCounts,
+    taigaCompare: taigaCompare,
+    DEV_STEPS: DEV_STEPS,
+    devBeforeReview: devBeforeReview,
     TAIGA_STEPS: TAIGA_STEPS,
     enrich: enrich,
     countSeq: countSeq,

@@ -2,7 +2,7 @@
 
 This is a Google Apps Script Web App for recording and monitoring EHP / NHIP / INV change requests. The Google Sheet is the single source of truth.
 
-- **Constitution (highest authority)**: `.specify/memory/constitution.md` (v5.0.0)
+- **Constitution (highest authority)**: `.specify/memory/constitution.md` (v6.0.0)
 - **Active feature**: `specs/001-ehp-change-request-tracker/` (spec, plan, research, data-model, contracts, quickstart)
 
 ## Communication
@@ -30,7 +30,7 @@ npm run release      # PROD: push + redeploy (same URL) + tag; main only; run by
 
 ## Non-negotiables (see the constitution)
 
-- Never change the main sheet's columns or headers. Never touch the `_แมวส้ม_*` sheets. The app's own sheets must be named `_app_*`.
+- Never change the main sheet's columns or headers. Never touch the `_แมวส้ม_*` sheets (one exception: the app may read `_แมวส้ม_Taiga`, never write it). The app's own sheets must be named `_app_*`.
 - Closed = exactly `0.แก้ไขเรียบร้อย`, `0.ใช้งานได้อยู่แล้ว`, `0.ยกเลิก`. **Never use `startsWith('0.')`.**
 - Due date = `วันที่เลื่อน` if it parses, otherwise `วันที่ต้องได้`. Dates are `d/m/yyyy` C.E., and the timezone is Asia/Bangkok.
 - Writes must:

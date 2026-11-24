@@ -157,7 +157,7 @@
     // ------------------------------------------------------------------ API
 
     // Calls that only read; everything else changes data and must wait for fresh data (snapshot, 2026-11-20).
-    var READ_ONLY_API = ['Api_bootstrap', 'Api_heartbeat', 'Api_itemHistory', 'Api_listAccess', 'Api_listDeleted'];
+    var READ_ONLY_API = ['Api_bootstrap', 'Api_heartbeat', 'Api_itemHistory', 'Api_listAccess', 'Api_listDeleted', 'Api_taiga'];
 
     function api(name, arg) {
       if (state.stale && READ_ONLY_API.indexOf(name) === -1) {
@@ -395,6 +395,7 @@
       document.getElementById('user-role').textContent = b.user.isAdmin ? 'ผู้ดูแล' : b.user.canEdit ? 'ผู้แก้ไข' : 'ดูอย่างเดียว';
       renderMyName();
       state.access = null;
+      state.taigaFresh = false; // read the Taiga log again with the new rows; the old answer stays on screen meanwhile
       setStale(stale);
       render();
       if (stale) return; // the tour and presence wait for the real answer
@@ -462,7 +463,10 @@
         html = Views.access(state);
       }
       else if (r.name === 'done-report') html = Views.doneReport(doneReportState());
-      else if (r.name === 'taiga') html = Views.taigaRegister(taigaState());
+      else if (r.name === 'taiga') {
+        if (!state.taigaFresh && !state.taigaLoading) loadTaiga();
+        html = Views.taigaRegister(taigaState());
+      }
       else if (r.name === 'help') html = Views.help(state);
       else html = Views.monitor(state);
       if (state.tourStep !== null) html += Views.tour(state.tourStep);
@@ -791,7 +795,7 @@
     function taigaState() {
       if (!state.tg) {
         var saved = store(TG_KEY) || {};
-        state.tg = { scope: saved.scope || 'open', platform: saved.platform || '', pm: saved.pm || '', q: '' };
+        state.tg = { scope: saved.scope || 'open', platform: saved.platform || '', pm: saved.pm || '', q: '', sync: '', review: false };
       }
       return state;
     }
@@ -802,9 +806,18 @@
       tg.platform = el['tg-platform'].value;
       tg.pm = el['tg-pm'].value;
       tg.q = el['tg-q'].value;
+      tg.sync = el['tg-sync'] ? el['tg-sync'].value : ''; // not remembered: a hidden filter would look like missing items
       store(TG_KEY, { scope: tg.scope, platform: tg.platform, pm: tg.pm });
+      renderTaiga();
+    }
+    /** Re-render the register without losing the focused field or text typed but not applied yet. */
+    function renderTaiga() {
       var active = document.activeElement;
       var focusId = active && active.id;
+      var typed = document.getElementById('f-tg-q');
+      if (typed && state.tg) state.tg.q = typed.value;
+      var map = document.getElementById('tg-map');
+      if (map && state.tg) state.tg.mapOpen = map.open;
       var pos = active && active.tagName === 'INPUT' ? active.selectionStart : null;
       render();
       var again = focusId && document.getElementById(focusId);
@@ -812,6 +825,38 @@
         again.focus();
         if (pos !== null && again.setSelectionRange) again.setSelectionRange(pos, pos);
       }
+    }
+
+    // Taiga statuses (2026-11-24): read from the bot's log when the register opens; the app never writes that log.
+    function loadTaiga() {
+      state.taigaLoading = true;
+      state.taigaFresh = true; // one load per set of rows; an error waits for "โหลดข้อมูลใหม่"
+      api('Api_taiga').then(function (res) {
+        state.taigaLoading = false;
+        state.taiga = res.ok ? res.data : { available: false, error: res.message, latest: {}, statuses: [], map: {} };
+        if (route().name === 'taiga' && state.phase !== 'loading' && state.phase !== 'error') renderTaiga();
+      });
+    }
+    function saveTaigaMap(name, app) {
+      api('Api_saveTaigaMap', { taiga: name, app: app }).then(function (res) {
+        if (res.ok) {
+          if (app) state.taiga.map[name] = app;
+          else delete state.taiga.map[name];
+          UI.toast(app ? 'จับคู่ "' + name + '" กับ "' + D.statusLabel(app) + '" แล้ว' : 'ยกเลิกการจับคู่ "' + name + '" แล้ว');
+        } else UI.toast(res.message, 'error');
+        if (route().name === 'taiga') renderTaiga();
+      });
+    }
+    /** A person confirms every status change; the save uses the same guarded path as Kanban. */
+    function applyTaiga(id) {
+      var row = state.byId[id];
+      var c = row && Views.tgCompare(state, row);
+      if (!c || !c.canApply) return;
+      var close = !D.isOpen(c.expected) ? ' การปรับครั้งนี้จะปิดงาน' + (c.expected === D.DONE && !row.doneDate.date ? 'และใส่วันที่เสร็จเป็นวันนี้' : '') : '';
+      var skips = Views.tgReview(state, row) && D.DEV_STEPS.indexOf(c.expected) !== -1 ? ' ⚠ PM ยังไม่ตรวจผ่าน Taiga ของรายการนี้ การปรับจะข้ามขั้นตอนนี้' : '';
+      UI.confirm('ปรับสถานะรายการ #' + row.seq + ' ตาม Taiga?',
+        'Taiga: "' + c.taiga.status + '" · สถานะจะเปลี่ยนจาก "' + (row.status ? D.statusLabel(row.status) : 'ว่าง') + '" เป็น "' + D.statusLabel(c.expected) + '"' + close + skips,
+        'ปรับสถานะ').then(function (yes) { if (yes) moveStatus(id, c.expected); });
     }
     function exportTaiga() {
       var rep = Views.tgReport(state);
@@ -1085,6 +1130,8 @@
       },
       'dr-export': exportDoneReport,
       'tg-export': exportTaiga,
+      'tg-review': function () { state.tg.review = !state.tg.review; renderTaiga(); },
+      'tg-apply': function (el) { applyTaiga(el.getAttribute('data-id')); },
       'pick-skin': function (el) {
         var id = applySkin(el.getAttribute('data-skin'));
         store(SKIN_KEY, id);
@@ -1153,6 +1200,7 @@
       if (ev.target.classList && ev.target.classList.contains('access-name')) {
         return saveAccess({ email: ev.target.getAttribute('data-email'), name: ev.target.value });
       }
+      if (ev.target.classList && ev.target.classList.contains('tg-map-select')) return saveTaigaMap(ev.target.getAttribute('data-taiga'), ev.target.value);
       if (ev.target.classList && ev.target.classList.contains('access-select')) {
         var input = { email: ev.target.getAttribute('data-email') };
         input[ev.target.getAttribute('data-field')] = ev.target.value;

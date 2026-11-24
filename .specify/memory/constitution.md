@@ -1,7 +1,10 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 4.2.0 → 5.0.0 (MAJOR: Data Contract: "วันที่ต้องได้" is no longer required; an item may be saved
+Version change: 5.0.0 → 6.0.0 (MAJOR: Principle II: the app may READ the bot's hidden sheet "_แมวส้ม_Taiga" to show
+Taiga statuses; it must never write it, and every other "_แมวส้ม_*" sheet stays untouched. User request 2026-11-24.
+Approval by the PM (sheet owner side) confirmed by the user on 2026-11-24, as required by Governance.)
+Previous: 4.2.0 → 5.0.0 (MAJOR: Data Contract: "วันที่ต้องได้" is no longer required; an item may be saved
 without it, the PM fills it in later, and the form frames it in its own colour. User request 2026-11-24;
 approval by the PM (sheet owner side) confirmed by the user on 2026-11-24, as required by Governance.)
 Previous: 4.1.0 → 4.2.0 (MINOR: Data Contract gains the open status "0.PM ส่งกลับแก้ไข Taiga", which the
@@ -74,6 +77,7 @@ Follow-up TODOs: none.
 - ห้ามเพิ่ม ลบ หรือสลับคอลัมน์ และห้ามเปลี่ยนชื่อหัวคอลัมน์ในชีตหลัก
 - แอปต้องหาคอลัมน์จาก**ชื่อหัวคอลัมน์** (แถวที่ 1) ห้ามผูกกับตำแหน่ง A/B/C ตายตัว
 - ห้ามแตะต้องชีตอื่นในไฟล์ โดยเฉพาะ `_แมวส้ม_บันทึก` และ `_แมวส้ม_สถานะ` ซึ่งเป็นตัวติดตามการเปลี่ยนสถานะที่มีอยู่แล้ว
+  - **ข้อยกเว้น (2026-11-24):** แอป**อ่าน**ชีต `_แมวส้ม_Taiga` ได้เพื่อแสดงสถานะใน Taiga แต่**ห้ามเขียน** และการเปลี่ยน `สถานะ` ตาม Taiga ต้องมีคนกดยืนยันทุกครั้ง
 - ถ้าแอปต้องเก็บข้อมูลของตัวเอง (เช่น audit log) ให้สร้างชีตใหม่ที่ชื่อขึ้นต้นด้วย `_app_` เท่านั้น
 
 ### III. ค่าที่บันทึกต้องตรงกับค่าเดิมในชีตทุกตัวอักษร (Value Fidelity)
@@ -306,4 +310,4 @@ Follow-up TODOs: none.
 - ทุก plan และทุก review ต้องตรวจว่าเป็นไปตาม constitution นี้ ความซับซ้อนที่ไม่มีเหตุผลรองรับจะทำให้รวมงานไม่ได้
 - คำแนะนำสำหรับ agent อยู่ใน `CLAUDE.md` และต้องสอดคล้องกับเอกสารนี้เสมอ
 
-**Version**: 5.0.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-24
+**Version**: 6.0.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-24
