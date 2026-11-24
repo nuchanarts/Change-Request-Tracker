@@ -3,7 +3,7 @@ SYNC IMPACT REPORT
 ==================
 Version change: 5.0.0 → 6.0.0 (MAJOR: Principle II: the app may READ the bot's hidden sheet "_แมวส้ม_Taiga" to show
 Taiga statuses; it must never write it, and every other "_แมวส้ม_*" sheet stays untouched. User request 2026-11-24.
-PM APPROVAL PENDING: required by Governance before this is merged or released.)
+Approval by the PM (sheet owner side) confirmed by the user on 2026-11-24, as required by Governance.)
 Previous: 4.2.0 → 5.0.0 (MAJOR: Data Contract: "วันที่ต้องได้" is no longer required; an item may be saved
 without it, the PM fills it in later, and the form frames it in its own colour. User request 2026-11-24;
 approval by the PM (sheet owner side) confirmed by the user on 2026-11-24, as required by Governance.)
