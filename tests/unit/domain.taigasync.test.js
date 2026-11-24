@@ -88,3 +88,49 @@ describe('taigaCompare', () => {
     expect(cmp(row(1, { seq: '' }))).toMatchObject({ state: 'diff', canApply: false });
   });
 });
+
+describe('taigaEffectiveMap: the team table (user, 2026-11-24) unless an admin changed it', () => {
+  it('has the pairs the team gave, with the exact sheet spellings', () => {
+    expect(D.taigaEffectiveMap([], [])).toEqual({
+      New: '0.จัดทำ Taiga',
+      'PM Reviewing': 'รอ PM ตรวจสอบ Taiga',
+      'Ready for DEV': 'รอทีมพัฒนา',
+      'In progress': 'กำลังพัฒนา',
+      'Ready for test': 'กำลังทดสอบ',
+      Rework: 'ส่งกลับนักพัฒนาแก้ไข',
+      'Waiting Compile': 'รอ compile',
+      'compile from dev': 'รอ compile',
+      Done: '0.แก้ไขเรียบร้อย',
+      Archived: '0.ยกเลิก',
+    });
+    Object.values(D.taigaEffectiveMap([], [])).forEach((v) => expect(D.WORKFLOW).toContain(v));
+  });
+
+  it('matches names as Taiga spells them, ignoring only case and extra spaces', () => {
+    const m = D.taigaEffectiveMap(['READY FOR  dev', 'Compile From Dev', 'Ready'], []);
+    expect(m['READY FOR  dev']).toBe('รอทีมพัฒนา');
+    expect(m['Compile From Dev']).toBe('รอ compile');
+    expect(m['Ready for DEV']).toBeUndefined(); // listed once, under Taiga's own spelling
+    expect(m.Ready).toBeUndefined(); // similar is not the same
+  });
+
+  it('an admin can change or clear a pair, and an invalid target counts as cleared', () => {
+    const m = D.taigaEffectiveMap(
+      ['Done'],
+      [
+        { taiga: 'Done', app: 'รอ compile' },
+        { taiga: 'Archived', app: '' },
+        { taiga: 'New', app: 'พิมพ์เอง' },
+        { taiga: 'Extra', app: 'กำลังทดสอบ' },
+      ],
+    );
+    expect(m.Done).toBe('รอ compile');
+    expect(m).not.toHaveProperty('Archived');
+    expect(m).not.toHaveProperty('New');
+    expect(m.Extra).toBe('กำลังทดสอบ');
+  });
+
+  it('a pair saved under another letter case still wins over the default', () => {
+    expect(D.taigaEffectiveMap(['done'], [{ taiga: 'Done', app: '' }])).not.toHaveProperty('done');
+  });
+});

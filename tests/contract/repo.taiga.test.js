@@ -30,7 +30,7 @@ const event = (o = {}) => {
     ประเภท: 'US',
     ref: 77,
     จาก: 'New',
-    เป็น: 'In progress',
+    เป็น: 'Step X',
     โดย: 'แดง',
     ลิงก์: LINK,
     ...o,
@@ -61,31 +61,35 @@ const build = (logRows) => {
   });
 };
 
+/** Pairs other than the built-in team table. */
+const own = (map) =>
+  Object.fromEntries(Object.entries(map).filter(([k]) => !(k in Domain.TAIGA_DEFAULT_MAP)));
+
 describe("taiga(): read the bot's Taiga log", () => {
   it('returns the newest status per item, the statuses seen and the map, and writes nothing', () => {
     const repo = build([
       HEAD,
       event(),
-      event({ เวลา: new Date(9000), จาก: 'In progress', เป็น: 'Done', ชนิด: 'เสร็จ' }),
+      event({ เวลา: new Date(9000), จาก: 'Step X', เป็น: 'Step Y', ชนิด: 'เสร็จ' }),
     ]);
     const t = repo.taiga();
     expect(t.available).toBe(true);
     expect(t.latest[KEY]).toEqual({
-      status: 'Done',
-      from: 'In progress',
+      status: 'Step Y',
+      from: 'Step X',
       by: 'แดง',
       at: 9000,
       deleted: false,
     });
-    expect(t.statuses.slice().sort()).toEqual(['Done', 'In progress']);
-    expect(t.map).toEqual({});
+    expect(t.statuses.slice().sort()).toEqual(['Step X', 'Step Y']);
+    expect(own(t.map)).toEqual({});
     expect(log.writes).toEqual([]);
     expect(ss.getSheetByName(Config.SHEETS.taigaMap)).toBeFalsy();
   });
 
   it('finds columns by header, not position', () => {
     const repo = build([HEAD.slice().reverse(), event().reverse()]);
-    expect(repo.taiga().latest[KEY].status).toBe('In progress');
+    expect(repo.taiga().latest[KEY].status).toBe('Step X');
   });
 
   it('is simply unavailable when the log is missing or has another layout', () => {
@@ -111,12 +115,12 @@ describe("saveTaigaMap(): admins only, in the app's own sheet", () => {
   const save = (input, who = 'admin@x.com') => repo.saveTaigaMap(who, 'owner@x.com', input);
 
   it('adds, changes and clears a pair, and logs each change', () => {
-    expect(save({ taiga: 'In progress', app: 'กำลังพัฒนา' }).ok).toBe(true);
-    expect(repo.taiga().map).toEqual({ 'In progress': 'กำลังพัฒนา' });
-    expect(save({ taiga: 'In progress', app: 'กำลังทดสอบ' }).ok).toBe(true);
-    expect(repo.taiga().map).toEqual({ 'In progress': 'กำลังทดสอบ' });
-    expect(save({ taiga: 'In progress', app: '' }).ok).toBe(true);
-    expect(repo.taiga().map).toEqual({});
+    expect(save({ taiga: 'Step X', app: 'กำลังพัฒนา' }).ok).toBe(true);
+    expect(own(repo.taiga().map)).toEqual({ 'Step X': 'กำลังพัฒนา' });
+    expect(save({ taiga: 'Step X', app: 'กำลังทดสอบ' }).ok).toBe(true);
+    expect(own(repo.taiga().map)).toEqual({ 'Step X': 'กำลังทดสอบ' });
+    expect(save({ taiga: 'Step X', app: '' }).ok).toBe(true);
+    expect(own(repo.taiga().map)).toEqual({});
     expect(ss.getSheetByName(Config.SHEETS.taigaMap).getLastRow()).toBe(2); // one row per Taiga status
     const logged = ss
       .getSheetByName(Config.SHEETS.log)
@@ -124,34 +128,44 @@ describe("saveTaigaMap(): admins only, in the app's own sheet", () => {
       .getDisplayValues()
       .filter((r) => r[2] === 'TAIGA_MAP');
     expect(logged.map((r) => [r[1], r[5], r[6], r[7]])).toEqual([
-      ['admin@x.com', 'In progress', '', 'กำลังพัฒนา'],
-      ['admin@x.com', 'In progress', 'กำลังพัฒนา', 'กำลังทดสอบ'],
-      ['admin@x.com', 'In progress', 'กำลังทดสอบ', ''],
+      ['admin@x.com', 'Step X', '', 'กำลังพัฒนา'],
+      ['admin@x.com', 'Step X', 'กำลังพัฒนา', 'กำลังทดสอบ'],
+      ['admin@x.com', 'Step X', 'กำลังทดสอบ', ''],
     ]);
     expect(log.writes).toEqual([]);
   });
 
+  it('clearing a built-in pair is remembered, and choosing it again is too', () => {
+    expect(repo.taiga().map.Done).toBe('0.แก้ไขเรียบร้อย');
+    expect(save({ taiga: 'Done', app: '0.แก้ไขเรียบร้อย' }).ok).toBe(true); // already so: nothing to write
+    expect(ss.getSheetByName(Config.SHEETS.taigaMap)).toBeFalsy();
+    expect(save({ taiga: 'Done', app: '' }).ok).toBe(true);
+    expect(repo.taiga().map).not.toHaveProperty('Done');
+    expect(save({ taiga: 'Done', app: '0.แก้ไขเรียบร้อย' }).ok).toBe(true);
+    expect(repo.taiga().map.Done).toBe('0.แก้ไขเรียบร้อย');
+  });
+
   it('refuses non-admins, unknown app statuses and empty Taiga names', () => {
-    expect(save({ taiga: 'In progress', app: 'กำลังพัฒนา' }, 'editor@x.com').code).toBe('NOT_ADMIN');
-    expect(save({ taiga: 'In progress', app: 'ไม่มีสถานะนี้' }).code).toBe('VALIDATION');
+    expect(save({ taiga: 'Step X', app: 'กำลังพัฒนา' }, 'editor@x.com').code).toBe('NOT_ADMIN');
+    expect(save({ taiga: 'Step X', app: 'ไม่มีสถานะนี้' }).code).toBe('VALIDATION');
     expect(save({ taiga: ' ', app: 'กำลังพัฒนา' }).code).toBe('VALIDATION');
     expect(ss.getSheetByName(Config.SHEETS.taigaMap)).toBeFalsy();
   });
 
   it('a hand-typed target that is not a workflow status is ignored', () => {
-    save({ taiga: 'In progress', app: 'กำลังพัฒนา' });
+    save({ taiga: 'Step X', app: 'กำลังพัฒนา' });
     ss.getSheetByName(Config.SHEETS.taigaMap)._set(2, 2, 'พิมพ์เอง');
-    expect(repo.taiga().map).toEqual({});
+    expect(own(repo.taiga().map)).toEqual({});
   });
 
   it('a name that looks like a formula is stored as text', () => {
     save({ taiga: '=1+1', app: 'กำลังพัฒนา' });
-    expect(repo.taiga().map).toEqual({ '=1+1': 'กำลังพัฒนา' });
+    expect(own(repo.taiga().map)).toEqual({ '=1+1': 'กำลังพัฒนา' });
   });
 
   it('writes nothing when the lock is busy', () => {
     lock.tryLock = () => false;
-    expect(save({ taiga: 'In progress', app: 'กำลังพัฒนา' }).code).toBe('LOCK_TIMEOUT');
+    expect(save({ taiga: 'Step X', app: 'กำลังพัฒนา' }).code).toBe('LOCK_TIMEOUT');
     expect(ss.getSheetByName(Config.SHEETS.taigaMap)).toBeFalsy();
   });
 });

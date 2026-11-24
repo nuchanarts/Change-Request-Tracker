@@ -106,11 +106,11 @@ test('a change made in the sheet meanwhile is never overwritten', async ({ page 
 test('admins pair a Taiga status with an app status; nothing changes until a person applies it', async ({
   page,
 }) => {
-  const [a] = await setup(page);
+  const [, , a] = await setup(page);
   await expect(rowOf(page, a).locator('.tg-sync-unmapped')).toBeVisible();
   await page.locator('#tg-map summary').click();
-  await page.locator('#tg-map select[data-taiga="In progress"]').selectOption('กำลังพัฒนา');
-  await expect(page.locator('.toast')).toContainText('In progress');
+  await page.locator('#tg-map select[data-taiga="Strange"]').selectOption('กำลังพัฒนา');
+  await expect(page.locator('.toast')).toContainText('Strange');
   await expect(rowOf(page, a).locator('.tg-sync-diff')).toContainText('กำลังพัฒนา');
   await expect(page.locator('#tg-map')).toHaveAttribute('open', '');
   expect(await page.evaluate(() => window.__mockLog.length)).toBe(0);
@@ -137,4 +137,21 @@ test('no sideways page scroll at any width', async ({ page }) => {
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(over).toBeLessThanOrEqual(0);
+});
+
+test('the team table works without any setup, and an admin can switch a pair off', async ({ page }) => {
+  const [a] = await setup(page);
+  await expect(rowOf(page, a).locator('.tg-sync-diff')).toContainText('กำลังพัฒนา');
+  await page.locator('#tg-map summary').click();
+  await expect(page.locator('#tg-map select[data-taiga="Done"]')).toHaveValue('0.แก้ไขเรียบร้อย');
+  await page.locator('#tg-map select[data-taiga="In progress"]').selectOption('');
+  await expect(rowOf(page, a).locator('.tg-sync-unmapped')).toBeVisible();
+});
+
+test('applying a status that closes the item says so before saving', async ({ page }) => {
+  const [a] = await setup(page, { map: { 'In progress': '0.แก้ไขเรียบร้อย' } });
+  await rowOf(page, a)
+    .getByRole('button', { name: /ปรับตาม Taiga/ })
+    .click();
+  await expect(page.locator('#dialog')).toContainText('จะปิดงาน');
 });

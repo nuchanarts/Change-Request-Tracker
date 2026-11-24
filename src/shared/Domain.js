@@ -1435,6 +1435,64 @@ var Domain = (function () {
 
   // ---------------------------------------------------------------- Taiga status vs sheet status (2026-11-24)
 
+  /** Team table: Taiga board column → sheet status (user, 2026-11-24). An admin may override it in _app_taiga_map. */
+  var TAIGA_DEFAULT_MAP = {
+    New: '0.จัดทำ Taiga',
+    'PM Reviewing': PM_REVIEW,
+    'Ready for DEV': 'รอทีมพัฒนา',
+    'In progress': 'กำลังพัฒนา',
+    'Ready for test': 'กำลังทดสอบ',
+    Rework: 'ส่งกลับนักพัฒนาแก้ไข',
+    'Waiting Compile': 'รอ compile',
+    'compile from dev': 'รอ compile',
+    Done: DONE,
+    Archived: CANCELLED,
+  };
+
+  /** Same Taiga status name, ignoring only letter case and extra spaces. @param {any} s */
+  function taigaName(s) {
+    return clean(s).toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  /**
+   * Taiga status → app status, keyed by the names Taiga really uses. A saved pair wins over the team table;
+   * a saved pair that is empty or not a workflow status means "not paired".
+   * @param {string[]} statuses names seen in Taiga @param {Array<{taiga:string, app:string}>} pairs saved by an admin
+   */
+  function taigaEffectiveMap(statuses, pairs) {
+    /** @type {Object<string,string>} */
+    var byName = Object.create(null);
+    Object.keys(TAIGA_DEFAULT_MAP).forEach(function (k) {
+      byName[taigaName(k)] = /** @type {any} */ (TAIGA_DEFAULT_MAP)[k];
+    });
+    pairs.forEach(function (p) {
+      if (taigaName(p.taiga)) byName[taigaName(p.taiga)] = p.app;
+    });
+    var names = statuses.slice();
+    /** @type {Object<string,boolean>} */
+    var seen = Object.create(null);
+    names.forEach(function (n) {
+      seen[taigaName(n)] = true;
+    });
+    pairs
+      .map(function (p) {
+        return p.taiga;
+      })
+      .concat(Object.keys(TAIGA_DEFAULT_MAP))
+      .forEach(function (n) {
+        if (!taigaName(n) || seen[taigaName(n)]) return;
+        seen[taigaName(n)] = true;
+        names.push(n);
+      });
+    /** @type {Object<string,string>} */
+    var out = {};
+    names.forEach(function (n) {
+      var app = byName[taigaName(n)];
+      if (WORKFLOW.indexOf(app) !== -1) out[n] = app;
+    });
+    return out;
+  }
+
   /** 'site/project/type/ref' of a full Taiga item link, or null. @param {any} url */
   function taigaKey(url) {
     var m = /^https?:\/\/([^/\s?#]+)\/project\/([^/\s?#]+)\/(us|task|issue|epic)\/(\d+)/i.exec(clean(url));
@@ -1825,6 +1883,9 @@ var Domain = (function () {
     progressOf: progressOf,
     taigaRegister: taigaRegister,
     taigaRegisterCsv: taigaRegisterCsv,
+    TAIGA_DEFAULT_MAP: TAIGA_DEFAULT_MAP,
+    taigaName: taigaName,
+    taigaEffectiveMap: taigaEffectiveMap,
     taigaKey: taigaKey,
     taigaLatest: taigaLatest,
     taigaKeyCounts: taigaKeyCounts,

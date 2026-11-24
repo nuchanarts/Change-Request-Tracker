@@ -924,7 +924,10 @@
     function tgMapPanel(state) {
       var t = state.taiga;
       var names = t.statuses.slice();
-      Object.keys(t.map).forEach(function (n) { if (names.indexOf(n) === -1) names.push(n); });
+      var seen = names.map(D.taigaName);
+      Object.keys(t.map).concat(Object.keys(D.TAIGA_DEFAULT_MAP)).forEach(function (n) {
+        if (seen.indexOf(D.taigaName(n)) === -1) { seen.push(D.taigaName(n)); names.push(n); }
+      });
       names.sort();
       var left = names.filter(function (n) { return !Object.prototype.hasOwnProperty.call(t.map, n); }).length;
       var html = '<details class="tg-map" id="tg-map"' + (state.tg.mapOpen ? ' open' : '') + '><summary>จับคู่สถานะ Taiga กับสถานะในแอป' + (left ? ' (ยังไม่จับคู่ ' + left + ')' : '') + '</summary>';

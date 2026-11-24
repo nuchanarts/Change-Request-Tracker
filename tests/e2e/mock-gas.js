@@ -98,7 +98,9 @@
   };
 
   // Taiga events the bot would have logged; tests set window.__taigaEvents / __taigaMap in __beforeMock
-  var taigaMap = Object.assign({}, window.__taigaMap || {});
+  var taigaPairs = Object.keys(window.__taigaMap || {}).map(function (k) {
+    return { taiga: k, app: window.__taigaMap[k] };
+  });
   var taigaEvents =
     window.__taigaEvents ||
     rows
@@ -119,26 +121,26 @@
 
   var handlers = {
     Api_taiga: function () {
-      if (params.get('notaiga')) return ok({ available: false, latest: {}, statuses: [], map: taigaMap });
+      if (params.get('notaiga')) return ok({ available: false, latest: {}, statuses: [], map: {} });
+      var statuses = taigaEvents
+        .map(function (e) {
+          return e.to;
+        })
+        .filter(function (s, i, a) {
+          return a.indexOf(s) === i;
+        });
       return ok({
         available: true,
         latest: D.taigaLatest(taigaEvents),
-        statuses: taigaEvents
-          .map(function (e) {
-            return e.to;
-          })
-          .filter(function (s, i, a) {
-            return a.indexOf(s) === i;
-          }),
-        map: taigaMap,
+        statuses: statuses,
+        map: D.taigaEffectiveMap(statuses, taigaPairs),
       });
     },
     Api_saveTaigaMap: function (input) {
       if (!user.isAdmin)
         return { ok: false, code: 'NOT_ADMIN', message: 'เฉพาะผู้ดูแลเท่านั้นที่จัดการสิทธิ์ได้' };
       if (input.app && D.WORKFLOW.indexOf(input.app) === -1) return fail('VALIDATION');
-      if (input.app) taigaMap[input.taiga] = input.app;
-      else delete taigaMap[input.taiga];
+      taigaPairs.push({ taiga: input.taiga, app: input.app });
       return ok({ taiga: input.taiga, app: input.app });
     },
     Api_heartbeat: function (input) {

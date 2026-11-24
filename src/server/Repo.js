@@ -951,19 +951,21 @@ function makeRepo(deps) {
 
   /** Taiga status per item + the status map. Reads only. */
   function taiga() {
-    /** @type {Object<string,string>} */
-    var map = {};
-    taigaMapRows().forEach(function (/** @type {any} */ m) {
-      if (m.taiga && D.WORKFLOW.indexOf(m.app) !== -1) map[m.taiga] = m.app;
-    });
+    var pairs = taigaMapRows();
     var events = taigaEvents();
-    if (events === null) return { available: false, latest: {}, statuses: [], map: map };
+    if (events === null)
+      return { available: false, latest: {}, statuses: [], map: D.taigaEffectiveMap([], pairs) };
     /** @type {string[]} */
     var statuses = [];
     events.forEach(function (/** @type {any} */ e) {
       if (e.kind !== 'ทดสอบ' && e.to && statuses.indexOf(e.to) === -1) statuses.push(e.to);
     });
-    return { available: true, latest: D.taigaLatest(events), statuses: statuses, map: map };
+    return {
+      available: true,
+      latest: D.taigaLatest(events),
+      statuses: statuses,
+      map: D.taigaEffectiveMap(statuses, pairs),
+    };
   }
 
   /**
@@ -980,10 +982,11 @@ function makeRepo(deps) {
     if (app && D.WORKFLOW.indexOf(app) === -1)
       return C.fail('VALIDATION', { fields: { app: 'กรุณาเลือกสถานะจากรายการ' } });
     return withLock(function () {
-      var found = taigaMapRows().filter(function (/** @type {any} */ m) {
-        return m.taiga === name;
+      var pairs = taigaMapRows();
+      var found = pairs.filter(function (/** @type {any} */ m) {
+        return D.taigaName(m.taiga) === D.taigaName(name);
       })[0];
-      var before = found ? found.app : '';
+      var before = D.taigaEffectiveMap([name], pairs)[name] || ''; // saved pair, else the team table
       if (before === app) return C.ok({ taiga: name, app: app });
       var sh = ensureSheet(C.SHEETS.taigaMap, C.TAIGA_MAP_HEADERS);
       var now = deps.nowText();
