@@ -903,6 +903,98 @@ function makeRepo(deps) {
     });
   }
 
+  // ------------------------------------------------------------------ Taiga status (2026-11-24)
+
+  /** The status map rows, or [] before the first pair is saved. */
+  function taigaMapRows() {
+    var sh = ss.getSheetByName(C.SHEETS.taigaMap);
+    if (!sh || sh.getLastRow() < 2) return [];
+    return sh
+      .getRange(2, 1, sh.getLastRow() - 1, 2)
+      .getDisplayValues()
+      .map(function (/** @type {any[]} */ r, /** @type {number} */ i) {
+        return { row: i + 2, taiga: clean(r[0]), app: clean(r[1]) };
+      });
+  }
+
+  /** The bot's events, oldest first; null when its log is missing or has another layout. Never writes. */
+  function taigaEvents() {
+    var sh = ss.getSheetByName(C.SHEETS.taigaLog);
+    if (!sh || sh.getLastRow() < 1) return null;
+    var width = sh.getLastColumn();
+    var header = sh.getRange(1, 1, 1, width).getDisplayValues()[0].map(clean);
+    /** @type {Object<string, number>} */
+    var idx = {};
+    var missing = Object.keys(C.TAIGA_LOG_COLUMNS).filter(function (key) {
+      idx[key] = header.indexOf(/** @type {any} */ (C.TAIGA_LOG_COLUMNS)[key]);
+      return idx[key] === -1;
+    });
+    if (missing.length) return null;
+    var last = sh.getLastRow();
+    if (last < 2) return [];
+    var first = Math.max(2, last - C.TAIGA_LOG_MAX + 1);
+    return sh
+      .getRange(first, 1, last - first + 1, width)
+      .getValues()
+      .map(function (/** @type {any[]} */ v) {
+        var at = v[idx.at];
+        return {
+          kind: clean(v[idx.kind]),
+          link: clean(v[idx.link]),
+          from: clean(v[idx.from]),
+          to: clean(v[idx.to]),
+          by: clean(v[idx.by]),
+          at: at instanceof Date ? at.getTime() : null,
+        };
+      });
+  }
+
+  /** Taiga status per item + the status map. Reads only. */
+  function taiga() {
+    /** @type {Object<string,string>} */
+    var map = {};
+    taigaMapRows().forEach(function (/** @type {any} */ m) {
+      if (m.taiga && D.WORKFLOW.indexOf(m.app) !== -1) map[m.taiga] = m.app;
+    });
+    var events = taigaEvents();
+    if (events === null) return { available: false, latest: {}, statuses: [], map: map };
+    /** @type {string[]} */
+    var statuses = [];
+    events.forEach(function (/** @type {any} */ e) {
+      if (e.kind !== 'ทดสอบ' && e.to && statuses.indexOf(e.to) === -1) statuses.push(e.to);
+    });
+    return { available: true, latest: D.taigaLatest(events), statuses: statuses, map: map };
+  }
+
+  /**
+   * Pair one Taiga status with an app status ('' clears it). Admins only; one row per Taiga status, logged.
+   * @param {string} adminEmail @param {string} ownerEmail @param {{taiga?:string, app?:string}} input
+   */
+  function saveTaigaMap(adminEmail, ownerEmail, input) {
+    var admin = clean(adminEmail).toLowerCase();
+    if (!isAdmin(admin, ownerEmail)) return C.fail('NOT_ADMIN');
+    var name = clean(input && input.taiga);
+    var app = clean(input && input.app);
+    if (!name || name.length > 100)
+      return C.fail('VALIDATION', { fields: { taiga: 'ชื่อสถานะ Taiga ไม่ถูกต้อง' } });
+    if (app && D.WORKFLOW.indexOf(app) === -1)
+      return C.fail('VALIDATION', { fields: { app: 'กรุณาเลือกสถานะจากรายการ' } });
+    return withLock(function () {
+      var found = taigaMapRows().filter(function (/** @type {any} */ m) {
+        return m.taiga === name;
+      })[0];
+      var before = found ? found.app : '';
+      if (before === app) return C.ok({ taiga: name, app: app });
+      var sh = ensureSheet(C.SHEETS.taigaMap, C.TAIGA_MAP_HEADERS);
+      var now = deps.nowText();
+      var line = [name, app, admin, now].map(asText);
+      if (found) sh.getRange(found.row, 1, 1, line.length).setValues([line]);
+      else sh.appendRow(line);
+      writeLog([[now, admin, 'TAIGA_MAP', '', '', name, before, app]]);
+      return C.ok({ taiga: name, app: app });
+    });
+  }
+
   // ------------------------------------------------------------------ team list (_app_allowed)
 
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1251,6 +1343,8 @@ function makeRepo(deps) {
     listAccess: listAccess,
     requestAccess: requestAccess,
     saveAccess: saveAccess,
+    taiga: taiga,
+    saveTaigaMap: saveTaigaMap,
     repairQuotedOptions: repairQuotedOptions,
   };
 }

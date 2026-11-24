@@ -48,6 +48,8 @@ var Config = (function () {
       users: '_app_users',
       allowed: '_app_allowed',
       notify: '_app_notify', // queue that แมวส้ม reads and sends to LINE (2026-11-11)
+      taigaMap: '_app_taiga_map', // Taiga status → app status, set by an admin (2026-11-24)
+      taigaLog: '_แมวส้ม_Taiga', // the bot's Taiga event log: READ ONLY, never written by the app (2026-11-24)
     },
     NOTIFY_HEADERS: ['id', 'สร้างเมื่อ', 'ประเภท', 'ข้อความ', 'สถานะ', 'ส่งเมื่อ', 'หมายเหตุ'],
     NOTIFY_STATES: { pending: 'รอส่ง', sent: 'ส่งแล้ว', failed: 'ส่งไม่สำเร็จ' },
@@ -58,6 +60,10 @@ var Config = (function () {
     ALLOWED_HEADERS: ['email', 'ชื่อ', 'หมายเหตุ', 'บทบาท', 'สถานะ'],
     ROLE: { admin: 'ผู้ดูแล', editor: 'ผู้แก้ไข' },
     ACCESS: { allowed: 'อนุญาต', pending: 'รออนุมัติ', suspended: 'ระงับ' },
+    TAIGA_MAP_HEADERS: ['สถานะใน Taiga', 'สถานะในแอป', 'แก้โดย', 'แก้เมื่อ'],
+    /** Columns the app needs from the bot's Taiga log, found by header. */
+    TAIGA_LOG_COLUMNS: { at: 'เวลา', kind: 'ชนิด', from: 'จาก', to: 'เป็น', by: 'โดย', link: 'ลิงก์' },
+    TAIGA_LOG_MAX: 5000, // newest events read per load
     USER_NAME_LABEL: 'ชื่อผู้ใช้',
     PEOPLE_HEADERS: ['ชื่อ', 'ชื่อ-สกุล', 'ชื่อ - สกุล', 'ชื่อเล่น', 'รายชื่อ', 'Name', 'name'],
     /** Values documented in the constitution's Data Contract (used when a column has no Data Validation). */

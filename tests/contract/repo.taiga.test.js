@@ -1,0 +1,157 @@
+// The app reads the bot's Taiga log (never writes it) and keeps its own status map in _app_taiga_map (2026-11-24).
+import { describe, it, expect, beforeEach } from 'vitest';
+import { createRequire } from 'node:module';
+import { FakeSheet, FakeSpreadsheet, FakeLock, FakeCache } from './FakeSpreadsheet.js';
+
+const require = createRequire(import.meta.url);
+const makeRepo = require('../../src/server/Repo.js');
+const Config = require('../../src/server/Config.js');
+const Domain = require('../../src/shared/Domain.js');
+
+const HEAD = [
+  'เวลา',
+  'ชนิด',
+  'ประเภท',
+  'ref',
+  'หัวข้อ',
+  'จาก',
+  'เป็น',
+  'โดย',
+  'ลิงก์',
+  'คอมเมนต์',
+  'เปลี่ยนอะไร',
+];
+const LINK = 'https://taiga.hosxp.net/project/ehp/us/77';
+const KEY = 'taiga.hosxp.net/ehp/us/77';
+const event = (o = {}) => {
+  const e = {
+    เวลา: new Date(5000),
+    ชนิด: 'สถานะ',
+    ประเภท: 'US',
+    ref: 77,
+    จาก: 'New',
+    เป็น: 'In progress',
+    โดย: 'แดง',
+    ลิงก์: LINK,
+    ...o,
+  };
+  return HEAD.map((h) => (e[h] === undefined ? '' : e[h]));
+};
+
+let ss, log, lock;
+const build = (logRows) => {
+  const sheets = [
+    new FakeSheet(Config.SHEETS.main, [Domain.COLUMNS.map((c) => c.header)]),
+    new FakeSheet(Config.SHEETS.allowed, [
+      Config.ALLOWED_HEADERS.slice(),
+      ['admin@x.com', '', '', Config.ROLE.admin, Config.ACCESS.allowed],
+      ['editor@x.com', '', '', Config.ROLE.editor, Config.ACCESS.allowed],
+    ]),
+  ];
+  log = null;
+  if (logRows) sheets.push((log = new FakeSheet('_แมวส้ม_Taiga', logRows)));
+  ss = new FakeSpreadsheet(sheets);
+  lock = new FakeLock();
+  return makeRepo({
+    ss,
+    getLock: () => lock,
+    cache: new FakeCache(),
+    nowText: () => '24/11/2026 10:00:00',
+    makeDate: () => null,
+  });
+};
+
+describe("taiga(): read the bot's Taiga log", () => {
+  it('returns the newest status per item, the statuses seen and the map, and writes nothing', () => {
+    const repo = build([
+      HEAD,
+      event(),
+      event({ เวลา: new Date(9000), จาก: 'In progress', เป็น: 'Done', ชนิด: 'เสร็จ' }),
+    ]);
+    const t = repo.taiga();
+    expect(t.available).toBe(true);
+    expect(t.latest[KEY]).toEqual({
+      status: 'Done',
+      from: 'In progress',
+      by: 'แดง',
+      at: 9000,
+      deleted: false,
+    });
+    expect(t.statuses.slice().sort()).toEqual(['Done', 'In progress']);
+    expect(t.map).toEqual({});
+    expect(log.writes).toEqual([]);
+    expect(ss.getSheetByName(Config.SHEETS.taigaMap)).toBeFalsy();
+  });
+
+  it('finds columns by header, not position', () => {
+    const repo = build([HEAD.slice().reverse(), event().reverse()]);
+    expect(repo.taiga().latest[KEY].status).toBe('In progress');
+  });
+
+  it('is simply unavailable when the log is missing or has another layout', () => {
+    expect(build(null).taiga()).toMatchObject({ available: false, latest: {} });
+    expect(
+      build([
+        ['a', 'b'],
+        [1, 2],
+      ]).taiga(),
+    ).toMatchObject({ available: false, latest: {} });
+  });
+
+  it('an empty log is available with no items', () => {
+    expect(build([HEAD]).taiga()).toMatchObject({ available: true, latest: {}, statuses: [] });
+  });
+});
+
+describe("saveTaigaMap(): admins only, in the app's own sheet", () => {
+  let repo;
+  beforeEach(() => {
+    repo = build([HEAD, event()]);
+  });
+  const save = (input, who = 'admin@x.com') => repo.saveTaigaMap(who, 'owner@x.com', input);
+
+  it('adds, changes and clears a pair, and logs each change', () => {
+    expect(save({ taiga: 'In progress', app: 'กำลังพัฒนา' }).ok).toBe(true);
+    expect(repo.taiga().map).toEqual({ 'In progress': 'กำลังพัฒนา' });
+    expect(save({ taiga: 'In progress', app: 'กำลังทดสอบ' }).ok).toBe(true);
+    expect(repo.taiga().map).toEqual({ 'In progress': 'กำลังทดสอบ' });
+    expect(save({ taiga: 'In progress', app: '' }).ok).toBe(true);
+    expect(repo.taiga().map).toEqual({});
+    expect(ss.getSheetByName(Config.SHEETS.taigaMap).getLastRow()).toBe(2); // one row per Taiga status
+    const logged = ss
+      .getSheetByName(Config.SHEETS.log)
+      .getDataRange()
+      .getDisplayValues()
+      .filter((r) => r[2] === 'TAIGA_MAP');
+    expect(logged.map((r) => [r[1], r[5], r[6], r[7]])).toEqual([
+      ['admin@x.com', 'In progress', '', 'กำลังพัฒนา'],
+      ['admin@x.com', 'In progress', 'กำลังพัฒนา', 'กำลังทดสอบ'],
+      ['admin@x.com', 'In progress', 'กำลังทดสอบ', ''],
+    ]);
+    expect(log.writes).toEqual([]);
+  });
+
+  it('refuses non-admins, unknown app statuses and empty Taiga names', () => {
+    expect(save({ taiga: 'In progress', app: 'กำลังพัฒนา' }, 'editor@x.com').code).toBe('NOT_ADMIN');
+    expect(save({ taiga: 'In progress', app: 'ไม่มีสถานะนี้' }).code).toBe('VALIDATION');
+    expect(save({ taiga: ' ', app: 'กำลังพัฒนา' }).code).toBe('VALIDATION');
+    expect(ss.getSheetByName(Config.SHEETS.taigaMap)).toBeFalsy();
+  });
+
+  it('a hand-typed target that is not a workflow status is ignored', () => {
+    save({ taiga: 'In progress', app: 'กำลังพัฒนา' });
+    ss.getSheetByName(Config.SHEETS.taigaMap)._set(2, 2, 'พิมพ์เอง');
+    expect(repo.taiga().map).toEqual({});
+  });
+
+  it('a name that looks like a formula is stored as text', () => {
+    save({ taiga: '=1+1', app: 'กำลังพัฒนา' });
+    expect(repo.taiga().map).toEqual({ '=1+1': 'กำลังพัฒนา' });
+  });
+
+  it('writes nothing when the lock is busy', () => {
+    lock.tryLock = () => false;
+    expect(save({ taiga: 'In progress', app: 'กำลังพัฒนา' }).code).toBe('LOCK_TIMEOUT');
+    expect(ss.getSheetByName(Config.SHEETS.taigaMap)).toBeFalsy();
+  });
+});

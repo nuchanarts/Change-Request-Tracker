@@ -1433,6 +1433,74 @@ var Domain = (function () {
     };
   }
 
+  // ---------------------------------------------------------------- Taiga status vs sheet status (2026-11-24)
+
+  /** 'site/project/type/ref' of a full Taiga item link, or null. @param {any} url */
+  function taigaKey(url) {
+    var m = /^https?:\/\/([^/\s?#]+)\/project\/([^/\s?#]+)\/(us|task|issue|epic)\/(\d+)/i.exec(clean(url));
+    return m ? (m[1] + '/' + m[2] + '/' + m[3]).toLowerCase() + '/' + Number(m[4]) : null;
+  }
+
+  /**
+   * Newest state of every Taiga item. Every event carries the item's status; only a status move says who and when.
+   * @param {Array<{kind:string, link:string, from:string, to:string, by:string, at:number|null}>} events oldest first
+   */
+  function taigaLatest(events) {
+    /** @type {Object<string, {status:string, from:string, by:string, at:number|null, deleted:boolean}>} */
+    var out = {};
+    events.forEach(function (e) {
+      var key = e.kind === 'ทดสอบ' ? null : taigaKey(e.link);
+      if (!key) return;
+      var cur = out[key] || (out[key] = { status: '', from: '', by: '', at: null, deleted: false });
+      cur.deleted = e.kind === 'ลบ';
+      if (clean(e.to)) cur.status = clean(e.to);
+      if (e.kind === 'สถานะ' || e.kind === 'เสร็จ') {
+        cur.from = clean(e.from);
+        cur.by = clean(e.by);
+        cur.at = e.at;
+      }
+    });
+    return out;
+  }
+
+  /** How many rows point at each Taiga item. @param {any[]} rows */
+  function taigaKeyCounts(rows) {
+    /** @type {Object<string, number>} */
+    var counts = {};
+    rows.forEach(function (r) {
+      var key = taigaKey(taigaLink(r));
+      if (key) counts[key] = (counts[key] || 0) + 1;
+    });
+    return counts;
+  }
+
+  /**
+   * Compare one row with Taiga. state: none (nothing known) | deleted | unmapped | match | diff.
+   * Never guesses a status: only an exact map entry that is a workflow status counts. canApply = a person may
+   * press "ปรับตาม Taiga" (one row per Taiga item, and the row has a ลำดับ).
+   * @param {any} r @param {any} latest taigaLatest() @param {Object<string,string>} map @param {Object<string,number>} counts
+   */
+  function taigaCompare(r, latest, map, counts) {
+    var key = taigaKey(taigaLink(r));
+    var t = key && Object.prototype.hasOwnProperty.call(latest, key) ? latest[key] : null;
+    var out = { state: 'none', taiga: t, expected: '', duplicate: false, canApply: false };
+    if (!key || !t || (!t.status && !t.deleted)) return out;
+    out.duplicate = counts[key] > 1;
+    if (t.deleted) {
+      out.state = 'deleted';
+      return out;
+    }
+    var want = Object.prototype.hasOwnProperty.call(map, t.status) ? map[t.status] : '';
+    if (WORKFLOW.indexOf(want) === -1) {
+      out.state = 'unmapped';
+      return out;
+    }
+    out.expected = want;
+    out.state = r.status === want ? 'match' : 'diff';
+    out.canApply = out.state === 'diff' && !out.duplicate && r.seq !== null;
+    return out;
+  }
+
   /** CSV of the register (CRLF lines); the caller adds the UTF-8 BOM for Excel. @param {any[]} rows */
   function taigaRegisterCsv(rows) {
     var cols = [
@@ -1757,6 +1825,10 @@ var Domain = (function () {
     progressOf: progressOf,
     taigaRegister: taigaRegister,
     taigaRegisterCsv: taigaRegisterCsv,
+    taigaKey: taigaKey,
+    taigaLatest: taigaLatest,
+    taigaKeyCounts: taigaKeyCounts,
+    taigaCompare: taigaCompare,
     TAIGA_STEPS: TAIGA_STEPS,
     enrich: enrich,
     countSeq: countSeq,

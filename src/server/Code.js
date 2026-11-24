@@ -189,6 +189,20 @@ function Api_requestAccess(input) {
   });
 }
 
+/** Latest Taiga statuses from the bot's log (read only) and the status map; same audience as the item list. */
+function Api_taiga() {
+  return guard_(function (ctx) {
+    return Config.ok(ctx.repo.taiga());
+  });
+}
+
+/** Pair a Taiga status with an app status (admins only; enforced in Repo). @param {any} input */
+function Api_saveTaigaMap(input) {
+  return guard_(function (ctx) {
+    return ctx.repo.saveTaigaMap(ctx.email, owner_(ctx), input || {});
+  });
+}
+
 /** Team list for the admin screen (admins only). */
 function Api_listAccess() {
   return guard_(function (ctx) {
