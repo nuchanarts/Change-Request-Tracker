@@ -716,6 +716,12 @@
   /* Closed-work report */
   .dr-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-4); margin: var(--s-3) 0; }
   .dr-chip { display: inline-flex; align-items: center; gap: var(--s-1); }
+  /* ทะเบียน Taiga warnings (2026-11-25): chips on the summary line */
+  .tg-alert { position: relative; display: inline-flex; align-items: center; gap: var(--s-1); padding: 2px 10px; min-height: 28px; border: 1px solid transparent; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600; color: var(--warn); background: var(--warn-soft); }
+  .tg-alert-btn { color: var(--danger); background: var(--surface); border-color: currentColor; cursor: pointer; }
+  .tg-alert-btn[aria-pressed="true"] { background: var(--danger); border-color: var(--danger); color: var(--surface); }
+  .tg-alert .tip { position: static; }
+  .tg-alert .tip .tip-body { left: 0; top: calc(100% + 4px); transform: none; }
   /* ทะเบียน Taiga progress (2026-11-20): one thin bar per row, the step as text beside it */
   /* Taiga status vs sheet status (2026-11-24): words carry the meaning, colour only helps */
   .tg-taiga { min-width: 150px; }

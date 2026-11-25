@@ -986,19 +986,17 @@
         '<span class="spacer"></span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button>' +
         '<button class="btn small primary" data-action="tg-export"' + (rep.total ? '' : ' disabled') + '>' + UI.withIcon('download', 'Export CSV (Excel)') + '</button></div>';
       html += '<form class="filters dr-filters" id="tg-form" aria-label="ตัวเลือกทะเบียน Taiga">' + scopeSel + platformSel + pmSel + syncSel + search + '</form>';
-      html += '<div class="dr-summary" role="status"><span>พบ <strong id="tg-count" class="num">' + rep.total + '</strong> รายการ</span>' +
+      // the warnings share the summary line: full-width banners took too many lines (user request 2026-11-25)
+      html += '<div class="dr-summary"><span role="status">พบ <strong id="tg-count" class="num">' + rep.total + '</strong> รายการ</span>' +
+        (rep.earlyCount ? '<button type="button" class="tg-alert tg-alert-btn" id="tg-review-btn" data-action="tg-review" aria-pressed="' + !!tg.review + '" title="PM ยังไม่ตรวจผ่าน Taiga แต่เริ่มพัฒนาแล้ว กดเพื่อดูเฉพาะรายการนี้ กดอีกครั้งเพื่อแสดงทั้งหมด">' +
+          '⚠ PM ยังไม่ตรวจ Taiga แต่เริ่มพัฒนา <strong id="tg-review-count" class="num">' + rep.earlyCount + '</strong>' + (tg.review ? ' <span aria-hidden="true">✕</span>' : '') + '</button>' : '') +
+        (rep.noLink ? '<span class="tg-alert" id="tg-nolink">ไม่มีลิงก์ Taiga <strong class="num">' + rep.noLink + '</strong> ' +
+          UI.helpTip('รายการที่อยู่ในขั้นตอน Taiga แต่ยังไม่มีลิงก์ Taiga ในช่อง "ข้อมูลลิงค์ Taiga หรือ MANTIS" กดที่แถวเพื่อเปิดแล้ววางลิงก์ได้เลย') + '</span>' : '') +
         rep.byStatus.map(function (s) { return '<span class="dr-chip">' + UI.statusBadge(s.status) + ' <span class="num">' + s.count + '</span></span>'; }).join('') + '</div>';
       if (state.taiga && !hasTaiga) {
         html += '<p class="muted" id="tg-nolog">' + esc(state.taiga.error || 'ยังไม่มีข้อมูลความเคลื่อนไหวจาก Taiga ให้เทียบ') + '</p>';
       }
       if (hasTaiga && state.user.isAdmin) html += tgMapPanel(state);
-      if (rep.earlyCount) {
-        html += '<div class="banner danger banner-row" role="note"><span>⚠ PM ยังไม่ตรวจผ่าน Taiga แต่เริ่มพัฒนาแล้ว <strong id="tg-review-count" class="num">' + rep.earlyCount + '</strong> รายการ</span>' +
-          '<button type="button" class="btn small" id="tg-review-btn" data-action="tg-review">' + (tg.review ? 'แสดงทั้งหมด' : 'ดูเฉพาะรายการนี้') + '</button></div>';
-      }
-      if (rep.noLink) {
-        html += '<div class="banner warn" role="note">มี ' + rep.noLink + ' รายการที่อยู่ในขั้นตอน Taiga แต่ยังไม่มีลิงก์ Taiga ในช่อง "ข้อมูลลิงค์ Taiga หรือ MANTIS" กดที่แถวเพื่อเปิดแล้ววางลิงก์ได้เลย</div>';
-      }
       if (!rep.total) return html + UI.emptyState('ไม่มีรายการ Taiga', 'ลองเปลี่ยนขอบเขต ตัวกรอง หรือคำค้นหา', '');
       html += '<div class="table-wrap"><table class="responsive" id="tg-table"><thead><tr>' +
         '<th>ลำดับ</th><th data-hide-mobile>แพลตฟอร์ม</th><th data-hide-mobile>ระบบงาน</th><th>รายละเอียด</th><th>Taiga</th><th>สถานะ</th>' + (hasTaiga ? '<th>สถานะใน Taiga</th>' : '') + '<th>ความคืบหน้า</th><th>นักพัฒนา</th><th>ผู้ทดสอบ</th><th data-hide-mobile>PM</th><th>กำหนดส่ง</th>' +

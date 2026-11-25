@@ -175,10 +175,13 @@ test('flags items developed before the PM reviewed them and can show only those'
   await expect(rowOf(page, a).locator('.tg-review')).toContainText('Taiga: In progress');
   await expect(rowOf(page, b).locator('.tg-review')).toHaveCount(0);
   const n = Number(await page.locator('#tg-review-count').textContent());
-  await page.getByRole('button', { name: 'ดูเฉพาะรายการนี้' }).click();
+  const only = page.getByRole('button', { name: /PM ยังไม่ตรวจ Taiga/ });
+  await expect(only).toHaveAttribute('aria-pressed', 'false');
+  await only.click();
+  await expect(only).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#tg-table tbody tr')).toHaveCount(n);
   await expect(rowOf(page, a)).toBeVisible();
-  await page.getByRole('button', { name: 'แสดงทั้งหมด' }).click();
+  await only.click();
   await expect(rowOf(page, b)).toBeVisible();
 });
 
@@ -245,4 +248,29 @@ test('the open status map has no accessibility problems and no sideways scroll',
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(over).toBeLessThanOrEqual(0);
+});
+
+test('both warnings are small chips on the summary line, not full-width banners (2026-11-25)', async ({
+  page,
+}, info) => {
+  const [a] = await setup(page);
+  await waitForPm(page, a);
+  await reload(page);
+  await expect(page.locator('#tg-review-btn')).toBeVisible();
+  await expect(page.locator('#tg-nolink')).toContainText('ไม่มีลิงก์ Taiga');
+  await expect(page.locator('#tg-nolink .tip')).toHaveAttribute('aria-label', /วางลิงก์/);
+  await expect(page.locator('#main .banner, main .banner')).toHaveCount(0);
+  if (info.project.name === 'desktop') {
+    const mid = async (sel) => {
+      const box = await page.locator(sel).boundingBox();
+      return box.y + box.height / 2;
+    };
+    const line = await mid('#tg-count');
+    expect(Math.abs((await mid('#tg-review-btn')) - line)).toBeLessThan(8);
+    expect(Math.abs((await mid('#tg-nolink')) - line)).toBeLessThan(8);
+  }
+  await page.locator('#tg-nolink .tip').focus(); // the explanation stays on the screen
+  const tip = await page.locator('#tg-nolink .tip-body').boundingBox();
+  expect(tip.x).toBeGreaterThanOrEqual(0);
+  expect(tip.x + tip.width).toBeLessThanOrEqual(page.viewportSize().width);
 });
