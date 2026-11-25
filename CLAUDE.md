@@ -2,7 +2,7 @@
 
 This is a Google Apps Script Web App for recording and monitoring EHP / NHIP / INV change requests. The Google Sheet is the single source of truth.
 
-- **Constitution (highest authority)**: `.specify/memory/constitution.md` (v6.0.0)
+- **Constitution (highest authority)**: `.specify/memory/constitution.md` (v7.1.0)
 - **Active feature**: `specs/001-ehp-change-request-tracker/` (spec, plan, research, data-model, contracts, quickstart)
 
 ## Communication
@@ -44,4 +44,5 @@ npm run release      # PROD: push + redeploy (same URL) + tag; main only; run by
 - Develop and test only against the spreadsheet **copy**, through the TEST project.
 - Work test-first. Commit after every green cycle using Conventional Commits.
 - Do not use the React, Next.js, or Vercel skills on this project.
+- Taiga: only the browser may call it (`src/client/TaigaApi.html`), only `Config.TAIGA_HOST`, only to change an item's status, and only after a person confirms. Never store a Taiga password; keep the token in sessionStorage only.
 - LINE notifications: the app only queues messages in `_app_notify`; แมวส้ม sends them with `integrations/line-bot/sendAppNotifications.gs`, which the user pastes into the bot project. Never put a LINE token in this repo.

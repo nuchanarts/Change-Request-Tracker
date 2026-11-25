@@ -181,3 +181,181 @@ describe('devBeforeReview: developed while the PM has not passed the Taiga item 
     expect(check({ status: WAIT[0] }, 'In progress', 'ลบ')).toBeNull();
   });
 });
+
+describe('sheet statuses without exactly one Taiga status (user, 2026-11-25)', () => {
+  const base = D.taigaEffectiveMap([], []);
+
+  it('lists statuses with no Taiga status, and those with several, in workflow order', () => {
+    expect(D.statusTaigaGaps(base, {})).toEqual([
+      { app: '0.จัดทำไฟล์แก้ไข', several: [] },
+      { app: '0.PM ส่งกลับแก้ไข Taiga', several: [] },
+      { app: '0.รอแจ้งทีมพัฒนา', several: [] },
+      { app: 'dev ขอ Sourecode อจ.', several: [] },
+      { app: 'รอ compile', several: ['Waiting Compile', 'compile from dev'] },
+      { app: 'รอ Complie ต้องแจ้งอจ.', several: [] },
+      { app: '0.ใช้งานได้อยู่แล้ว', several: [] },
+    ]);
+  });
+
+  it('a saved pair stays listed, so it can be changed even after the status gets its own pair', () => {
+    const gaps = D.statusTaigaGaps(base, { กำลังพัฒนา: 'Rework' });
+    expect(gaps.map((g) => g.app)).toContain('กำลังพัฒนา');
+    expect(gaps).toHaveLength(8);
+  });
+
+  it('reads only pairs whose status is in the workflow and whose Taiga name is not empty', () => {
+    expect(
+      D.statusTaigaMap([
+        { app: '0.รอแจ้งทีมพัฒนา', taiga: ' Ready for DEV ' },
+        { app: 'พิมพ์เอง', taiga: 'New' },
+        { app: 'รอ compile', taiga: '' },
+      ]),
+    ).toEqual({ '0.รอแจ้งทีมพัฒนา': 'Ready for DEV' });
+  });
+
+  it('knows the Taiga names once each, whatever the letter case', () => {
+    const names = D.taigaNames(
+      ['done', 'Strange'],
+      { 'In progress': 'กำลังพัฒนา' },
+      { 'รอ compile': 'Kept' },
+    );
+    expect(names).toEqual(expect.arrayContaining(['done', 'Strange', 'In progress', 'Kept', 'Archived']));
+    expect(names).not.toContain('Done');
+    expect(new Set(names.map(D.taigaName)).size).toBe(names.length);
+  });
+
+  describe('taigaCompare with these pairs', () => {
+    const cmp = (status, to, appMap) => {
+      const r = row(1, { status });
+      return D.taigaCompare(r, D.taigaLatest([ev({ to })]), base, D.taigaKeyCounts([r]), appMap);
+    };
+
+    it('a paired status matches and cannot be applied', () => {
+      expect(cmp('0.รอแจ้งทีมพัฒนา', 'Ready for DEV', {})).toMatchObject({ state: 'diff' });
+      expect(
+        cmp('0.รอแจ้งทีมพัฒนา', 'ready for  dev', { '0.รอแจ้งทีมพัฒนา': 'Ready for DEV' }),
+      ).toMatchObject({
+        state: 'match',
+        expected: '0.รอแจ้งทีมพัฒนา',
+        canApply: false,
+      });
+      expect(cmp('0.รอแจ้งทีมพัฒนา', 'Strange', { '0.รอแจ้งทีมพัฒนา': 'Strange' }).state).toBe('match');
+    });
+
+    it('the pair of another status, or another Taiga status, changes nothing', () => {
+      expect(cmp('กำลังทดสอบ', 'Ready for DEV', { '0.รอแจ้งทีมพัฒนา': 'Ready for DEV' }).state).toBe('diff');
+      expect(cmp('0.รอแจ้งทีมพัฒนา', 'Done', { '0.รอแจ้งทีมพัฒนา': 'Ready for DEV' })).toMatchObject({
+        state: 'diff',
+        expected: '0.แก้ไขเรียบร้อย',
+      });
+    });
+
+    it('choosing one of several still accepts the others', () => {
+      expect(cmp('รอ compile', 'compile from dev', { 'รอ compile': 'Waiting Compile' }).state).toBe('match');
+    });
+
+    it('a deleted item and an empty status never match', () => {
+      const r = row(1, { status: '' });
+      const gone = D.taigaLatest([ev({ to: 'Done' }), ev({ to: '', kind: 'ลบ' })]);
+      expect(D.taigaCompare(r, gone, base, {}, { '': 'Done' }).state).toBe('deleted');
+      expect(cmp('', 'Done', {}).state).toBe('diff');
+    });
+  });
+});
+
+describe('sending the sheet status to Taiga: which Taiga status (user, 2026-11-25)', () => {
+  const base = D.taigaEffectiveMap([], []);
+  const APP = '0.รอแจ้งทีมพัฒนา';
+
+  it('is the pair made by hand, else the only Taiga status of that sheet status, else nothing', () => {
+    expect(D.statusTaigaTarget('กำลังพัฒนา', base, {})).toBe('In progress');
+    expect(D.statusTaigaTarget('กำลังพัฒนา', base, { กำลังพัฒนา: 'Rework' })).toBe('Rework');
+    expect(D.statusTaigaTarget(APP, base, {})).toBe('');
+    expect(D.statusTaigaTarget(APP, base, { [APP]: 'Ready for DEV' })).toBe('Ready for DEV');
+    expect(D.statusTaigaTarget('รอ compile', base, {})).toBe(''); // two Taiga statuses: never guess
+    expect(D.statusTaigaTarget('', base, {})).toBe('');
+    expect(D.statusTaigaTarget('constructor', base, {})).toBe('');
+  });
+
+  const cmp = (o, to, appMap = {}, rows) => {
+    const r = row(1, o);
+    return D.taigaCompare(r, D.taigaLatest([ev({ to })]), base, D.taigaKeyCounts(rows || [r]), appMap);
+  };
+
+  it('is offered when the two differ, also when the Taiga status is not paired', () => {
+    expect(cmp({ status: 'กำลังทดสอบ' }, 'In progress')).toMatchObject({
+      state: 'diff',
+      pushTo: 'Ready for test',
+    });
+    expect(cmp({ status: 'กำลังทดสอบ' }, 'Strange')).toMatchObject({
+      state: 'unmapped',
+      pushTo: 'Ready for test',
+    });
+  });
+
+  it('is never offered when they match, without a pair, for a shared link, a deleted item or no ลำดับ', () => {
+    expect(cmp({ status: 'กำลังพัฒนา' }, 'In progress').pushTo).toBe('');
+    expect(cmp({ status: APP }, 'In progress').pushTo).toBe('');
+    expect(cmp({ status: 'กำลังทดสอบ' }, 'In progress', {}, [row(1), row(2)]).pushTo).toBe('');
+    expect(cmp({ status: 'กำลังทดสอบ', seq: '' }, 'In progress').pushTo).toBe('');
+    const gone = D.taigaLatest([ev(), ev({ kind: 'ลบ' })]);
+    const r = row(1, { status: 'กำลังทดสอบ' });
+    expect(D.taigaCompare(r, gone, base, {}, {}).pushTo).toBe('');
+  });
+});
+
+// The tick next to the status on the item form (user request 2026-11-25).
+describe('taigaFormSync', () => {
+  const HOST = 'taiga.hosxp.net';
+  const map = { 'In progress': 'กำลังพัฒนา', Ready: 'รอทีมพัฒนา', A: 'กำลังทดสอบ', B: 'กำลังทดสอบ' };
+  const ask = (o = {}) =>
+    D.taigaFormSync({
+      item: { id: '1', seq: 1, status: 'กำลังพัฒนา', ticketLinks: [URL], ticketUrl: null, ...o.item },
+      rows: o.rows || [row(1)],
+      host: 'host' in o ? o.host : HOST,
+      latest: o.latest || {},
+      map,
+      appMap: o.appMap || {},
+    });
+
+  it('says which Taiga status the sheet status sends, even before the bot logged the item', () => {
+    expect(ask()).toEqual({ show: true, target: 'In progress', now: '', match: false, reason: '' });
+    expect(ask({ latest: { [KEY]: { status: 'Ready', deleted: false } } }).now).toBe('Ready');
+  });
+  it('knows when Taiga already matches, also when several Taiga statuses mean the same', () => {
+    expect(ask({ latest: { [KEY]: { status: 'In progress' } } }).match).toBe(true);
+    const b = ask({ item: { status: 'กำลังทดสอบ' }, latest: { [KEY]: { status: 'B' } } });
+    expect(b).toMatchObject({ match: true, reason: '' });
+  });
+  it('explains why nothing can be sent', () => {
+    expect(ask({ item: { status: 'กำลังทดสอบ' } }).reason).toBe('unmapped');
+    expect(ask({ item: { status: 'กำลังทดสอบ' }, appMap: { กำลังทดสอบ: 'B' } })).toMatchObject({
+      target: 'B',
+      reason: '',
+    });
+    expect(ask({ rows: [row(1), row(2)] }).reason).toBe('duplicate');
+    expect(ask({ latest: { [KEY]: { status: 'Ready', deleted: true } } }).reason).toBe('deleted');
+  });
+  it('is hidden without a Taiga item link on the allowed site', () => {
+    expect(ask({ item: { ticketLinks: [], ticketUrl: null } }).show).toBe(false);
+    expect(ask({ host: 'other.example' }).show).toBe(false);
+    expect(ask({ host: undefined }).show).toBe(false);
+  });
+  it('a new item counts every row with the same link as another one', () => {
+    expect(ask({ item: { id: null }, rows: [row(5)] }).reason).toBe('duplicate');
+    expect(ask({ item: { id: null }, rows: [] }).reason).toBe('');
+  });
+});
+
+describe('taigaWithSent', () => {
+  const sent = { [KEY]: { status: 'Done', at: 2000 } };
+  it('shows what was just sent until the bot logs something newer', () => {
+    expect(D.taigaWithSent({ [KEY]: { status: 'New', at: 1000 } }, sent, 2500)[KEY].status).toBe('Done');
+    expect(D.taigaWithSent({}, sent, 2500)[KEY].status).toBe('Done');
+    expect(D.taigaWithSent({ [KEY]: { status: 'Ready', at: 2100 } }, sent, 2500)[KEY].status).toBe('Ready');
+  });
+  it('forgets it after ten minutes', () => {
+    const late = 2000 + 10 * 60000 + 1;
+    expect(D.taigaWithSent({ [KEY]: { status: 'New', at: 1000 } }, sent, late)[KEY].status).toBe('New');
+  });
+});

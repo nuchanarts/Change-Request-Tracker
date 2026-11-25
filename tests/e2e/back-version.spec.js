@@ -9,7 +9,7 @@ for (const mode of ['', '?gas=1']) {
       await page.locator('tbody tr').first().locator('.detail-cell a').click();
       await expect(page.locator('#item-form')).toBeVisible();
       await page.getByRole('button', { name: 'กลับ' }).click();
-      await expect(page.getByRole('heading', { name: 'รายการทั้งหมด', level: 1 })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'ทะเบียน Taiga', level: 1 })).toBeVisible();
       await expect(page.getByRole('button', { name: 'เกินกำหนด', exact: true })).toHaveAttribute(
         'aria-pressed',
         'true',
@@ -28,7 +28,7 @@ for (const mode of ['', '?gas=1']) {
       await open(page, `/${mode}${mode ? '&hash=/items/5' : '#/items/5'}`);
       await expect(page.locator('#item-form')).toBeVisible();
       await page.getByRole('button', { name: 'กลับ' }).click();
-      await expect(page.getByRole('heading', { name: 'รายการทั้งหมด', level: 1 })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'ทะเบียน Taiga', level: 1 })).toBeVisible();
     });
   });
 }

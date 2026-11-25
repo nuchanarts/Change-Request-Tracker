@@ -107,6 +107,7 @@
       .filter(function (r) {
         return D.isOpen(r.status) && D.taigaKey((r.ticketLinks || [])[0] || r.ticket);
       })
+      .reverse() // the newest items are on the first page
       .slice(0, 12)
       .map(function (r, i) {
         return {
@@ -118,6 +119,80 @@
           at: Date.now() - i * 3600000,
         };
       });
+
+  var statusTaiga = Object.assign({}, window.__statusTaiga);
+
+  // A pretend Taiga server: requests to its host are answered here and never leave the browser.
+  var TAIGA_HOST = 'taiga.example';
+  window.__taigaLog = [];
+  var taiga = (window.__taiga = {
+    token: 'mock-token',
+    denied: false,
+    calls: [],
+    items: {},
+    statuses: Object.keys(D.TAIGA_DEFAULT_MAP).concat('Ready', 'Strange'),
+  });
+  taigaEvents.forEach(function (e, i) {
+    var key = D.taigaKey(e.link);
+    if (key) taiga.items[key.split('/').slice(1).join('/')] = { id: 100 + i, version: 1, status: e.to };
+  });
+  var realFetch = window.fetch;
+  window.fetch = function (url, o) {
+    var base = 'https://' + TAIGA_HOST + '/api/v1/';
+    if (String(url).indexOf(base) !== 0) return realFetch.apply(window, arguments);
+    var u = new URL(url);
+    var path = u.pathname.replace('/api/v1/', '');
+    var body = o.body ? JSON.parse(o.body) : {};
+    taiga.calls.push({ method: o.method, path: path });
+    var reply = function (status, data) {
+      return Promise.resolve(new Response(JSON.stringify(data), { status: status }));
+    };
+    if (path === 'auth') {
+      if (body.password === 'wrong') return reply(401, { _error_message: 'bad' });
+      return reply(200, { auth_token: taiga.token, full_name_display: 'คนใช้ Taiga' });
+    }
+    if (o.headers.Authorization !== 'Bearer ' + taiga.token) return reply(401, {});
+    if (taiga.denied) return reply(403, {});
+    if (path === 'resolver') {
+      var type = ['us', 'task', 'issue', 'epic'].filter(function (t) {
+        return u.searchParams.get(t);
+      })[0];
+      var hit = taiga.items[u.searchParams.get('project') + '/' + type + '/' + u.searchParams.get(type)];
+      if (!hit) return reply(404, {});
+      var res = { project: 1 };
+      res[type] = hit.id;
+      return reply(200, res);
+    }
+    if (/-statuses$/.test(path))
+      return reply(
+        200,
+        taiga.statuses.map(function (n, i) {
+          return { id: i + 1, name: n, is_closed: n === 'Done' || n === 'Archived' };
+        }),
+      );
+    var id = Number(path.split('/')[1]);
+    var item = Object.keys(taiga.items)
+      .map(function (k) {
+        return taiga.items[k];
+      })
+      .filter(function (x) {
+        return x.id === id;
+      })[0];
+    if (!item) return reply(404, {});
+    if (o.method === 'PATCH') {
+      if (body.version !== item.version)
+        return reply(400, { version: ['The version parameter is not valid'] });
+      item.status = taiga.statuses[body.status - 1];
+      item.version++;
+    }
+    return reply(200, {
+      id: item.id,
+      project: 1,
+      version: item.version,
+      status: taiga.statuses.indexOf(item.status) + 1,
+      status_extra_info: { name: item.status },
+    });
+  };
 
   var handlers = {
     Api_taiga: function () {
@@ -134,7 +209,30 @@
         latest: D.taigaLatest(taigaEvents),
         statuses: statuses,
         map: D.taigaEffectiveMap(statuses, taigaPairs),
+        appMap: Object.assign({}, statusTaiga),
+        host: TAIGA_HOST,
       });
+    },
+    Api_taigaPushCheck: function (req) {
+      var r = rows.filter(function (x) {
+        return x.rowNumber === req.rowNumber;
+      })[0];
+      if (!r) return fail('NOT_FOUND');
+      if (Number(r.seq) !== Number(req.seq)) return fail('SEQ_MISMATCH');
+      if (r.status !== req.status) return fail('CONFLICT');
+      return ok({});
+    },
+    Api_logTaigaPush: function (req) {
+      window.__taigaLog.push(req);
+      return ok({});
+    },
+    Api_saveStatusTaiga: function (input) {
+      if (!user.isAdmin)
+        return { ok: false, code: 'NOT_ADMIN', message: 'เฉพาะผู้ดูแลเท่านั้นที่จัดการสิทธิ์ได้' };
+      if (D.WORKFLOW.indexOf(input.app) === -1) return fail('VALIDATION');
+      if (input.taiga) statusTaiga[input.app] = input.taiga;
+      else delete statusTaiga[input.app];
+      return ok({ app: input.app, taiga: input.taiga });
     },
     Api_saveTaigaMap: function (input) {
       if (!user.isAdmin)

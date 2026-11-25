@@ -5,7 +5,7 @@ import { open } from './helpers.js';
 const pages = [
   '/#/monitor',
   '/#/kanban',
-  '/#/items',
+  '/#/items', // ทะเบียน Taiga with every item
   '/#/new',
   '/#/my-work',
   '/#/done-report',

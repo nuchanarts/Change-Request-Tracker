@@ -1,7 +1,12 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 5.0.0 → 6.0.0 (MAJOR: Principle II: the app may READ the bot's hidden sheet "_แมวส้ม_Taiga" to show
+Version change: 7.0.0 → 7.1.0 (MINOR: the Taiga exception may also be used from the item form, by a tick next to
+the status that is off until the person ticks it; every other condition is unchanged. User request 2026-11-25.)
+Previous: 6.0.0 → 7.0.0 (MAJOR: Additional Constraints: one exception to "no data to external services":
+an editor may send an item's status, and nothing else, to taiga.hosxp.net from the browser, with their own Taiga
+login and a confirmation per item. User request 2026-11-25.)
+Previous: 5.0.0 → 6.0.0 (MAJOR: Principle II: the app may READ the bot's hidden sheet "_แมวส้ม_Taiga" to show
 Taiga statuses; it must never write it, and every other "_แมวส้ม_*" sheet stays untouched. User request 2026-11-24.
 Approval by the PM (sheet owner side) confirmed by the user on 2026-11-24, as required by Governance.)
 Previous: 4.2.0 → 5.0.0 (MAJOR: Data Contract: "วันที่ต้องได้" is no longer required; an item may be saved
@@ -271,6 +276,7 @@ Follow-up TODOs: none.
 - **สิทธิ์การใช้งาน**: Deploy แบบ "Execute as: User accessing the web app" เพื่อให้ log บันทึกตัวตนจริงของคนแก้ และให้สิทธิ์แก้ไขในแอปเป็นไปตามสิทธิ์ของชีต ผู้ที่มีแค่สิทธิ์ดูจะเปิดได้เฉพาะหน้า Monitor
 - **ใครเข้าถึงได้**: ชีตเป็นของบัญชี Gmail ส่วนตัว ไม่ใช่ Workspace domain จึงใช้ "Anyone with a Google account" ซึ่งต้องล็อกอินก่อน คนที่ไม่มีสิทธิ์ในชีตจะอ่านข้อมูลไม่ได้ เพราะแอปรันด้วยสิทธิ์ของผู้ใช้เอง
 - **ข้อมูลภายใน**: ห้ามส่งข้อมูลออกไปยังบริการภายนอก และห้ามเปิดเว็บแอปให้ "Anyone (anonymous)" เข้าถึง
+  - **ข้อยกเว้นเดียว (2026-11-25):** ผู้มีสิทธิ์แก้ไขกด "ปรับ Taiga ตามชีต" หรือติ๊ก "ปรับ Taiga ตามสถานะนี้เมื่อบันทึก" ในหน้ารายการ เพื่อส่ง**เฉพาะสถานะ**ไปที่ `taiga.hosxp.net` ได้ ต้องยืนยันทีละรายการ ใช้บัญชี Taiga ของตัวเอง เรียกจากเบราว์เซอร์เท่านั้น ห้ามเก็บรหัสผ่าน ต้องตรวจว่าชีตและ Taiga ยังไม่ถูกแก้ไปก่อน และบันทึกลง `_app_log` ทุกครั้ง
 - **ข้อมูลไม่ครบ**: แถวที่ไม่มี `รายละเอียด` ไม่นับเป็นรายการ ส่วนแถวที่มีค่าผิดประเภทให้แสดงป้าย "ข้อมูลไม่ครบ/ผิดช่อง" ในหน้า Monitor เพื่อให้ PM ตามแก้
 
 ## Quality Gates
@@ -310,4 +316,4 @@ Follow-up TODOs: none.
 - ทุก plan และทุก review ต้องตรวจว่าเป็นไปตาม constitution นี้ ความซับซ้อนที่ไม่มีเหตุผลรองรับจะทำให้รวมงานไม่ได้
 - คำแนะนำสำหรับ agent อยู่ใน `CLAUDE.md` และต้องสอดคล้องกับเอกสารนี้เสมอ
 
-**Version**: 6.0.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-24
+**Version**: 7.1.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-25

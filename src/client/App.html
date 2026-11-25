@@ -32,7 +32,7 @@
       itemsQuery: '',
       itemsState: 'open',
       itemsPage: 0,
-      sort: { key: 'due', dir: 1 },
+      sort: { key: 'seq', dir: -1 }, // newest first, as the register always was
       myTab: store(KEYS.tab) || 'developer',
       mwFilter: store('ehp.mwfilter.v1') || {},
       asHidden: store('ehp.ashidden.v1') || [], // มอบหมายงาน: statuses hidden by the dev lead
@@ -54,11 +54,13 @@
     var COLS_KEY = 'ehp.itemcols.v1';
     /** Column order for the items table: saved order (known keys only) + any new columns, else the default. */
     state.itemCols = function () {
-      var def = Views.ITEM_COLS_DEFAULT;
+      var log = !!(state.taiga && state.taiga.available);
+      var def = Views.ITEM_COLS_DEFAULT.filter(function (k) { return k !== 'taiga' || log; });
       var saved = store(COLS_KEY);
       if (!Array.isArray(saved)) return def.slice();
       var order = saved.filter(function (k) { return def.indexOf(k) !== -1; });
-      def.forEach(function (k) { if (order.indexOf(k) === -1) order.push(k); });
+      // a column the saved order does not know goes after its neighbour in the default order
+      def.forEach(function (k, i) { if (order.indexOf(k) === -1) order.splice(i ? order.indexOf(def[i - 1]) + 1 : 0, 0, k); });
       return order;
     };
     function saveCols(order) {
@@ -129,20 +131,12 @@
     state.filteredRows = function () {
       return D.applyFilters(state.rows, state.domainFilters());
     };
-    state.itemRows = function () {
-      var list = state.drill
-        ? D.applyFilters(state.rows, { ids: state.drill.ids })
-        : D.applyFilters(state.rows, Object.assign(state.domainFilters(), { state: state.itemsState === 'all' ? null : state.itemsState }));
-      list = D.search(list, state.itemsQuery);
-      return sortRows(list);
-    };
-
     function sortRows(list) {
       var k = state.sort.key;
       var dir = state.sort.dir;
       var val = function (r) {
         if (k === 'due') return r.effectiveDue ? r.effectiveDue.y * 10000 + r.effectiveDue.m * 100 + r.effectiveDue.d : 99999999;
-        if (k === 'seq') return r.seq === null ? 1e9 : r.seq;
+        if (k === 'seq') return r.seq === null ? 1e9 * dir : r.seq; // no ลำดับ: always last
         if (k === 'status') return D.statusRank(r.status);
         if (k === 'urgency') return D.urgencyRank(r.urgency);
         return r[k] || '￿';
@@ -153,6 +147,7 @@
         return (x < y ? -1 : x > y ? 1 : (a.seq || 0) - (b.seq || 0)) * dir;
       });
     }
+    state.sortRows = sortRows;
 
     // ------------------------------------------------------------------ API
 
@@ -421,11 +416,18 @@
 
     function route() {
       var h = (currentHash || '#/monitor').slice(2).split('/');
-      return { name: h[0] || 'monitor', id: h[1] ? decodeURIComponent(h[1]) : null };
+      var r = { name: h[0] || 'monitor', id: h[1] ? decodeURIComponent(h[1]) : null };
+      if (r.name === 'items' && !r.id) r.name = 'taiga'; // "รายการทั้งหมด" is part of ทะเบียน Taiga now (2026-11-25)
+      return r;
+    }
+    /** An old link or bookmark to "รายการทั้งหมด" still shows every item. */
+    function isOldItemsLink() {
+      return /^#\/items\/?$/.test(currentHash);
     }
 
     function showRoute(hash) {
       currentHash = hash || '#/monitor';
+      if (isOldItemsLink()) taigaState().tg.kind = 'all';
       resetForm();
       render();
       heartbeatSoon();
@@ -439,7 +441,7 @@
       var main = document.getElementById('main');
       var r = route();
       document.querySelectorAll('.nav a').forEach(function (a) {
-        var active = a.getAttribute('data-route') === (r.name === 'my-work' && r.id === 'pm' ? 'my-work-pm' : r.name);
+        var active = a.getAttribute('data-route') === (r.name === 'my-work' && r.id === 'pm' ? 'my-work-pm' : r.name === 'items' ? 'taiga' : r.name);
         if (active) a.setAttribute('aria-current', 'page');
         else a.removeAttribute('aria-current');
       });
@@ -449,8 +451,8 @@
       var html;
       if (r.name === 'items' && r.id) {
         var row = state.byId[r.id];
-        html = row ? Views.form(state, 'edit', row) : UI.emptyState('ไม่พบรายการนี้', 'รายการอาจถูกเปลี่ยนเลขลำดับในชีต ลองโหลดข้อมูลใหม่', '<a class="btn" href="#/items">กลับไปที่รายการทั้งหมด</a>');
-      } else if (r.name === 'items') html = Views.items(state);
+        html = row ? Views.form(state, 'edit', row) : UI.emptyState('ไม่พบรายการนี้', 'รายการอาจถูกเปลี่ยนเลขลำดับในชีต ลองโหลดข้อมูลใหม่', '<a class="btn" href="#/taiga">กลับไปที่ทะเบียน Taiga</a>');
+      }
       else if (r.name === 'new') html = Views.form(state, 'new', null);
       else if (r.name === 'my-work') {
         state.myTab = r.id === 'pm' ? 'pm' : 'developer';
@@ -471,6 +473,10 @@
       else html = Views.monitor(state);
       if (state.tourStep !== null) html += Views.tour(state.tourStep);
       main.innerHTML = html;
+      if (document.getElementById('tg-form-sync')) {
+        if (!state.taigaFresh && !state.taigaLoading) loadTaiga();
+        refreshFormSync();
+      }
       if (r.name === 'monitor' && !state.introPlayed) playIntro(main);
     }
 
@@ -518,8 +524,7 @@
 
     /** Where "กลับ" goes when the page was opened directly (no history in this session). */
     function parentOf(r) {
-      if (r.name === 'items' && r.id) return '#/items';
-      if (r.name === 'items' && state.drill) return '#/monitor';
+      if (r.name === 'items') return '#/taiga';
       return '#/monitor';
     }
 
@@ -617,7 +622,41 @@
       }
     }
 
+    var SYNC_KEY = 'ehp.taigaFormSync.v1';
+    var formSync = store(SYNC_KEY) === true; // the person's last choice
+    /** Draw the Taiga tick next to the status in place, so nothing typed in the form is lost. */
+    function refreshFormSync() {
+      var slot = document.getElementById('tg-form-sync');
+      var form = document.getElementById('item-form');
+      if (!slot || !form || !state.taiga) return;
+      var row = form.getAttribute('data-mode') === 'edit' ? state.byId[route().id] : null;
+      var t = state.taiga;
+      var ticket = form.elements.ticket ? form.elements.ticket.value.trim() : '';
+      var sameTicket = row && ticket === (row.raw.ticket || '').trim();
+      var html = row && row.seq === null ? '' : Views.tgFormSync(D.taigaFormSync({
+        item: {
+          id: row ? row.id : null,
+          seq: row ? row.seq : 0,
+          status: form.elements.status.value,
+          ticketLinks: sameTicket ? row.ticketLinks : [], // a new text replaces the links inside the cell
+          ticketUrl: D.ticketUrl(ticket),
+        },
+        rows: state.rows, host: t.host, latest: t.latest, map: t.map, appMap: t.appMap || {},
+      }), formSync);
+      if (slot.getAttribute('data-html') === html) return;
+      slot.setAttribute('data-html', html);
+      slot.innerHTML = html;
+    }
+
+    /** After the sheet is saved: send the item's status to Taiga, then leave the form. */
+    function thenSync(wanted, id, done) {
+      if (!wanted) return done();
+      return pushTaiga(id, true).then(done);
+    }
+
     function submitForm(form) {
+      var box = document.getElementById('f-taiga-sync');
+      var sync = !!(box && box.checked && !box.disabled);
       var mode = form.getAttribute('data-mode');
       var r = route();
       var row = mode === 'edit' ? state.byId[r.id] : null;
@@ -642,11 +681,17 @@
           }
           UI.toast('บันทึกรายการใหม่แล้ว ลำดับที่ ' + res.data.seq);
           resetForm();
-          return load().then(function () { go('#/items/' + res.data.seq); });
+          return load().then(function () {
+            return thenSync(sync, String(res.data.seq), function () { go('#/items/' + res.data.seq); });
+          });
         });
       }
       var changes = D.diffChanges(row.raw, values);
-      if (!Object.keys(changes).length) return UI.toast('ยังไม่มีช่องไหนเปลี่ยน');
+      var leave = function () { if (route().name === 'items' && route().id === r.id) back(); };
+      if (!Object.keys(changes).length) {
+        if (sync) return pushTaiga(r.id, true).then(function (ok) { if (ok) leave(); });
+        return UI.toast('ยังไม่มีช่องไหนเปลี่ยน');
+      }
       var vu = D.validateUpdate(changes, row.raw, state.options);
       state.formErrors = vu.errors;
       state.formWarnings = vu.warnings;
@@ -656,7 +701,7 @@
       }
       // after saving, go back to the page the item was opened from (user request 2026-11-11)
       return saveChanges(row, changes, btn).then(function (ok) {
-        if (ok && route().name === 'items' && route().id === r.id) back();
+        if (ok) return thenSync(sync, r.id, leave);
       });
     }
 
@@ -791,33 +836,26 @@
 
     // ------------------------------------------------------------------ Taiga register (2026-11-20)
 
-    var TG_KEY = 'ehp.taiga.v1'; // remembers scope, platform and PM; the search box starts empty
+    var TG_KEY = 'ehp.taiga.v1'; // remembers งาน Taiga / ทุกรายการ
     function taigaState() {
       if (!state.tg) {
         var saved = store(TG_KEY) || {};
-        state.tg = { scope: saved.scope || 'open', platform: saved.platform || '', pm: saved.pm || '', q: '', sync: '', review: false };
+        state.tg = { kind: saved.kind === 'all' || isOldItemsLink() ? 'all' : 'taiga', sync: '', review: false };
       }
       return state;
     }
-    function readTaigaForm(form) {
-      var tg = state.tg;
-      var el = form.elements;
-      tg.scope = el['tg-scope'].value;
-      tg.platform = el['tg-platform'].value;
-      tg.pm = el['tg-pm'].value;
-      tg.q = el['tg-q'].value;
-      tg.sync = el['tg-sync'] ? el['tg-sync'].value : ''; // not remembered: a hidden filter would look like missing items
-      store(TG_KEY, { scope: tg.scope, platform: tg.platform, pm: tg.pm });
+    function setTgKind(kind) {
+      state.tg.kind = kind;
+      state.itemsPage = 0;
+      store(TG_KEY, { kind: kind });
       renderTaiga();
     }
     /** Re-render the register without losing the focused field or text typed but not applied yet. */
     function renderTaiga() {
       var active = document.activeElement;
       var focusId = active && active.id;
-      var typed = document.getElementById('f-tg-q');
-      if (typed && state.tg) state.tg.q = typed.value;
-      var map = document.getElementById('tg-map');
-      if (map && state.tg) state.tg.mapOpen = map.open;
+      var typed = document.getElementById('q');
+      if (typed) state.itemsQuery = typed.value;
       var pos = active && active.tagName === 'INPUT' ? active.selectionStart : null;
       render();
       var again = focusId && document.getElementById(focusId);
@@ -827,13 +865,21 @@
       }
     }
 
+    // the status map stays open or closed through every re-render, also a data reload ("toggle" does not bubble)
+    document.addEventListener('toggle', function (ev) {
+      if (ev.target.id === 'tg-map' && ev.target.isConnected && state.tg) state.tg.mapOpen = ev.target.open;
+    }, true);
+
     // Taiga statuses (2026-11-24): read from the bot's log when the register opens; the app never writes that log.
+    var taigaSent = {}; // what this page sent to Taiga itself, see Domain.taigaWithSent
     function loadTaiga() {
       state.taigaLoading = true;
       state.taigaFresh = true; // one load per set of rows; an error waits for "โหลดข้อมูลใหม่"
       api('Api_taiga').then(function (res) {
         state.taigaLoading = false;
         state.taiga = res.ok ? res.data : { available: false, error: res.message, latest: {}, statuses: [], map: {} };
+        state.taiga.latest = D.taigaWithSent(state.taiga.latest, taigaSent, Date.now());
+        refreshFormSync();
         if (route().name === 'taiga' && state.phase !== 'loading' && state.phase !== 'error') renderTaiga();
       });
     }
@@ -843,6 +889,17 @@
           if (app) state.taiga.map[name] = app;
           else delete state.taiga.map[name];
           UI.toast(app ? 'จับคู่ "' + name + '" กับ "' + D.statusLabel(app) + '" แล้ว' : 'ยกเลิกการจับคู่ "' + name + '" แล้ว');
+        } else UI.toast(res.message, 'error');
+        if (route().name === 'taiga') renderTaiga();
+      });
+    }
+    function saveStatusTaiga(app, name) {
+      api('Api_saveStatusTaiga', { app: app, taiga: name }).then(function (res) {
+        if (res.ok) {
+          state.taiga.appMap = state.taiga.appMap || {};
+          if (name) state.taiga.appMap[app] = name;
+          else delete state.taiga.appMap[app];
+          UI.toast(name ? 'จับคู่ "' + D.statusLabel(app) + '" กับ Taiga "' + name + '" แล้ว' : 'ยกเลิกการจับคู่ "' + D.statusLabel(app) + '" แล้ว');
         } else UI.toast(res.message, 'error');
         if (route().name === 'taiga') renderTaiga();
       });
@@ -857,6 +914,134 @@
       UI.confirm('ปรับสถานะรายการ #' + row.seq + ' ตาม Taiga?',
         'Taiga: "' + c.taiga.status + '" · สถานะจะเปลี่ยนจาก "' + (row.status ? D.statusLabel(row.status) : 'ว่าง') + '" เป็น "' + D.statusLabel(c.expected) + '"' + close + skips,
         'ปรับสถานะ').then(function (yes) { if (yes) moveStatus(id, c.expected); });
+    }
+    var TG_USER_KEY = 'ehp.taigaUser.v1';
+    /** Log in to Taiga with the person's own account; resolves true once logged in, false when cancelled. */
+    function taigaLogin(host) {
+      return new Promise(function (resolve) {
+        var dlg = document.getElementById('dialog');
+        var done = false;
+        var kept = store(TG_USER_KEY); // username only; false = the person asked not to keep it
+        dlg.className = '';
+        dlg.innerHTML = '<form id="tg-login" method="post"><h2>เข้าสู่ระบบ Taiga</h2>' +
+          '<p class="muted">ใช้บัญชี Taiga ของคุณเอง รหัสผ่านส่งตรงไปที่ ' + UI.esc(host) + ' แอปไม่เก็บรหัสผ่าน และจำการเข้าสู่ระบบเฉพาะแท็บนี้</p>' +
+          '<div class="field"><label for="tg-user">ชื่อผู้ใช้ Taiga</label><input id="tg-user" name="username" type="text" autocomplete="username" value="' + UI.esc(kept || '') + '" required /></div>' +
+          '<div class="field"><label for="tg-pass">รหัสผ่าน Taiga</label><input id="tg-pass" name="password" type="password" autocomplete="current-password" required /></div>' +
+          '<label class="tg-keep"><input type="checkbox" name="keep"' + (kept === false ? '' : ' checked') + ' /> จำชื่อผู้ใช้ในเครื่องนี้</label>' +
+          '<p class="err" role="alert" id="tg-login-err"></p>' +
+          '<div class="dialog-actions"><button type="button" class="btn" id="tg-login-no">ยกเลิก</button><button type="submit" class="btn primary">เข้าสู่ระบบ</button></div></form>';
+        var form = document.getElementById('tg-login');
+        document.getElementById('tg-login-no').addEventListener('click', function () { dlg.close(); });
+        form.addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          var btn = form.querySelector('[type="submit"]');
+          btn.disabled = true;
+          var user = form.elements.username.value.trim();
+          TaigaApi.login(host, user, form.elements.password.value).then(function () {
+            store(TG_USER_KEY, form.elements.keep.checked ? user : false);
+            done = true;
+            dlg.close();
+          }, function (e) {
+            btn.disabled = false;
+            document.getElementById('tg-login-err').textContent = e.message;
+            form.elements.password.value = '';
+            form.elements.password.focus();
+          });
+        });
+        dlg.addEventListener('close', function onClose() {
+          dlg.removeEventListener('close', onClose);
+          dlg.innerHTML = '';
+          // closed while Taiga was still answering: the person cancelled
+          if (!done) TaigaApi.logout();
+          resolve(done);
+        });
+        dlg.showModal();
+        if (kept) form.elements.password.focus();
+      });
+    }
+
+    var tgPushing = false;
+    /** "ปรับ Taiga ตามชีต": a person confirms every item; Taiga's version check stops overwriting newer changes. */
+    /** @param {boolean} [fromForm] the item form's tick: Taiga itself is asked, the bot's log need not know the item */
+    function pushTaiga(id, fromForm) {
+      var row = state.byId[id];
+      if (!row || tgPushing || !state.taiga) return Promise.resolve(false);
+      var c = Views.tgCompare(state, row);
+      var appMap = state.taiga.appMap || {};
+      var pushTo = fromForm ? D.statusTaigaTarget(row.status, state.taiga.map, appMap) : c && c.pushTo;
+      if (!pushTo && !fromForm) return Promise.resolve(false);
+      var counts = D.taigaKeyCounts(state.rows);
+      var host = state.taiga.host;
+      var key = D.taigaKey(D.taigaLink(row));
+      if (!key || !host || key.split('/')[0] !== host) return Promise.resolve(false);
+      if (counts[key] > 1) {
+        UI.toast('ลิงก์ Taiga นี้ใช้กับหลายรายการ จึงไม่ปรับให้อัตโนมัติ', 'error');
+        return Promise.resolve(false);
+      }
+      var seen = c && c.taiga ? c.taiga.status : '';
+      var cancelled = { code: 'CANCELLED' };
+      tgPushing = true;
+      function needLogin() {
+        if (TaigaApi.loggedIn(host)) return Promise.resolve();
+        return taigaLogin(host).then(function (yes) { if (!yes) throw cancelled; });
+      }
+      function settle(status) {
+        // the register shows it at once; the bot's log catches up later
+        taigaSent[key] = { status: status, from: item.status, by: TaigaApi.name(), at: Date.now(), deleted: false };
+        state.taiga.latest[key] = taigaSent[key];
+      }
+      var item, target;
+      return needLogin().then(function () {
+        return TaigaApi.load(key).catch(function (e) {
+          if (e.code !== 'AUTH') throw e;
+          TaigaApi.logout(); // expired: log in once more
+          return needLogin().then(function () { return TaigaApi.load(key); });
+        });
+      }).then(function (res) {
+        item = res;
+        var fresh = {};
+        fresh[key] = { status: item.status, deleted: false };
+        if (D.taigaName(item.status) === D.taigaName(pushTo) || D.taigaCompare(row, fresh, state.taiga.map, counts, appMap).state === 'match') {
+          state.taiga.latest[key] = Object.assign({ from: '', by: '', at: null, deleted: false }, c && c.taiga, { status: item.status });
+          throw { code: 'SAME', message: 'Taiga อยู่ที่ "' + item.status + '" อยู่แล้ว' };
+        }
+        if (!pushTo) throw { code: 'UNMAPPED', message: 'สถานะ "' + D.statusLabel(row.status) + '" ยังไม่จับคู่กับ Taiga จึงยังไม่ได้ปรับ Taiga' };
+        target = item.statuses.filter(function (s) { return D.taigaName(s.name) === D.taigaName(pushTo); })[0];
+        if (!target) throw { code: 'NO_STATUS', message: 'โปรเจกต์นี้ใน Taiga ไม่มีสถานะ "' + pushTo + '" ตรวจการจับคู่สถานะอีกครั้ง' };
+        return UI.confirm('ปรับ Taiga รายการ #' + row.seq + ' ตามสถานะในชีต?',
+          'ชีต: "' + D.statusLabel(row.status) + '" · Taiga จะเปลี่ยนจาก "' + item.status + '" เป็น "' + target.name + '" ในชื่อ ' + TaigaApi.name() +
+          (seen && D.taigaName(item.status) !== D.taigaName(seen) ? ' ⚠ Taiga เปลี่ยนจากที่แสดงในทะเบียน ("' + seen + '") แล้ว' : '') +
+          (target.is_closed ? ' สถานะนี้ปิดงานใน Taiga' : ''), 'ส่งไป Taiga');
+      }).then(function (yes) {
+        if (!yes) throw cancelled;
+        return api('Api_taigaPushCheck', { rowNumber: row.rowNumber, seq: row.seq, status: row.raw.status });
+      }).then(function (res) {
+        if (!res.ok) throw res;
+        return TaigaApi.saveStatus(item, target.id).catch(function (e) {
+          if (e.code === 'AUTH') TaigaApi.logout();
+          if (e.code === 'NETWORK') throw { code: e.code, message: 'ไม่แน่ใจว่า Taiga ได้รับหรือไม่ กรุณาเปิดดูใน Taiga' };
+          throw e;
+        });
+      }).then(function () {
+        settle(target.name);
+        return api('Api_logTaigaPush', { rowNumber: row.rowNumber, seq: row.seq, from: item.status, to: target.name });
+      }).then(function (res) {
+        if (res.ok) UI.toast('ปรับ Taiga รายการ #' + row.seq + ' เป็น "' + target.name + '" แล้ว');
+        else UI.toast('ปรับ Taiga แล้ว แต่บันทึกประวัติในแอปไม่สำเร็จ', 'error');
+        return true;
+      }).catch(function (e) {
+        if (e.code === 'CANCELLED') {
+          if (fromForm) UI.toast('ยังไม่ได้ปรับ Taiga รายการ #' + row.seq, 'error');
+          return false;
+        }
+        UI.toast(e.message || 'ส่งไป Taiga ไม่สำเร็จ', e.code === 'SAME' ? undefined : 'error');
+        return e.code === 'SAME';
+      }).then(function (ok) {
+        tgPushing = false;
+        if (route().name === 'taiga') renderTaiga();
+        return ok;
+      });
     }
     function exportTaiga() {
       var rep = Views.tgReport(state);
@@ -931,9 +1116,10 @@
         state.drill = state.drills[el.getAttribute('data-drill')];
         state.itemsPage = 0;
         state.itemsQuery = '';
-        go('#/items');
+        if (state.tg) Object.assign(state.tg, { review: false }); // the list must match the number that was clicked
+        go('#/taiga');
       },
-      'clear-drill': function () { state.drill = null; render(); },
+      'clear-drill': function () { state.drill = null; state.itemsPage = 0; render(); },
       'clear-filters': function () {
         state.filters = Object.assign({}, EMPTY_FILTERS);
         store(KEYS.filters, state.filters);
@@ -1130,8 +1316,11 @@
       },
       'dr-export': exportDoneReport,
       'tg-export': exportTaiga,
-      'tg-review': function () { state.tg.review = !state.tg.review; renderTaiga(); },
+      'tg-review': function () { state.tg.review = !state.tg.review; state.itemsPage = 0; renderTaiga(); },
+      'tg-kind': function (el) { setTgKind(el.getAttribute('data-value')); },
       'tg-apply': function (el) { applyTaiga(el.getAttribute('data-id')); },
+      'tg-push': function (el) { pushTaiga(el.getAttribute('data-id')); },
+      'tg-logout': function () { TaigaApi.logout(); renderTaiga(); },
       'pick-skin': function (el) {
         var id = applySkin(el.getAttribute('data-skin'));
         store(SKIN_KEY, id);
@@ -1197,10 +1386,13 @@
     document.addEventListener('change', function (ev) {
       var form = ev.target.form;
       if (ev.target.id === 'mw-who') return setMyName(ev.target.value);
+      if (ev.target.id === 'f-taiga-sync') return store(SYNC_KEY, (formSync = ev.target.checked));
+      if (ev.target.id === 'f-status' && form && form.id === 'item-form') refreshFormSync();
       if (ev.target.classList && ev.target.classList.contains('access-name')) {
         return saveAccess({ email: ev.target.getAttribute('data-email'), name: ev.target.value });
       }
       if (ev.target.classList && ev.target.classList.contains('tg-map-select')) return saveTaigaMap(ev.target.getAttribute('data-taiga'), ev.target.value);
+      if (ev.target.classList && ev.target.classList.contains('tg-app-select')) return saveStatusTaiga(ev.target.getAttribute('data-app'), ev.target.value);
       if (ev.target.classList && ev.target.classList.contains('access-select')) {
         var input = { email: ev.target.getAttribute('data-email') };
         input[ev.target.getAttribute('data-field')] = ev.target.value;
@@ -1208,8 +1400,11 @@
       }
       if (form && form.id === 'export-form') return refreshExport();
       if (form && form.id === 'dr-form') return readDoneReportForm(form);
-      // the search box re-renders on input (debounced); its change event on blur must not re-render under a click
-      if (form && form.id === 'tg-form') return ev.target.id === 'f-tg-q' ? undefined : readTaigaForm(form);
+      if (ev.target.id === 'f-tg-sync') {
+        state.tg.sync = ev.target.value; // not remembered: a hidden filter would look like missing items
+        state.itemsPage = 0;
+        return renderTaiga();
+      }
       if (form && form.id === 'filters') {
         ['platform', 'pm', 'developer', 'urgency', 'from', 'to'].forEach(function (k) { state.filters[k] = form.elements[k].value; });
         store(KEYS.filters, state.filters);
@@ -1230,6 +1425,7 @@
 
     var searchTimer = null;
     document.addEventListener('input', function (ev) {
+      if (ev.target.id === 'f-ticket') refreshFormSync();
       if (ev.target.id === 'mw-q') {
         clearTimeout(searchTimer);
         searchTimer = setTimeout(function () {
@@ -1241,14 +1437,10 @@
         }, 150);
         return;
       }
-      if (ev.target.id === 'f-tg-q') {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(function () { readTaigaForm(ev.target.form); }, 200);
-        return;
-      }
       if (ev.target.id !== 'q') return;
       clearTimeout(searchTimer);
       searchTimer = setTimeout(function () {
+        if (!ev.target.isConnected) return; // left the page, or re-rendered with the typed text kept
         state.itemsQuery = ev.target.value;
         state.itemsPage = 0;
         var pos = ev.target.selectionStart;

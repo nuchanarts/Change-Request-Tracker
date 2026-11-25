@@ -72,6 +72,16 @@ describe('taigaRegister', () => {
     expect(seqs(D.taigaRegister(rows, { scope: 'closed' }))).toEqual([2]);
     expect(seqs(D.taigaRegister(rows, { scope: 'all' }))).toEqual([6, 3, 2, 1]);
   });
+  it('kind "all" keeps every item, but only Taiga-step items count as missing a link (2026-11-25)', () => {
+    const rep = D.taigaRegister(rows, { kind: 'all' });
+    expect(seqs(rep)).toEqual([6, 5, 4, 3, 1]);
+    expect(rep.noLink).toBe(1);
+    expect(seqs(D.taigaRegister(rows, { kind: 'all', scope: 'closed' }))).toEqual([2]);
+  });
+  it('scope "overdue" keeps overdue open items', () => {
+    const late = [...rows, mk(7, { ticket: TG + '7', dueDate: '1/11/2026' })];
+    expect(seqs(D.taigaRegister(late, { scope: 'overdue' }))).toEqual([7]);
+  });
   it('counts per status in workflow order', () => {
     const rep = D.taigaRegister(rows, { scope: 'all' });
     expect(rep.byStatus.map((s) => s.status)).toEqual([

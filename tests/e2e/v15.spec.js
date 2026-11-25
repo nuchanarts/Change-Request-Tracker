@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { open } from './helpers.js';
 
 test.describe('Navigation order, Taiga link, access admin (2026-11-11)', () => {
-  test('top menu is in the requested order with Taiga and admin links', async ({ page }) => {
+  test('top menu is in the requested order with the admin link', async ({ page }) => {
     await open(page);
     const names = (await page.locator('.nav a:visible').allTextContents()).map((t) =>
       t.replace(/\d+/g, '').trim(),
@@ -13,14 +13,12 @@ test.describe('Navigation order, Taiga link, access admin (2026-11-11)', () => {
       'บอร์ดงาน',
       'นักพัฒนา', // was งานของฉัน (user request 2026-11-20)
       'งาน PM',
-      'รายการทั้งหมด',
       'รายงานปิดงาน',
       'ทะเบียน Taiga', // user request 2026-11-20
       'จัดการสิทธิ์',
       'วิธีใช้งาน', // icon only; the name is for screen readers
-      'Taiga ↗',
     ]);
-    await expect(page.locator('.nav a.nav-ext')).toHaveAttribute('href', 'https://taiga.hosxp.net/login');
+    await expect(page.locator('.nav a[target="_blank"]')).toHaveCount(0); // Taiga ↗ removed 2026-11-25
   });
 
   test('admins approve a pending request and add a new member', async ({ page }) => {

@@ -63,9 +63,9 @@ test.describe('US1 Monitor', () => {
     await open(page);
     const overdue = n(await statValue(page, 'overdue').textContent());
     await page.locator('[data-metric="overdue"] button').click();
-    await expect(page).toHaveURL(/#\/items$/);
+    await expect(page).toHaveURL(/#\/taiga$/);
     await expect(page.locator('.drill')).toContainText(`(${overdue} รายการ)`);
-    await expect(page.locator('.page-head .muted').first()).toContainText(String(overdue));
+    await expect(page.locator('#tg-count')).toHaveText(String(overdue));
   });
 
   test('filters recompute every number', async ({ page }) => {

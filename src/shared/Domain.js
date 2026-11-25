@@ -76,6 +76,7 @@ var Domain = (function () {
   // New requests still start here (Data Contract default), even though it is not the first step.
   var DEFAULT_STATUS = '0.รอแจ้งทีมพัฒนา';
   var URGENCY = ['ด่วนที่สุด', 'ด่วน', 'ปกติ'];
+  var DEFAULT_URGENCY = 'ปกติ';
   var UNASSIGNED = 'ยังไม่มอบหมาย';
   var NO_PM = 'ไม่ระบุ PM';
   var NO_STATUS_LABEL = '(ไม่ระบุสถานะ)';
@@ -501,7 +502,7 @@ var Domain = (function () {
       )
         return false;
       if (!inList(f.developer, r.developer === '' ? UNASSIGNED : r.developer)) return false;
-      if (!inList(f.urgency, r.urgency)) return false;
+      if (!inList(f.urgency, urgencyOf(r.urgency))) return false;
       if (!inList(f.issueType, r.issueType)) return false;
       if (!inList(f.status, r.status)) return false;
       // ids is a drill-down: an empty list means "nothing", never "no filter"
@@ -1398,15 +1399,18 @@ var Domain = (function () {
   }
 
   /**
-   * Items with a Taiga link or in a Taiga step, newest first. scope: 'open' (default) | 'closed' | 'all'.
-   * @param {any[]} rows @param {{scope?: string}} q
+   * Items with a Taiga link or in a Taiga step, newest first; kind 'all' = every item (the register replaced
+   * "รายการทั้งหมด", user 2026-11-25). scope: 'open' (default) | 'overdue' | 'closed' | 'all'.
+   * @param {any[]} rows @param {{scope?: string, kind?: string}} q
    */
   function taigaRegister(rows, q) {
     var scope = (q && q.scope) || 'open';
+    var every = !!q && q.kind === 'all';
     var out = rows.filter(function (r) {
       if (scope === 'open' && !r.isOpen) return false;
       if (scope === 'closed' && r.isOpen) return false;
-      return !!taigaLink(r) || TAIGA_STEPS.indexOf(r.status) !== -1;
+      if (scope === 'overdue' && !r.isOverdue) return false;
+      return every || !!taigaLink(r) || TAIGA_STEPS.indexOf(r.status) !== -1;
     });
     out.sort(function (a, b) {
       return (b.seq === null ? -1 : b.seq) - (a.seq === null ? -1 : a.seq);
@@ -1427,7 +1431,7 @@ var Domain = (function () {
       rows: out,
       total: out.length,
       noLink: out.filter(function (r) {
-        return !taigaLink(r);
+        return TAIGA_STEPS.indexOf(r.status) !== -1 && !taigaLink(r);
       }).length,
       byStatus: byStatus,
     };
@@ -1493,6 +1497,66 @@ var Domain = (function () {
     return out;
   }
 
+  /**
+   * Sheet status → Taiga status, for sheet statuses without exactly one Taiga status (user, 2026-11-25).
+   * @param {Array<{app:string, taiga:string}>} pairs saved by an admin
+   */
+  function statusTaigaMap(pairs) {
+    /** @type {Object<string,string>} */
+    var out = {};
+    pairs.forEach(function (p) {
+      if (WORKFLOW.indexOf(p.app) !== -1 && clean(p.taiga)) out[p.app] = clean(p.taiga);
+    });
+    return out;
+  }
+
+  /**
+   * Every known Taiga status name, once each: seen in Taiga first, then paired names, then the team table.
+   * @param {string[]} statuses @param {Object<string,string>} map taigaEffectiveMap() @param {Object<string,string>} appMap
+   */
+  function taigaNames(statuses, map, appMap) {
+    /** @type {Object<string,boolean>} */
+    var seen = Object.create(null);
+    var paired = Object.keys(appMap).map(function (app) {
+      return appMap[app];
+    });
+    return statuses.concat(Object.keys(map), paired, Object.keys(TAIGA_DEFAULT_MAP)).filter(function (n) {
+      var name = taigaName(n);
+      if (!name || seen[name]) return false;
+      seen[name] = true;
+      return true;
+    });
+  }
+
+  /**
+   * Sheet statuses to pair by hand: no Taiga status, or several, or already paired by hand. Workflow order.
+   * @param {Object<string,string>} map taigaEffectiveMap() @param {Object<string,string>} appMap statusTaigaMap()
+   */
+  function statusTaigaGaps(map, appMap) {
+    /** @type {Array<{app:string, several:string[]}>} */
+    var out = [];
+    WORKFLOW.forEach(function (app) {
+      var names = Object.keys(map).filter(function (n) {
+        return map[n] === app;
+      });
+      if (names.length !== 1 || appMap[app]) out.push({ app: app, several: names.length > 1 ? names : [] });
+    });
+    return out;
+  }
+
+  /**
+   * The Taiga status to send for a sheet status: the pair made by hand, else its only Taiga status, else ''.
+   * @param {any} status @param {Object<string,string>} map taigaEffectiveMap() @param {Object<string,string>} appMap
+   */
+  function statusTaigaTarget(status, map, appMap) {
+    if (WORKFLOW.indexOf(status) === -1) return '';
+    if (Object.prototype.hasOwnProperty.call(appMap, status)) return appMap[status];
+    var names = Object.keys(map).filter(function (n) {
+      return map[n] === status;
+    });
+    return names.length === 1 ? names[0] : '';
+  }
+
   /** 'site/project/type/ref' of a full Taiga item link, or null. @param {any} url */
   function taigaKey(url) {
     var m = /^https?:\/\/([^/\s?#]+)\/project\/([^/\s?#]+)\/(us|task|issue|epic)\/(\d+)/i.exec(clean(url));
@@ -1536,19 +1600,30 @@ var Domain = (function () {
    * Compare one row with Taiga. state: none (nothing known) | deleted | unmapped | match | diff.
    * Never guesses a status: only an exact map entry that is a workflow status counts. canApply = a person may
    * press "ปรับตาม Taiga" (one row per Taiga item, and the row has a ลำดับ).
+   * A status an admin paired by hand with this Taiga status (appMap) counts as a match.
+   * pushTo = the Taiga status a person may send with "ปรับ Taiga ตามชีต" ('' = not offered), same rules as canApply.
    * @param {any} r @param {any} latest taigaLatest() @param {Object<string,string>} map @param {Object<string,number>} counts
+   * @param {Object<string,string>} [appMap] statusTaigaMap()
    */
-  function taigaCompare(r, latest, map, counts) {
+  function taigaCompare(r, latest, map, counts, appMap) {
     var key = taigaKey(taigaLink(r));
     var t = key && Object.prototype.hasOwnProperty.call(latest, key) ? latest[key] : null;
-    var out = { state: 'none', taiga: t, expected: '', duplicate: false, canApply: false };
+    var out = { state: 'none', taiga: t, expected: '', duplicate: false, canApply: false, pushTo: '' };
     if (!key || !t || (!t.status && !t.deleted)) return out;
     out.duplicate = counts[key] > 1;
     if (t.deleted) {
       out.state = 'deleted';
       return out;
     }
+    var byHand = appMap && Object.prototype.hasOwnProperty.call(appMap, r.status) ? appMap[r.status] : '';
+    if (r.status && byHand && taigaName(byHand) === taigaName(t.status)) {
+      out.expected = r.status;
+      out.state = 'match';
+      return out;
+    }
     var want = Object.prototype.hasOwnProperty.call(map, t.status) ? map[t.status] : '';
+    if (r.status !== want && !out.duplicate && r.seq !== null)
+      out.pushTo = statusTaigaTarget(r.status, map, appMap || {});
     if (WORKFLOW.indexOf(want) === -1) {
       out.state = 'unmapped';
       return out;
@@ -1556,6 +1631,46 @@ var Domain = (function () {
     out.expected = want;
     out.state = r.status === want ? 'match' : 'diff';
     out.canApply = out.state === 'diff' && !out.duplicate && r.seq !== null;
+    return out;
+  }
+
+  /**
+   * The tick next to the status on the item form: what saving would send to Taiga, or why it cannot.
+   * @param {{item:any, rows:any[], host:any, latest:any, map:any, appMap:any}} o item = what the form shows now
+   */
+  function taigaFormSync(o) {
+    var key = taigaKey(taigaLink(o.item));
+    var out = { show: false, target: '', now: '', match: false, reason: '' };
+    if (!key || !o.host || key.split('/')[0] !== o.host) return out;
+    out.show = true;
+    var others = o.rows.filter(function (r) {
+      return r.id !== o.item.id && taigaKey(taigaLink(r)) === key;
+    }).length;
+    /** @type {Object<string, number>} */
+    var counts = {};
+    counts[key] = others + 1;
+    var cmp = taigaCompare(o.item, o.latest, o.map, counts, o.appMap);
+    out.now = cmp.taiga ? cmp.taiga.status : '';
+    out.match = cmp.state === 'match';
+    out.target = statusTaigaTarget(o.item.status, o.map, o.appMap || {});
+    if (others) out.reason = 'duplicate';
+    else if (cmp.state === 'deleted') out.reason = 'deleted';
+    else if (!out.target && !out.match) out.reason = 'unmapped';
+    return out;
+  }
+
+  var SENT_KEEP_MS = 10 * 60000;
+  /**
+   * The bot's log runs a little behind: keep showing what was just sent until it logs something newer.
+   * @param {any} latest taigaLatest() @param {any} sent the same shape @param {number} now ms
+   */
+  function taigaWithSent(latest, sent, now) {
+    var out = Object.assign({}, latest);
+    Object.keys(sent).forEach(function (key) {
+      var logged = out[key];
+      if (now - sent[key].at > SENT_KEEP_MS || (logged && logged.at > sent[key].at)) return;
+      out[key] = sent[key];
+    });
     return out;
   }
 
@@ -1706,9 +1821,14 @@ var Domain = (function () {
     return Object.prototype.hasOwnProperty.call(COLUMN_BY_KEY, key);
   }
 
-  /** 0 = ด่วนที่สุด … URGENCY.length = empty/unknown. @param {any} u */
+  /** The urgency to show: an empty cell reads as ปกติ (user, 2026-11-25); the sheet is not changed. @param {any} u */
+  function urgencyOf(u) {
+    return clean(u) || DEFAULT_URGENCY;
+  }
+
+  /** 0 = ด่วนที่สุด … URGENCY.length = unknown; empty counts as ปกติ. @param {any} u */
   function urgencyRank(u) {
-    var i = URGENCY.indexOf(clean(u));
+    var i = URGENCY.indexOf(urgencyOf(u));
     return i === -1 ? URGENCY.length : i;
   }
 
@@ -1910,10 +2030,16 @@ var Domain = (function () {
     TAIGA_DEFAULT_MAP: TAIGA_DEFAULT_MAP,
     taigaName: taigaName,
     taigaEffectiveMap: taigaEffectiveMap,
+    statusTaigaMap: statusTaigaMap,
+    statusTaigaGaps: statusTaigaGaps,
+    statusTaigaTarget: statusTaigaTarget,
+    taigaNames: taigaNames,
     taigaKey: taigaKey,
     taigaLatest: taigaLatest,
     taigaKeyCounts: taigaKeyCounts,
     taigaCompare: taigaCompare,
+    taigaFormSync: taigaFormSync,
+    taigaWithSent: taigaWithSent,
     DEV_STEPS: DEV_STEPS,
     devBeforeReview: devBeforeReview,
     TAIGA_STEPS: TAIGA_STEPS,
@@ -1957,6 +2083,8 @@ var Domain = (function () {
     diffChanges: diffChanges,
     nextSeq: nextSeq,
     URGENCY: URGENCY,
+    DEFAULT_URGENCY: DEFAULT_URGENCY,
+    urgencyOf: urgencyOf,
     urgencyRank: urgencyRank,
     isColumnKey: isColumnKey,
     clean: clean,

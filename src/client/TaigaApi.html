@@ -1,0 +1,83 @@
+<script>
+  /* Taiga calls made by the browser itself (user request 2026-11-25, constitution v7). The person logs in with
+     their own Taiga account; the password goes straight to Taiga and is never kept. The token stays in this tab. */
+  var TaigaApi = (function () {
+    'use strict';
+    var KEY = 'ehp.taigaAuth.v1';
+    var TYPES = {
+      us: ['userstories', 'userstory-statuses'],
+      task: ['tasks', 'task-statuses'],
+      issue: ['issues', 'issue-statuses'],
+      epic: ['epics', 'epic-statuses'],
+    };
+    var auth = null;
+    try { auth = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) { auth = null; }
+
+    function remember(value) {
+      auth = value;
+      try {
+        if (value) sessionStorage.setItem(KEY, JSON.stringify(value));
+        else sessionStorage.removeItem(KEY);
+      } catch (e) { /* storage unavailable: the login lasts until the page reloads */ }
+    }
+    function fail(code, message) {
+      return { code: code, message: message };
+    }
+
+    /** One request; rejects with {code, message}. The token is only ever sent to the site it came from. */
+    function call(host, method, path, body) {
+      var headers = { 'Content-Type': 'application/json', 'x-disable-pagination': '1' };
+      if (auth && auth.host === host) headers.Authorization = 'Bearer ' + auth.token;
+      return fetch('https://' + host + '/api/v1/' + path, {
+        method: method, headers: headers, body: body ? JSON.stringify(body) : undefined, credentials: 'omit', referrerPolicy: 'no-referrer',
+      }).then(function (res) {
+        return res.json().catch(function () { return null; }).then(function (data) {
+          if (res.ok && data) return data;
+          if (res.status === 401) throw fail('AUTH', 'การเข้าสู่ระบบ Taiga หมดอายุ กรุณาลองใหม่');
+          if (res.status === 403) throw fail('DENIED', 'บัญชี Taiga นี้ไม่มีสิทธิ์กับรายการนี้');
+          if (res.status === 404) throw fail('MISSING', 'ไม่พบรายการนี้ใน Taiga หรือบัญชี Taiga นี้ไม่มีสิทธิ์เห็น');
+          if (data && data.version) throw fail('CONFLICT', 'มีคนแก้รายการนี้ใน Taiga ไปก่อน ระบบจึงไม่ส่งทับ กรุณาลองใหม่');
+          throw fail('ERROR', 'Taiga ไม่รับคำสั่ง (รหัส ' + res.status + ')');
+        });
+      }, function () {
+        throw fail('NETWORK', 'เชื่อมต่อ Taiga ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต');
+      });
+    }
+
+    function loggedIn(host) { return !!(auth && auth.host === host); }
+    function name() { return auth ? auth.name : ''; }
+    function logout() { remember(null); }
+
+    function login(host, username, password) {
+      remember(null);
+      return call(host, 'POST', 'auth', { type: 'normal', username: username, password: password }).then(function (d) {
+        if (!d.auth_token) throw fail('ERROR', 'Taiga ไม่ตอบกลับการเข้าสู่ระบบ');
+        remember({ host: host, token: d.auth_token, name: d.full_name_display || username });
+      }, function (e) {
+        throw e.code === 'NETWORK' ? e : fail('LOGIN', 'ชื่อผู้ใช้หรือรหัสผ่าน Taiga ไม่ถูกต้อง');
+      });
+    }
+
+    /** The item as it is in Taiga now, with its project's statuses. @param {string} key Domain.taigaKey() */
+    function load(key) {
+      var p = key.split('/'); // site/project/type/ref
+      var type = TYPES[p[2]];
+      return call(p[0], 'GET', 'resolver?project=' + encodeURIComponent(p[1]) + '&' + p[2] + '=' + p[3]).then(function (r) {
+        if (!r[p[2]]) throw fail('MISSING', 'ไม่พบรายการนี้ใน Taiga หรือบัญชี Taiga นี้ไม่มีสิทธิ์เห็น');
+        return call(p[0], 'GET', type[0] + '/' + r[p[2]]);
+      }).then(function (item) {
+        return call(p[0], 'GET', type[1] + '?project=' + item.project).then(function (statuses) {
+          var now = statuses.filter(function (s) { return s.id === item.status; })[0];
+          return { host: p[0], path: type[0] + '/' + item.id, version: item.version, status: now ? now.name : '', statuses: statuses };
+        });
+      });
+    }
+
+    /** Change only the status; Taiga refuses it when the item changed after load(). */
+    function saveStatus(item, statusId) {
+      return call(item.host, 'PATCH', item.path, { status: statusId, version: item.version });
+    }
+
+    return { loggedIn: loggedIn, name: name, login: login, logout: logout, load: load, saveStatus: saveStatus };
+  })();
+</script>
