@@ -525,3 +525,27 @@ test('form tick: hidden for an item without a Taiga link', async ({ page }) => {
   await page.waitForTimeout(500);
   await expect(tick(page)).toHaveCount(0);
 });
+
+test('form tick: a new item is saved first, then sent to its Taiga link', async ({ page }) => {
+  await setup(page, { map: FORM_MAP });
+  await page.evaluate(() => {
+    window.__taiga.items['sync/us/99'] = { id: 999, version: 1, status: 'New' };
+  });
+  await page.evaluate(() => (location.hash = '#/new'));
+  await page.selectOption('#f-platform', 'NHIP');
+  await page.selectOption('#f-issueType', 'Requement');
+  await page.fill('#f-system', 'เวชระเบียน');
+  await page.fill('#f-detail', 'ทดสอบเพิ่มรายการพร้อม Taiga');
+  await page.locator('input[name="pm-pick"]').first().check();
+  await expect(tick(page)).toHaveCount(0);
+  await page.locator('#f-ticket').fill('https://taiga.example/project/sync/us/99');
+  await page.locator('#f-status').selectOption('กำลังทดสอบ');
+  await tick(page).check();
+  await page.locator('#save-btn').click();
+  await login(page);
+  await expect(dialog(page)).toContainText('"Ready for test"');
+  await dialog(page).getByRole('button', { name: 'ส่งไป Taiga' }).click();
+  await expect(page).toHaveURL(/#\/items\/\d+$/);
+  expect(await taigaOf(page, 99)).toBe('Ready for test');
+  expect(await page.evaluate(() => window.__taigaLog.length)).toBe(1);
+});
