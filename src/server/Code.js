@@ -203,6 +203,13 @@ function Api_saveTaigaMap(input) {
   });
 }
 
+/** Pair a sheet status with a Taiga status (admins only; enforced in Repo). @param {any} input */
+function Api_saveStatusTaiga(input) {
+  return guard_(function (ctx) {
+    return ctx.repo.saveStatusTaiga(ctx.email, owner_(ctx), input || {});
+  });
+}
+
 /** Team list for the admin screen (admins only). */
 function Api_listAccess() {
   return guard_(function (ctx) {

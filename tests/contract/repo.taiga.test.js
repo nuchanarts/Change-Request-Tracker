@@ -169,3 +169,62 @@ describe("saveTaigaMap(): admins only, in the app's own sheet", () => {
     expect(ss.getSheetByName(Config.SHEETS.taigaMap)).toBeFalsy();
   });
 });
+
+describe('saveStatusTaiga(): sheet status → Taiga status, admins only (2026-11-25)', () => {
+  const A = '0.รอแจ้งทีมพัฒนา';
+  let repo;
+  beforeEach(() => {
+    repo = build([HEAD, event()]);
+  });
+  const save = (input, who = 'admin@x.com') => repo.saveStatusTaiga(who, 'owner@x.com', input);
+  const sheet = () => ss.getSheetByName('_app_status_taiga');
+
+  it('adds, changes and clears a pair, logs each change and leaves everything else alone', () => {
+    expect(repo.taiga().appMap).toEqual({});
+    expect(save({ app: A, taiga: 'Step X' })).toMatchObject({ ok: true });
+    expect(repo.taiga().appMap).toEqual({ [A]: 'Step X' });
+    expect(save({ app: A, taiga: 'Ready for DEV' }).ok).toBe(true);
+    expect(repo.taiga().appMap).toEqual({ [A]: 'Ready for DEV' });
+    expect(save({ app: A, taiga: '' }).ok).toBe(true);
+    expect(repo.taiga().appMap).toEqual({});
+    expect(sheet().getLastRow()).toBe(2); // one row per sheet status
+    const logged = ss
+      .getSheetByName(Config.SHEETS.log)
+      .getDataRange()
+      .getDisplayValues()
+      .filter((r) => r[2] === 'STATUS_TAIGA');
+    expect(logged.map((r) => [r[1], r[5], r[6], r[7]])).toEqual([
+      ['admin@x.com', A, '', 'Step X'],
+      ['admin@x.com', A, 'Step X', 'Ready for DEV'],
+      ['admin@x.com', A, 'Ready for DEV', ''],
+    ]);
+    expect(log.writes).toEqual([]);
+    expect(ss.getSheetByName(Config.SHEETS.taigaMap)).toBeFalsy();
+  });
+
+  it('saving the same pair again, or clearing what is not set, writes nothing', () => {
+    expect(save({ app: A, taiga: '' }).ok).toBe(true);
+    expect(sheet()).toBeFalsy();
+    save({ app: A, taiga: 'Step X' });
+    save({ app: A, taiga: 'Step X' });
+    expect(sheet().getLastRow()).toBe(2);
+  });
+
+  it('refuses non-admins, statuses outside the workflow and Taiga names never seen', () => {
+    expect(save({ app: A, taiga: 'Step X' }, 'editor@x.com').code).toBe('NOT_ADMIN');
+    expect(save({ app: 'ไม่มีสถานะนี้', taiga: 'Step X' }).code).toBe('VALIDATION');
+    expect(save({ app: '', taiga: 'Step X' }).code).toBe('VALIDATION');
+    expect(save({ app: A, taiga: 'พิมพ์เอง' }).code).toBe('VALIDATION');
+    expect(sheet()).toBeFalsy();
+  });
+
+  it('writes nothing when the lock is busy', () => {
+    lock.tryLock = () => false;
+    expect(save({ app: A, taiga: 'Step X' }).code).toBe('LOCK_TIMEOUT');
+    expect(sheet()).toBeFalsy();
+  });
+
+  it('a missing Taiga log still returns the pairs', () => {
+    expect(build(null).taiga()).toMatchObject({ available: false, appMap: {} });
+  });
+});

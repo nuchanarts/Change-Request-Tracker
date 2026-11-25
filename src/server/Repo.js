@@ -917,6 +917,28 @@ function makeRepo(deps) {
       });
   }
 
+  /** The hand-made pairs sheet status → Taiga status, or [] before the first one is saved. */
+  function statusTaigaRows() {
+    var sh = ss.getSheetByName(C.SHEETS.statusTaiga);
+    if (!sh || sh.getLastRow() < 2) return [];
+    return sh
+      .getRange(2, 1, sh.getLastRow() - 1, 2)
+      .getDisplayValues()
+      .map(function (/** @type {any[]} */ r, /** @type {number} */ i) {
+        return { row: i + 2, app: clean(r[0]), taiga: clean(r[1]) };
+      });
+  }
+
+  /** Statuses seen in the bot's events. @param {any[]} events */
+  function taigaStatuses(events) {
+    /** @type {string[]} */
+    var statuses = [];
+    events.forEach(function (/** @type {any} */ e) {
+      if (e.kind !== 'ทดสอบ' && e.to && statuses.indexOf(e.to) === -1) statuses.push(e.to);
+    });
+    return statuses;
+  }
+
   /** The bot's events, oldest first; null when its log is missing or has another layout. Never writes. */
   function taigaEvents() {
     var sh = ss.getSheetByName(C.SHEETS.taigaLog);
@@ -952,19 +974,23 @@ function makeRepo(deps) {
   /** Taiga status per item + the status map. Reads only. */
   function taiga() {
     var pairs = taigaMapRows();
+    var appMap = D.statusTaigaMap(statusTaigaRows());
     var events = taigaEvents();
     if (events === null)
-      return { available: false, latest: {}, statuses: [], map: D.taigaEffectiveMap([], pairs) };
-    /** @type {string[]} */
-    var statuses = [];
-    events.forEach(function (/** @type {any} */ e) {
-      if (e.kind !== 'ทดสอบ' && e.to && statuses.indexOf(e.to) === -1) statuses.push(e.to);
-    });
+      return {
+        available: false,
+        latest: {},
+        statuses: [],
+        map: D.taigaEffectiveMap([], pairs),
+        appMap: appMap,
+      };
+    var statuses = taigaStatuses(events);
     return {
       available: true,
       latest: D.taigaLatest(events),
       statuses: statuses,
       map: D.taigaEffectiveMap(statuses, pairs),
+      appMap: appMap,
     };
   }
 
@@ -995,6 +1021,45 @@ function makeRepo(deps) {
       else sh.appendRow(line);
       writeLog([[now, admin, 'TAIGA_MAP', '', '', name, before, app]]);
       return C.ok({ taiga: name, app: app });
+    });
+  }
+
+  /**
+   * Pair one sheet status with a Taiga status ('' clears it). Admins only; one row per sheet status, logged.
+   * Only Taiga names the app knows are accepted. Changes no item and sends nothing to Taiga.
+   * @param {string} adminEmail @param {string} ownerEmail @param {{app?:string, taiga?:string}} input
+   */
+  function saveStatusTaiga(adminEmail, ownerEmail, input) {
+    var admin = clean(adminEmail).toLowerCase();
+    if (!isAdmin(admin, ownerEmail)) return C.fail('NOT_ADMIN');
+    var app = clean(input && input.app);
+    var name = clean(input && input.taiga);
+    if (D.WORKFLOW.indexOf(app) === -1)
+      return C.fail('VALIDATION', { fields: { app: 'กรุณาเลือกสถานะจากรายการ' } });
+    return withLock(function () {
+      var rows = statusTaigaRows();
+      var appMap = D.statusTaigaMap(rows);
+      if (name) {
+        var statuses = taigaStatuses(taigaEvents() || []);
+        var known = D.taigaNames(statuses, D.taigaEffectiveMap(statuses, taigaMapRows()), appMap);
+        if (known.indexOf(name) === -1)
+          return C.fail('VALIDATION', { fields: { taiga: 'กรุณาเลือกสถานะ Taiga จากรายการ' } });
+      }
+      var before = appMap[app] || '';
+      if (before === name) return C.ok({ app: app, taiga: name });
+      var found = rows.filter(function (/** @type {any} */ m) {
+        return m.app === app;
+      });
+      var sh = ensureSheet(C.SHEETS.statusTaiga, C.STATUS_TAIGA_HEADERS);
+      var now = deps.nowText();
+      var line = [app, name, admin, now].map(asText);
+      // a status typed twice by hand: keep every copy the same
+      found.forEach(function (/** @type {any} */ m) {
+        sh.getRange(m.row, 1, 1, line.length).setValues([line]);
+      });
+      if (!found.length) sh.appendRow(line);
+      writeLog([[now, admin, 'STATUS_TAIGA', '', '', app, before, name]]);
+      return C.ok({ app: app, taiga: name });
     });
   }
 
@@ -1348,6 +1413,7 @@ function makeRepo(deps) {
     saveAccess: saveAccess,
     taiga: taiga,
     saveTaigaMap: saveTaigaMap,
+    saveStatusTaiga: saveStatusTaiga,
     repairQuotedOptions: repairQuotedOptions,
   };
 }

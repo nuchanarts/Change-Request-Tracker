@@ -1493,6 +1493,53 @@ var Domain = (function () {
     return out;
   }
 
+  /**
+   * Sheet status → Taiga status, for sheet statuses without exactly one Taiga status (user, 2026-11-25).
+   * @param {Array<{app:string, taiga:string}>} pairs saved by an admin
+   */
+  function statusTaigaMap(pairs) {
+    /** @type {Object<string,string>} */
+    var out = {};
+    pairs.forEach(function (p) {
+      if (WORKFLOW.indexOf(p.app) !== -1 && clean(p.taiga)) out[p.app] = clean(p.taiga);
+    });
+    return out;
+  }
+
+  /**
+   * Every known Taiga status name, once each: seen in Taiga first, then paired names, then the team table.
+   * @param {string[]} statuses @param {Object<string,string>} map taigaEffectiveMap() @param {Object<string,string>} appMap
+   */
+  function taigaNames(statuses, map, appMap) {
+    /** @type {Object<string,boolean>} */
+    var seen = Object.create(null);
+    var paired = Object.keys(appMap).map(function (app) {
+      return appMap[app];
+    });
+    return statuses.concat(Object.keys(map), paired, Object.keys(TAIGA_DEFAULT_MAP)).filter(function (n) {
+      var name = taigaName(n);
+      if (!name || seen[name]) return false;
+      seen[name] = true;
+      return true;
+    });
+  }
+
+  /**
+   * Sheet statuses to pair by hand: no Taiga status, or several, or already paired by hand. Workflow order.
+   * @param {Object<string,string>} map taigaEffectiveMap() @param {Object<string,string>} appMap statusTaigaMap()
+   */
+  function statusTaigaGaps(map, appMap) {
+    /** @type {Array<{app:string, several:string[]}>} */
+    var out = [];
+    WORKFLOW.forEach(function (app) {
+      var names = Object.keys(map).filter(function (n) {
+        return map[n] === app;
+      });
+      if (names.length !== 1 || appMap[app]) out.push({ app: app, several: names.length > 1 ? names : [] });
+    });
+    return out;
+  }
+
   /** 'site/project/type/ref' of a full Taiga item link, or null. @param {any} url */
   function taigaKey(url) {
     var m = /^https?:\/\/([^/\s?#]+)\/project\/([^/\s?#]+)\/(us|task|issue|epic)\/(\d+)/i.exec(clean(url));
@@ -1536,9 +1583,11 @@ var Domain = (function () {
    * Compare one row with Taiga. state: none (nothing known) | deleted | unmapped | match | diff.
    * Never guesses a status: only an exact map entry that is a workflow status counts. canApply = a person may
    * press "ปรับตาม Taiga" (one row per Taiga item, and the row has a ลำดับ).
+   * A status an admin paired by hand with this Taiga status (appMap) counts as a match.
    * @param {any} r @param {any} latest taigaLatest() @param {Object<string,string>} map @param {Object<string,number>} counts
+   * @param {Object<string,string>} [appMap] statusTaigaMap()
    */
-  function taigaCompare(r, latest, map, counts) {
+  function taigaCompare(r, latest, map, counts, appMap) {
     var key = taigaKey(taigaLink(r));
     var t = key && Object.prototype.hasOwnProperty.call(latest, key) ? latest[key] : null;
     var out = { state: 'none', taiga: t, expected: '', duplicate: false, canApply: false };
@@ -1546,6 +1595,12 @@ var Domain = (function () {
     out.duplicate = counts[key] > 1;
     if (t.deleted) {
       out.state = 'deleted';
+      return out;
+    }
+    var byHand = appMap && Object.prototype.hasOwnProperty.call(appMap, r.status) ? appMap[r.status] : '';
+    if (r.status && byHand && taigaName(byHand) === taigaName(t.status)) {
+      out.expected = r.status;
+      out.state = 'match';
       return out;
     }
     var want = Object.prototype.hasOwnProperty.call(map, t.status) ? map[t.status] : '';
@@ -1910,6 +1965,9 @@ var Domain = (function () {
     TAIGA_DEFAULT_MAP: TAIGA_DEFAULT_MAP,
     taigaName: taigaName,
     taigaEffectiveMap: taigaEffectiveMap,
+    statusTaigaMap: statusTaigaMap,
+    statusTaigaGaps: statusTaigaGaps,
+    taigaNames: taigaNames,
     taigaKey: taigaKey,
     taigaLatest: taigaLatest,
     taigaKeyCounts: taigaKeyCounts,
