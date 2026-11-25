@@ -55,9 +55,10 @@
       return '<span class="badge ' + statusClass(s) + '">' + esc(s ? D.statusLabel(s) : '(ไม่ระบุสถานะ)') + '</span>';
     }
 
-    function urgency(u) {
+    function urgency(value) {
+      var u = D.urgencyOf(value);
       var cls = u === 'ด่วนที่สุด' ? 'urg-top' : u === 'ด่วน' ? 'urg-high' : '';
-      return u ? '<span class="' + cls + '">' + esc(u) + '</span>' : '<span class="muted">–</span>';
+      return '<span class="' + cls + '">' + esc(u) + '</span>';
     }
 
     /** Due date text with overdue/today emphasis (never color alone: the words carry the meaning). */

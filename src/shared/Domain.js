@@ -76,6 +76,7 @@ var Domain = (function () {
   // New requests still start here (Data Contract default), even though it is not the first step.
   var DEFAULT_STATUS = '0.รอแจ้งทีมพัฒนา';
   var URGENCY = ['ด่วนที่สุด', 'ด่วน', 'ปกติ'];
+  var DEFAULT_URGENCY = 'ปกติ';
   var UNASSIGNED = 'ยังไม่มอบหมาย';
   var NO_PM = 'ไม่ระบุ PM';
   var NO_STATUS_LABEL = '(ไม่ระบุสถานะ)';
@@ -501,7 +502,7 @@ var Domain = (function () {
       )
         return false;
       if (!inList(f.developer, r.developer === '' ? UNASSIGNED : r.developer)) return false;
-      if (!inList(f.urgency, r.urgency)) return false;
+      if (!inList(f.urgency, urgencyOf(r.urgency))) return false;
       if (!inList(f.issueType, r.issueType)) return false;
       if (!inList(f.status, r.status)) return false;
       // ids is a drill-down: an empty list means "nothing", never "no filter"
@@ -1780,9 +1781,14 @@ var Domain = (function () {
     return Object.prototype.hasOwnProperty.call(COLUMN_BY_KEY, key);
   }
 
-  /** 0 = ด่วนที่สุด … URGENCY.length = empty/unknown. @param {any} u */
+  /** The urgency to show: an empty cell reads as ปกติ (user, 2026-11-25); the sheet is not changed. @param {any} u */
+  function urgencyOf(u) {
+    return clean(u) || DEFAULT_URGENCY;
+  }
+
+  /** 0 = ด่วนที่สุด … URGENCY.length = unknown; empty counts as ปกติ. @param {any} u */
   function urgencyRank(u) {
-    var i = URGENCY.indexOf(clean(u));
+    var i = URGENCY.indexOf(urgencyOf(u));
     return i === -1 ? URGENCY.length : i;
   }
 
@@ -2035,6 +2041,8 @@ var Domain = (function () {
     diffChanges: diffChanges,
     nextSeq: nextSeq,
     URGENCY: URGENCY,
+    DEFAULT_URGENCY: DEFAULT_URGENCY,
+    urgencyOf: urgencyOf,
     urgencyRank: urgencyRank,
     isColumnKey: isColumnKey,
     clean: clean,

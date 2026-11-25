@@ -44,6 +44,19 @@ describe('shared helpers used by Repo and the UI', () => {
     expect(D.URGENCY).toEqual(['ด่วนที่สุด', 'ด่วน', 'ปกติ']);
     expect(D.urgencyRank('ด่วนที่สุด')).toBe(0);
     expect(D.urgencyRank('ปกติ')).toBe(2);
-    expect(D.urgencyRank('')).toBe(3);
+    expect(D.urgencyRank('')).toBe(2); // empty counts as ปกติ (user, 2026-11-25)
+    expect(D.urgencyRank('อื่น')).toBe(3);
+  });
+  it('an empty urgency reads and filters as ปกติ; a typed value is kept as it is', () => {
+    expect(D.urgencyOf('')).toBe('ปกติ');
+    expect(D.urgencyOf(' ')).toBe('ปกติ');
+    expect(D.urgencyOf('ด่วน')).toBe('ด่วน');
+    expect(D.urgencyOf('อื่น')).toBe('อื่น');
+    const rows = ['', 'ปกติ', 'ด่วน'].map((urgency, i) =>
+      D.enrich({ rowNumber: i + 2, seq: String(i + 1), detail: 'x', urgency }, { y: 2026, m: 11, d: 25 }),
+    );
+    expect(D.applyFilters(rows, { urgency: ['ปกติ'] }).map((r) => r.seq)).toEqual([1, 2]);
+    expect(D.applyFilters(rows, { urgency: ['ด่วน'] }).map((r) => r.seq)).toEqual([3]);
+    expect(rows[0].raw.urgency || '').toBe(''); // shown only: the sheet cell stays empty
   });
 });

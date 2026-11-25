@@ -271,6 +271,7 @@ test.describe('Assign page for the dev lead (2026-11-11)', () => {
 test.describe('After saving an edit, return to the page it was opened from (2026-11-11)', () => {
   test('from the list: back to the list at the same scroll position', async ({ page }) => {
     await open(page, '/#/items');
+    await expect(page.locator('th[data-col="taiga"]')).toBeAttached(); // the table is drawn again when the Taiga log arrives
     const row = page.locator('tbody tr').nth(20);
     await row.scrollIntoViewIfNeeded();
     const y = await page.evaluate(() => window.scrollY);

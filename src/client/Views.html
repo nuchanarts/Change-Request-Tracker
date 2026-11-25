@@ -479,6 +479,7 @@
       var me = state.myName();
       return {
         status: D.DEFAULT_STATUS,
+        urgency: (state.options.urgency || []).indexOf(D.DEFAULT_URGENCY) !== -1 ? D.DEFAULT_URGENCY : '',
         pm: me && state.options.pm.indexOf(me) !== -1 ? me : '',
       };
     }

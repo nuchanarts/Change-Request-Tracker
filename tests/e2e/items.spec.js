@@ -106,6 +106,7 @@ test('columns can be rearranged with the buttons, are remembered, and can be res
 test('dragging a header moves the column', async ({ page }) => {
   test.skip(test.info().project.name !== 'desktop', 'drag is a desktop gesture; buttons cover touch');
   await open(page, '/#/items');
+  await expect(page.locator('th[data-col="taiga"]')).toBeAttached(); // the table is drawn again when the Taiga log arrives
   await page.locator('th[data-col="due"]').dragTo(page.locator('th[data-col="platform"]'));
   expect((await headerTexts(page)).slice(0, 3)).toEqual(['ลำดับ', 'กำหนดส่ง', 'แพลตฟอร์ม']);
 });

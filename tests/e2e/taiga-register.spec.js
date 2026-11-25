@@ -131,3 +131,26 @@ test('the whole table fits a 1366 px screen and an unused filter bar has no head
   await page.locator('#f-platform').selectOption('INV');
   await expect(page.getByRole('button', { name: 'ล้างตัวกรอง' })).toBeVisible();
 });
+
+test('an empty urgency shows ปกติ instead of a dash, and the new form starts at ปกติ (2026-11-25)', async ({
+  page,
+}, info) => {
+  await page.addInitScript(() => {
+    window.__beforeMock = (rows) => rows.forEach((r) => Number(r.seq) > 700 && (r.urgency = ''));
+  });
+  await open(page, '/#/taiga');
+  await page.getByRole('button', { name: 'ทุกรายการ', exact: true }).click();
+  await expect(page.locator('th[data-col="taiga"]')).toBeAttached();
+  const col = await page.locator('th[data-col="urgency"]').evaluate((th) => th.cellIndex);
+  const texts = await page
+    .locator('#tg-table tbody tr')
+    .evaluateAll((trs, i) => trs.slice(0, 5).map((tr) => tr.cells[i].textContent), col);
+  expect(texts).toEqual(Array(5).fill('ปกติ'));
+  expect(await page.evaluate(() => window.__mockSheet.rows.filter((r) => !r.urgency).length)).toBeGreaterThan(
+    5,
+  );
+  if (info.project.name === 'desktop')
+    await expect(page.locator('#tg-table tbody tr').first().locator('td').nth(col)).toBeVisible();
+  await page.goto('/#/new');
+  await expect(page.locator('#f-urgency')).toHaveValue('ปกติ');
+});
