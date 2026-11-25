@@ -15,13 +15,13 @@ test.describe('Navigation inside the Apps Script sandbox', () => {
     };
     await visit('บอร์ดงาน', page.getByRole('heading', { name: 'บอร์ดงาน', level: 1 }));
     await visit(/^นักพัฒนา$/, page.getByRole('heading', { name: 'งานนักพัฒนา', level: 1 }));
-    await visit('รายการทั้งหมด', page.getByRole('heading', { name: 'รายการทั้งหมด', level: 1 }));
+    await visit('ทะเบียน Taiga', page.getByRole('heading', { name: 'ทะเบียน Taiga', level: 1 }));
     await visit('งาน PM', page.getByRole('heading', { name: 'งาน PM', level: 1 }));
     await visit('มอบหมายงาน', page.getByRole('heading', { name: 'มอบหมายงาน', level: 1 }));
     await visit('วิธีใช้งาน', page.getByRole('heading', { name: 'วิธีใช้งาน', level: 1 }));
     await visit('หน้าหลัก', page.getByRole('heading', { name: 'Change Request Tracker Systems' }));
     const pushed = await page.evaluate(() => window.__gasHistory);
-    expect(pushed).toEqual(['/kanban', '/my-work', '/items', '/my-work/pm', '/assign', '/help', '/monitor']);
+    expect(pushed).toEqual(['/kanban', '/my-work', '/taiga', '/my-work/pm', '/assign', '/help', '/monitor']);
     expect(await page.evaluate(() => window.__leftIframe)).toBe(false);
     await expect(nav.getByRole('link', { name: 'หน้าหลัก' })).toHaveAttribute('aria-current', 'page');
   });
@@ -32,7 +32,7 @@ test.describe('Navigation inside the Apps Script sandbox', () => {
     await expect(page.locator('.drill')).toBeVisible();
     await page.locator('tbody tr').first().locator('.detail-cell a').click();
     await expect(page.locator('#item-form')).toBeVisible();
-    await page.evaluate(() => window.__gasBack('/items'));
+    await page.evaluate(() => window.__gasBack('/taiga'));
     await expect(page.locator('.drill')).toBeVisible();
   });
 

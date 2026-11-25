@@ -107,6 +107,7 @@
       .filter(function (r) {
         return D.isOpen(r.status) && D.taigaKey((r.ticketLinks || [])[0] || r.ticket);
       })
+      .reverse() // the newest items are on the first page
       .slice(0, 12)
       .map(function (r, i) {
         return {

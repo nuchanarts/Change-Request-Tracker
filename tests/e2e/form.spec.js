@@ -131,7 +131,7 @@ test.describe('US3 Safe edit', () => {
     await expect(page.locator('dialog')).toContainText('_app_log');
     await page.locator('dialog').getByRole('button', { name: 'ลบรายการ' }).click();
     await expect(page.locator('.toast', { hasText: 'ลบรายการ #' + seq + ' แล้ว' })).toBeVisible();
-    await expect(page).toHaveURL(/#\/items$/);
+    await expect(page).toHaveURL(/#\/taiga$/);
     expect(await page.evaluate(() => window.__mockSheet.rows.length)).toBe(before - 1);
     expect(await page.evaluate((s) => window.__mockSheet.rows.some((r) => r.seq === s), seq)).toBe(false);
   });

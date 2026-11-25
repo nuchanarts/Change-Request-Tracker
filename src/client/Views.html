@@ -7,16 +7,17 @@
 
     // ------------------------------------------------------------------ shared bits
 
-    function filterBar(state) {
+    /** compact: no heading line until a filter is in use (ทะเบียน Taiga). */
+    function filterBar(state, compact) {
       var f = state.filters;
       var o = state.options;
       var devs = [D.UNASSIGNED].concat(o.developer || []);
       var active = ['platform', 'pm', 'developer', 'urgency', 'from', 'to'].filter(function (k) { return f[k]; }).length;
       return (
         '<form class="filters' + (active ? ' is-active' : '') + '" id="filters" aria-label="ตัวกรอง">' +
-        '<div class="filters-head"><span class="filters-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 8v5l-4 2v-7z"/></svg></span>' +
+        (compact && !active ? '' : '<div class="filters-head"><span class="filters-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 8v5l-4 2v-7z"/></svg></span>' +
         '<strong>ตัวกรอง</strong><span class="filters-count">' + (active ? 'ใช้อยู่ ' + active + ' ตัว' : 'แสดงทุกรายการ') + '</span>' +
-        (active ? '<button type="button" class="btn small filters-clear" data-action="clear-filters">' + UI.withIcon('clear', 'ล้างตัวกรอง') + '</button>' : '') + '</div>' +
+        (active ? '<button type="button" class="btn small filters-clear" data-action="clear-filters">' + UI.withIcon('clear', 'ล้างตัวกรอง') + '</button>' : '') + '</div>') +
         UI.select({ name: 'platform', label: 'แพลตฟอร์ม', icon: 'platform', options: o.platform, value: f.platform, emptyLabel: 'ทั้งหมด' }) +
         pmFilterSelect(o.pm || [], f.pm) +
         UI.select({ name: 'developer', label: 'นักพัฒนา', icon: 'dev', options: devs, value: f.developer, emptyLabel: 'ทั้งหมด' }) +
@@ -326,7 +327,7 @@
 
     // ------------------------------------------------------------------ Items (US5 + drill-down)
 
-    /** Column definitions for "รายการทั้งหมด" (order is configurable; default per user request 2026-11-11). */
+    /** Column definitions for ทะเบียน Taiga, which replaced "รายการทั้งหมด" on 2026-11-25 (order is configurable; default per user request 2026-11-11). */
     var ITEM_COLS = {
       seq: { label: 'ลำดับ', sort: 'seq', cell: function (r) { return '<td class="num" data-hide-mobile>' + esc(r.seq === null ? '–' : r.seq) + '</td>'; } },
       platform: { label: 'แพลตฟอร์ม', sort: 'platform', cell: function (r) { return '<td class="platform-cell" data-hide-mobile><span class="kplat">' + esc(r.platform || '–') + '</span></td>'; } },
@@ -342,62 +343,46 @@
       ticket: {
         label: 'Taiga/MANTIS',
         cell: function (r) {
-          return '<td class="ticket-cell">' + (r.ticketUrl ? UI.ticketLink(r) : r.ticket ? '<span class="num">#' + esc(r.ticket) + '</span>' : '<span class="muted">–</span>') + '</td>';
+          var link = D.taigaLink(r);
+          var need = !link && D.TAIGA_STEPS.indexOf(r.status) !== -1 ? '<span class="tg-nolink">ยังไม่มีลิงก์</span>' : '';
+          var own = link ? UI.ticketLink(Object.assign({}, r, { ticketUrl: link })) : r.ticketUrl ? UI.ticketLink(r) : r.ticket ? '<span class="num">#' + esc(r.ticket) + '</span>' : '';
+          return '<td class="ticket-cell">' + ([own, need].filter(Boolean).join(' ') || '<span class="muted">–</span>') + '</td>';
         },
       },
-      status: { label: 'สถานะ', sort: 'status', cell: function (r) { return '<td>' + UI.statusBadge(r.status) + '</td>'; } },
+      status: { label: 'สถานะ', sort: 'status', cell: function (r, state) { return tgStatusCell(state, r); } },
+      taiga: { label: 'สถานะใน Taiga', cell: function (r, state) { return tgTaigaCell(state, r); } },
+      progress: { label: 'ความคืบหน้า', cell: function (r) { return '<td class="tg-prog-cell">' + tgProgress(r) + '</td>'; } },
       urgency: { label: 'ความเร่งด่วน', sort: 'urgency', cell: function (r) { return '<td data-hide-mobile>' + UI.urgency(r.urgency) + '</td>'; } },
       developer: { label: 'นักพัฒนา', sort: 'developer', cell: function (r) { return '<td>' + esc(r.developer || '–') + '</td>'; } },
+      tester: { label: 'ผู้ทดสอบ', sort: 'tester', cell: function (r) { return '<td data-hide-mobile>' + (r.tester ? esc(r.tester) : '<span class="muted">–</span>') + '</td>'; } },
       pm: { label: 'PM', sort: 'pm', cell: function (r) { return '<td data-hide-mobile>' + esc(r.pm) + '</td>'; } },
       due: { label: 'กำหนดส่ง', sort: 'due', cell: function (r, state) { return '<td>' + UI.due(r, state.today) + '</td>'; } },
     };
-    var ITEM_COLS_DEFAULT = ['seq', 'platform', 'system', 'detail', 'ticket', 'status', 'urgency', 'developer', 'pm', 'due'];
+    var ITEM_COLS_DEFAULT = ['seq', 'platform', 'system', 'detail', 'ticket', 'status', 'taiga', 'progress', 'urgency', 'developer', 'tester', 'pm', 'due'];
 
     var PAGE = 50;
     var STATES = [['open', 'งานค้าง'], ['overdue', 'เกินกำหนด'], ['closed', 'ปิดแล้ว'], ['all', 'ทั้งหมด']];
 
-    function items(state) {
-      var list = state.itemRows();
-      var total = list.length;
-      var pages = Math.max(1, Math.ceil(total / PAGE));
+    /** The table with sortable, movable columns and pages (the order is remembered per browser). */
+    function itemTable(state, list) {
+      var pages = Math.max(1, Math.ceil(list.length / PAGE));
       var page = Math.min(state.itemsPage, pages - 1);
       var slice = list.slice(page * PAGE, page * PAGE + PAGE);
-      var html = schemaBanner(state) + '<div class="page-head"><h1>รายการทั้งหมด</h1><span class="muted">' + total.toLocaleString('th-TH') + ' รายการ</span>' +
-        '<span class="spacer"></span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button></div>';
-      if (state.drill) {
-        html += '<div class="drill" role="status">' + UI.backButton() + '<span>กำลังดู: <strong>' + esc(state.drill.title) + '</strong> (' + state.drill.ids.length + ' รายการ)</span><button class="btn small" data-action="clear-drill">ดูรายการทั้งหมด</button></div>';
-      } else {
-        html += filterBar(state);
-      }
-      html += '<div class="toolbar"><label class="sr-only" for="q">ค้นหา</label><input type="search" id="q" placeholder="ค้นหา รายละเอียด ระบบงาน เลขลำดับ หรือเลข Taiga/MANTIS" value="' + esc(state.itemsQuery) + '" />';
-      if (!state.drill) {
-        html += '<div class="chips" role="group" aria-label="สถานะงาน">' + STATES.map(function (s) {
-          return '<button type="button" class="chip" data-action="items-state" data-value="' + s[0] + '" aria-pressed="' + (state.itemsState === s[0]) + '">' + s[1] + '</button>';
-        }).join('') + '</div>';
-      }
-      html += '</div>';
-      if (!total) {
-        return html + UI.emptyState('ไม่พบรายการ', state.itemsQuery ? 'ไม่มีรายการที่ตรงกับคำค้น "' + state.itemsQuery + '" ลองใช้คำอื่น' : 'ลองเปลี่ยนตัวกรองหรือสถานะงาน',
-          state.user.canEdit ? '<a class="btn primary" href="#/new">เพิ่มรายการใหม่</a>' : '');
-      }
+      var order = state.itemCols();
+      var html = '';
       var th = function (key, label, cls) {
         var cur = state.sort.key === key;
         return '<th class="' + (cls || '') + '" aria-sort="' + (cur ? (state.sort.dir > 0 ? 'ascending' : 'descending') : 'none') + '"><button data-action="sort" data-key="' + key + '">' + label + (cur ? (state.sort.dir > 0 ? ' ▲' : ' ▼') : '') + '</button></th>';
       };
-      // Columns are user-arrangeable (drag a header, or "จัดคอลัมน์"); the order is remembered per browser.
-      var order = state.itemCols();
-      html += '<div class="cols-bar"><button type="button" class="btn small" data-action="cols-toggle" aria-expanded="' + !!state.colsOpen + '">' + UI.withIcon('kanban', 'จัดคอลัมน์') + '</button>' +
-        '<span class="muted">ลากหัวคอลัมน์เพื่อย้ายตำแหน่งได้</span></div>';
       if (state.colsOpen) {
         html += '<div class="cols-panel" role="group" aria-label="จัดลำดับคอลัมน์">' + order.map(function (k, i) {
           return '<span class="cols-item"><button type="button" class="cols-move" data-action="cols-move" data-key="' + k + '" data-dir="-1"' + (i === 0 ? ' disabled' : '') + ' aria-label="ย้าย ' + esc(ITEM_COLS[k].label) + ' ไปทางซ้าย">←</button>' +
             '<span>' + esc(ITEM_COLS[k].label) + '</span><button type="button" class="cols-move" data-action="cols-move" data-key="' + k + '" data-dir="1"' + (i === order.length - 1 ? ' disabled' : '') + ' aria-label="ย้าย ' + esc(ITEM_COLS[k].label) + ' ไปทางขวา">→</button></span>';
-        }).join('') + '<button type="button" class="btn small" data-action="cols-reset">คืนค่าเริ่มต้น</button></div>';
+        }).join('') + '<button type="button" class="btn small" data-action="cols-reset">คืนค่าเริ่มต้น</button><span class="muted">หรือลากหัวคอลัมน์เพื่อย้ายตำแหน่ง</span></div>';
       }
-      html += '<div class="table-wrap"><table class="responsive"><thead><tr>' + order.map(function (k) {
+      html += '<div class="table-wrap"><table class="responsive" id="tg-table"><thead><tr>' + order.map(function (k) {
         var c = ITEM_COLS[k];
-        var inner = c.sort ? th(c.sort, c.label, c.cls).replace(/^<th /, '<th draggable="true" data-col="' + k + '" ') : '<th draggable="true" data-col="' + k + '" class="' + (c.cls || '') + '">' + esc(c.label) + '</th>';
-        return inner;
+        return c.sort ? th(c.sort, c.label, c.cls).replace(/^<th /, '<th draggable="true" data-col="' + k + '" ') : '<th draggable="true" data-col="' + k + '" class="' + (c.cls || '') + '">' + esc(c.label) + '</th>';
       }).join('') + '</tr></thead><tbody>' +
         slice.map(function (r) {
           return '<tr class="clickable" data-action="open-item" data-id="' + esc(r.id) + '">' + order.map(function (k) { return ITEM_COLS[k].cell(r, state); }).join('') + '</tr>';
@@ -482,7 +467,7 @@
       });
       html += '<div class="form-actions">';
       if (!readOnly) html += '<button type="submit" class="btn primary" id="save-btn">' + UI.withIcon('save', mode === 'new' ? 'บันทึกรายการใหม่' : 'บันทึกการแก้ไข') + '</button>';
-      html += '<a class="btn" href="' + (mode === 'new' ? '#/monitor' : '#/items') + '">' + (readOnly ? 'กลับ' : 'ยกเลิก') + '</a>';
+      html += '<a class="btn" href="' + (mode === 'new' ? '#/monitor' : '#/taiga') + '">' + (readOnly ? 'กลับ' : 'ยกเลิก') + '</a>';
       if (row && !readOnly && row.seq !== null) html += '<span class="spacer"></span><button type="button" class="btn danger" data-action="delete-item">' + UI.withIcon('trash', 'ลบรายการนี้') + '</button>';
       html += '</div></form>';
       if (row) html += '<p class="muted" style="margin-top:12px;font-size:13px">แถวที่ ' + row.rowNumber + ' ในชีต ระบบจะบันทึกเฉพาะช่องที่คุณแก้ และเก็บประวัติไว้ในชีต _app_log</p>';
@@ -866,21 +851,25 @@
 
     // ------------------------------------------------------------------ Taiga register (user request 2026-11-20)
 
-    var TG_SCOPES = [['open', 'งานที่ยังไม่ปิด'], ['closed', 'ปิดแล้ว'], ['all', 'ทั้งหมด']];
+    var TG_KINDS = [['taiga', 'งาน Taiga'], ['all', 'ทุกรายการ']];
 
-    /** แพลตฟอร์ม / PM / search narrow the rows, then the register picks the Taiga items. */
+    /**
+     * The shared filters, the search and the chips narrow the rows; a drill-down shows exactly its own rows.
+     * outside = matches hidden only because they are not Taiga work.
+     */
     function tgReport(state) {
       var tg = state.tg;
-      var rows = D.applyFilters(state.rows, {
-        platform: tg.platform ? [tg.platform] : [],
-        pm: D.pmFilter(tg.pm, (state.options && state.options.pm) || []),
-      });
-      if (tg.q) rows = D.search(rows, tg.q);
-      if (tg.sync && state.taiga && state.taiga.available) rows = rows.filter(function (r) { return tgCompare(state, r).state === tg.sync; });
-      var rep = D.taigaRegister(rows, { scope: tg.scope });
+      var drill = state.drill;
+      var rows = D.applyFilters(state.rows, drill ? { ids: drill.ids } : state.domainFilters());
+      rows = D.search(rows, state.itemsQuery);
+      var opts = drill ? { scope: 'all', kind: 'all' } : { scope: state.itemsState, kind: tg.kind };
+      if (!drill && tg.sync && state.taiga && state.taiga.available) rows = rows.filter(function (r) { return tgCompare(state, r).state === tg.sync; });
+      var rep = D.taigaRegister(rows, opts);
       var early = rep.rows.filter(function (r) { return tgReview(state, r); });
-      if (tg.review && early.length) rep = D.taigaRegister(early, { scope: tg.scope });
+      if (tg.review && early.length) rep = D.taigaRegister(early, opts);
       rep.earlyCount = early.length;
+      rep.outside = !rep.total && opts.kind !== 'all' ? D.taigaRegister(rows, { scope: opts.scope, kind: 'all' }).total : 0;
+      rep.rows = state.sortRows(rep.rows);
       return rep;
     }
 
@@ -979,24 +968,29 @@
     function taigaRegister(state) {
       var tg = state.tg;
       var rep = tgReport(state);
-      var scopeSel = UI.select({ name: 'tg-scope', label: 'แสดง', icon: 'list', value: tg.scope, allowEmpty: false,
-        options: TG_SCOPES.map(function (x) { return x[0]; }),
-        groups: [{ label: 'ขอบเขต', options: TG_SCOPES.map(function (x) { return { value: x[0], label: x[1] }; }) }] });
-      var platformSel = UI.select({ name: 'tg-platform', label: 'แพลตฟอร์ม', icon: 'platform', options: state.options.platform, value: tg.platform, emptyLabel: 'ทั้งหมด' });
-      var pmSel = pmFilterSelect(state.options.pm || [], tg.pm, 'tg-pm');
-      var search = UI.input({ name: 'tg-q', label: 'ค้นหา', value: tg.q, placeholder: 'ลำดับ เลข ticket หรือคำในรายละเอียด' });
       var hasTaiga = !!(state.taiga && state.taiga.available); // the bot's log is there and readable (2026-11-24)
-      var syncSel = hasTaiga ? UI.select({ name: 'tg-sync', label: 'เทียบกับ Taiga', icon: 'taiga', value: tg.sync, emptyLabel: 'ทั้งหมด',
-        options: TG_SYNC.map(function (x) { return x[0]; }),
-        groups: [{ label: 'เทียบกับ Taiga', options: TG_SYNC.map(function (x) { return { value: x[0], label: x[1] }; }) }] }) : '';
-
-      var html = '<div class="page-head"><h1>ทะเบียน Taiga</h1><span class="muted">ความคืบหน้าของงานที่มีลิงก์ Taiga หรืออยู่ในขั้นตอน Taiga</span>' +
+      var chips = function (label, action, list, value) {
+        return '<div class="chips" role="group" aria-label="' + label + '">' + list.map(function (x) {
+          return '<button type="button" class="chip" id="' + action + '-' + x[0] + '" data-action="' + action + '" data-value="' + x[0] + '" aria-pressed="' + (value === x[0]) + '">' + x[1] + '</button>';
+        }).join('') + '</div>';
+      };
+      var html = schemaBanner(state) + '<div class="page-head"><h1>ทะเบียน Taiga</h1>' +
         '<span class="spacer"></span>' +
         (hasTaiga && state.taiga.host && TaigaApi.loggedIn(state.taiga.host) ? '<button class="btn small" data-action="tg-logout">ออกจาก Taiga (' + esc(TaigaApi.name()) + ')</button>' : '') +
         '<button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button>' +
         '<button class="btn small primary" data-action="tg-export"' + (rep.total ? '' : ' disabled') + '>' + UI.withIcon('download', 'Export CSV (Excel)') + '</button></div>';
-      html += '<form class="filters dr-filters" id="tg-form" aria-label="ตัวเลือกทะเบียน Taiga">' + scopeSel + platformSel + pmSel + syncSel + search + '</form>';
-      // the warnings share the summary line: full-width banners took too many lines (user request 2026-11-25)
+      if (state.drill) {
+        html += '<div class="drill" role="status">' + UI.backButton() + '<span>กำลังดู: <strong>' + esc(state.drill.title) + '</strong> (' + state.drill.ids.length + ' รายการ)</span><button class="btn small" data-action="clear-drill">ดูทั้งทะเบียน</button></div>';
+      } else html += filterBar(state, true);
+      html += '<div class="toolbar tg-toolbar"><label class="sr-only" for="q">ค้นหา</label><input type="search" id="q" placeholder="ค้นหา รายละเอียด ระบบงาน เลขลำดับ หรือเลข Taiga/MANTIS" value="' + esc(state.itemsQuery) + '" />';
+      if (!state.drill) {
+        html += chips('ขอบเขต', 'tg-kind', TG_KINDS, tg.kind) + chips('สถานะงาน', 'items-state', STATES, state.itemsState);
+        if (hasTaiga) {
+          html += '<select id="f-tg-sync" aria-label="เทียบกับ Taiga"><option value="">เทียบกับ Taiga: ทั้งหมด</option>' +
+            TG_SYNC.map(function (x) { return '<option value="' + x[0] + '"' + (tg.sync === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>';
+        }
+      }
+      html += '<button type="button" class="btn small" id="cols-toggle" data-action="cols-toggle" aria-expanded="' + !!state.colsOpen + '">' + UI.withIcon('kanban', 'จัดคอลัมน์') + '</button></div>';
       html += '<div class="dr-summary"><span role="status">พบ <strong id="tg-count" class="num">' + rep.total + '</strong> รายการ</span>' +
         (rep.earlyCount ? '<button type="button" class="tg-alert tg-alert-btn" id="tg-review-btn" data-action="tg-review" aria-pressed="' + !!tg.review + '" title="PM ยังไม่ตรวจผ่าน Taiga แต่เริ่มพัฒนาแล้ว กดเพื่อดูเฉพาะรายการนี้ กดอีกครั้งเพื่อแสดงทั้งหมด">' +
           '⚠ PM ยังไม่ตรวจ Taiga แต่เริ่มพัฒนา <strong id="tg-review-count" class="num">' + rep.earlyCount + '</strong>' + (tg.review ? ' <span aria-hidden="true">✕</span>' : '') + '</button>' : '') +
@@ -1007,19 +1001,12 @@
         html += '<p class="muted" id="tg-nolog">' + esc(state.taiga.error || 'ยังไม่มีข้อมูลความเคลื่อนไหวจาก Taiga ให้เทียบ') + '</p>';
       }
       if (hasTaiga && state.user.isAdmin) html += tgMapPanel(state);
-      if (!rep.total) return html + UI.emptyState('ไม่มีรายการ Taiga', 'ลองเปลี่ยนขอบเขต ตัวกรอง หรือคำค้นหา', '');
-      html += '<div class="table-wrap"><table class="responsive" id="tg-table"><thead><tr>' +
-        '<th>ลำดับ</th><th data-hide-mobile>แพลตฟอร์ม</th><th data-hide-mobile>ระบบงาน</th><th>รายละเอียด</th><th>Taiga</th><th>สถานะ</th>' + (hasTaiga ? '<th>สถานะใน Taiga</th>' : '') + '<th>ความคืบหน้า</th><th>นักพัฒนา</th><th>ผู้ทดสอบ</th><th data-hide-mobile>PM</th><th>กำหนดส่ง</th>' +
-        '</tr></thead><tbody>' + rep.rows.map(function (r) {
-          var link = D.taigaLink(r);
-          var linkCell = link ? '<td>' + UI.ticketLink(Object.assign({}, r, { ticketUrl: link })) + '</td>' : '<td><span class="tg-nolink">ยังไม่มีลิงก์</span></td>';
-          return '<tr class="clickable" data-action="open-item" data-id="' + esc(r.id) + '">' +
-            ITEM_COLS.seq.cell(r, state) + ITEM_COLS.platform.cell(r, state) + ITEM_COLS.system.cell(r, state) + ITEM_COLS.detail.cell(r, state) +
-            linkCell + tgStatusCell(state, r) + (hasTaiga ? tgTaigaCell(state, r) : '') + '<td class="tg-prog-cell">' + tgProgress(r) + '</td>' +
-            ITEM_COLS.developer.cell(r, state) + '<td>' + (r.tester ? esc(r.tester) : '<span class="muted">–</span>') + '</td>' +
-            ITEM_COLS.pm.cell(r, state) + ITEM_COLS.due.cell(r, state) + '</tr>';
-        }).join('') + '</tbody></table></div>';
-      return html;
+      if (!rep.total) {
+        return html + UI.emptyState('ไม่พบรายการ', state.itemsQuery ? 'ไม่มีรายการที่ตรงกับคำค้น "' + state.itemsQuery + '" ลองใช้คำอื่น' : 'ลองเปลี่ยนตัวกรองหรือสถานะงาน',
+          rep.outside ? '<button type="button" class="btn primary" data-action="tg-kind" data-value="all">พบ ' + rep.outside + ' รายการที่ไม่ใช่งาน Taiga กดเพื่อดู</button>'
+            : state.user.canEdit ? '<a class="btn primary" href="#/new">เพิ่มรายการใหม่</a>' : '');
+      }
+      return html + itemTable(state, rep.rows);
     }
 
     // ------------------------------------------------------------------ Text report export
@@ -1135,7 +1122,7 @@
 
     // ------------------------------------------------------------------ presence (2026-11-18)
 
-    var PRESENCE_LABELS = { monitor: 'หน้าหลัก', assign: 'มอบหมายงาน', kanban: 'บอร์ดงาน', 'my-work': 'งานนักพัฒนา', 'my-work-pm': 'งาน PM', items: 'รายการทั้งหมด', access: 'จัดการสิทธิ์', help: 'วิธีใช้งาน', new: 'กำลังเพิ่มรายการใหม่' };
+    var PRESENCE_LABELS = { monitor: 'หน้าหลัก', assign: 'มอบหมายงาน', kanban: 'บอร์ดงาน', 'my-work': 'งานนักพัฒนา', 'my-work-pm': 'งาน PM', taiga: 'ทะเบียน Taiga', items: 'ทะเบียน Taiga', access: 'จัดการสิทธิ์', help: 'วิธีใช้งาน', new: 'กำลังเพิ่มรายการใหม่' };
 
     function presenceLabel(e) {
       if (e.view === 'edit') return e.seq === null ? 'กำลังแก้รายการ' : 'กำลังแก้ #' + e.seq;
@@ -1191,7 +1178,7 @@
         '<li>ใช้ตัวกรองนักพัฒนาเพื่อดูบอร์ดของแต่ละคน การ์ดขอบแดงคืองานเกินกำหนด</li></ol></section>' +
         '<section><h2>เพิ่มรายการใหม่</h2><ol><li>กด "เพิ่มรายการ" ที่เมนูด้านบน</li><li>เลือกค่าจากรายการในทุกช่อง ช่องที่มี * ต้องกรอก</li><li>ระบบงานเลือกจากรายการหรือพิมพ์ชื่อใหม่ได้</li>' +
         '<li>กด "บันทึกรายการใหม่" ระบบจะต่อท้ายชีตและให้เลขลำดับอัตโนมัติ</li></ol></section>' +
-        '<section><h2>แก้ไขหรืออัปเดตสถานะ</h2><ol><li>เปิดรายการจาก "รายการทั้งหมด" หรือ "นักพัฒนา"</li><li>แก้เฉพาะช่องที่ต้องการแล้วกด "บันทึกการแก้ไข" ระบบเขียนเฉพาะช่องที่เปลี่ยน</li>' +
+        '<section><h2>แก้ไขหรืออัปเดตสถานะ</h2><ol><li>เปิดรายการจาก "ทะเบียน Taiga" (กด "ทุกรายการ" เพื่อดูงานที่ไม่ใช่งาน Taiga) หรือ "นักพัฒนา"</li><li>แก้เฉพาะช่องที่ต้องการแล้วกด "บันทึกการแก้ไข" ระบบเขียนเฉพาะช่องที่เปลี่ยน</li>' +
         '<li>ถ้าเปลี่ยนเป็น "0.แก้ไขเรียบร้อย" ต้องใส่วันที่เสร็จ</li><li>ถ้างานถูกยกเลิก ให้เปลี่ยนสถานะเป็น "ยกเลิก" ถ้าบันทึกผิดหรือซ้ำ กด "ลบรายการนี้" ระบบจะลบแถวออกจากชีต และเก็บสำเนาไว้ใน _app_log</li></ol></section>' +
         '<section><h2>ความหมายของคำในแอป</h2><dl>' +
         '<dt>งานค้าง</dt><dd>ทุกรายการที่สถานะไม่ใช่ 0.แก้ไขเรียบร้อย, 0.ใช้งานได้อยู่แล้ว หรือ 0.ยกเลิก รวมถึงสถานะว่าง (0.รอแจ้งทีมพัฒนา และ 0.จัดทำไฟล์แก้ไข ยังนับเป็นงานค้าง)</dd>' +
@@ -1222,6 +1209,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, items: items, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, taigaRegister: taigaRegister, tgReport: tgReport, tgReview: tgReview, tgCompare: tgCompare, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, taigaRegister: taigaRegister, tgReport: tgReport, tgReview: tgReview, tgCompare: tgCompare, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>

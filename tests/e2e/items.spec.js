@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { open } from './helpers.js';
 
-const countText = (page) => page.locator('.page-head .muted').first();
+// "รายการทั้งหมด" is part of ทะเบียน Taiga since 2026-11-25; #/items opens it with every item
+const countText = (page) => page.locator('.dr-summary [role="status"]');
 const n = (s) => Number(String(s).replace(/[^\d]/g, ''));
 
 test.describe('US5 Search & list', () => {
@@ -9,7 +10,7 @@ test.describe('US5 Search & list', () => {
     await open(page, '/#/items');
     await page.getByRole('button', { name: 'ทั้งหมด', exact: true }).click();
     await page.fill('#q', '25');
-    await expect(countText(page)).toHaveText('1 รายการ');
+    await expect(countText(page)).toHaveText('พบ 1 รายการ');
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await expect(page.locator('tbody tr')).toContainText('(ตัวอย่าง #25)');
   });
@@ -32,7 +33,7 @@ test.describe('US5 Search & list', () => {
       const rows = fx.rows.map((r) => D.enrich(r, fx.today));
       return D.applyFilters(rows, { platform: ['INV'], state: 'overdue' }).length;
     });
-    await expect(countText(page)).toHaveText(`${expected.toLocaleString('th-TH')} รายการ`);
+    await expect(countText(page)).toHaveText(`พบ ${expected} รายการ`);
     expect(n(await countText(page).textContent())).toBeGreaterThan(0);
   });
 
@@ -71,6 +72,7 @@ test('items table: platform and system have their own columns, before the detail
   page,
 }) => {
   await open(page, '/#/items');
+  await expect(page.locator('th[data-col="taiga"]')).toBeAttached(); // the Taiga log has loaded
   expect(await headerTexts(page)).toEqual([
     'ลำดับ',
     'แพลตฟอร์ม',
@@ -78,8 +80,11 @@ test('items table: platform and system have their own columns, before the detail
     'รายละเอียด',
     'Taiga/MANTIS',
     'สถานะ',
+    'สถานะใน Taiga',
+    'ความคืบหน้า',
     'ความเร่งด่วน',
     'นักพัฒนา',
+    'ผู้ทดสอบ',
     'PM',
     'กำหนดส่ง',
   ]);

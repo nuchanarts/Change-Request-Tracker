@@ -13,7 +13,7 @@ test('item history shows who changed what, newest first', async ({ page }) => {
   await page.fill('#f-devHours', '9');
   await page.getByRole('button', { name: 'บันทึกการแก้ไข' }).click();
   await expect(page.locator('.toast').first()).toContainText('บันทึกการแก้ไขแล้ว');
-  await expect(page).toHaveURL(/#\/items$/); // save reloads data, then returns to the list
+  await expect(page).toHaveURL(/#\/taiga$/); // save reloads data, then returns to the list
   await page.goto(`/#/items/${seq}`);
   await page.locator('#history summary').click();
   await expect(page.locator('#history .hist li').first()).toContainText('ระยะเวลาพัฒนา');

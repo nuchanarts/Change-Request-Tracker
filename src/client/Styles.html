@@ -627,7 +627,6 @@
   .ticket-link { display: inline-flex; align-items: center; gap: 3px; font-weight: 500; color: #1d4ed8; }
   .ticket-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; align-items: center; }
   .taiga-btn { color: #1d4ed8; border-color: #cfe0fa; }
-  .nav a.nav-ext { color: #1d4ed8; }
 
   /* Access management */
   .access-req { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
@@ -720,6 +719,23 @@
   .tg-alert { position: relative; display: inline-flex; align-items: center; gap: var(--s-1); padding: 2px 10px; min-height: 28px; border: 1px solid transparent; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600; color: var(--warn); background: var(--warn-soft); }
   .tg-alert-btn { color: var(--danger); background: var(--surface); border-color: currentColor; cursor: pointer; }
   .tg-alert-btn[aria-pressed="true"] { background: var(--danger); border-color: var(--danger); color: var(--surface); }
+  /* ทะเบียน Taiga toolbar (2026-11-25): search, chips and the Taiga filter share one line */
+  .tg-toolbar select { width: auto; max-width: 230px; }
+  .tg-toolbar .chips + .chips { padding-left: var(--s-3); border-left: 1px solid var(--line); }
+  @media (max-width: 640px) { .tg-toolbar .chips + .chips { padding-left: 0; border-left: 0; } }
+  /* 13 columns have to fit a 1366 px screen */
+  @media (min-width: 641px) {
+    #tg-table { font-size: 14px; }
+    #tg-table th, #tg-table td { padding-left: 6px; padding-right: 6px; }
+    #tg-table th { font-size: 13px; }
+    #tg-table td.detail-cell { min-width: 150px; }
+    #tg-table .detail-cell a { font-size: 15px; }
+    #tg-table .badge { font-size: 12.5px; padding: 2px 8px; }
+    #tg-table .tg-taiga { min-width: 120px; }
+    #tg-table .tg-review { min-width: 130px; }
+    #tg-table .tg-prog { min-width: 76px; flex-wrap: wrap; gap: 2px 8px; }
+    #tg-table .tg-track { flex: 1 0 60px; }
+  }
   .tg-alert .tip { position: static; }
   .tg-alert .tip .tip-body { left: 0; top: calc(100% + 4px); transform: none; }
   /* ทะเบียน Taiga progress (2026-11-20): one thin bar per row, the step as text beside it */

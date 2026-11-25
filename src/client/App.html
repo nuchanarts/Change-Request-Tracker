@@ -32,7 +32,7 @@
       itemsQuery: '',
       itemsState: 'open',
       itemsPage: 0,
-      sort: { key: 'due', dir: 1 },
+      sort: { key: 'seq', dir: -1 }, // newest first, as the register always was
       myTab: store(KEYS.tab) || 'developer',
       mwFilter: store('ehp.mwfilter.v1') || {},
       asHidden: store('ehp.ashidden.v1') || [], // มอบหมายงาน: statuses hidden by the dev lead
@@ -54,11 +54,13 @@
     var COLS_KEY = 'ehp.itemcols.v1';
     /** Column order for the items table: saved order (known keys only) + any new columns, else the default. */
     state.itemCols = function () {
-      var def = Views.ITEM_COLS_DEFAULT;
+      var log = !!(state.taiga && state.taiga.available);
+      var def = Views.ITEM_COLS_DEFAULT.filter(function (k) { return k !== 'taiga' || log; });
       var saved = store(COLS_KEY);
       if (!Array.isArray(saved)) return def.slice();
       var order = saved.filter(function (k) { return def.indexOf(k) !== -1; });
-      def.forEach(function (k) { if (order.indexOf(k) === -1) order.push(k); });
+      // a column the saved order does not know goes after its neighbour in the default order
+      def.forEach(function (k, i) { if (order.indexOf(k) === -1) order.splice(i ? order.indexOf(def[i - 1]) + 1 : 0, 0, k); });
       return order;
     };
     function saveCols(order) {
@@ -129,20 +131,12 @@
     state.filteredRows = function () {
       return D.applyFilters(state.rows, state.domainFilters());
     };
-    state.itemRows = function () {
-      var list = state.drill
-        ? D.applyFilters(state.rows, { ids: state.drill.ids })
-        : D.applyFilters(state.rows, Object.assign(state.domainFilters(), { state: state.itemsState === 'all' ? null : state.itemsState }));
-      list = D.search(list, state.itemsQuery);
-      return sortRows(list);
-    };
-
     function sortRows(list) {
       var k = state.sort.key;
       var dir = state.sort.dir;
       var val = function (r) {
         if (k === 'due') return r.effectiveDue ? r.effectiveDue.y * 10000 + r.effectiveDue.m * 100 + r.effectiveDue.d : 99999999;
-        if (k === 'seq') return r.seq === null ? 1e9 : r.seq;
+        if (k === 'seq') return r.seq === null ? 1e9 * dir : r.seq; // no ลำดับ: always last
         if (k === 'status') return D.statusRank(r.status);
         if (k === 'urgency') return D.urgencyRank(r.urgency);
         return r[k] || '￿';
@@ -153,6 +147,7 @@
         return (x < y ? -1 : x > y ? 1 : (a.seq || 0) - (b.seq || 0)) * dir;
       });
     }
+    state.sortRows = sortRows;
 
     // ------------------------------------------------------------------ API
 
@@ -421,11 +416,18 @@
 
     function route() {
       var h = (currentHash || '#/monitor').slice(2).split('/');
-      return { name: h[0] || 'monitor', id: h[1] ? decodeURIComponent(h[1]) : null };
+      var r = { name: h[0] || 'monitor', id: h[1] ? decodeURIComponent(h[1]) : null };
+      if (r.name === 'items' && !r.id) r.name = 'taiga'; // "รายการทั้งหมด" is part of ทะเบียน Taiga now (2026-11-25)
+      return r;
+    }
+    /** An old link or bookmark to "รายการทั้งหมด" still shows every item. */
+    function isOldItemsLink() {
+      return /^#\/items\/?$/.test(currentHash);
     }
 
     function showRoute(hash) {
       currentHash = hash || '#/monitor';
+      if (isOldItemsLink()) taigaState().tg.kind = 'all';
       resetForm();
       render();
       heartbeatSoon();
@@ -439,7 +441,7 @@
       var main = document.getElementById('main');
       var r = route();
       document.querySelectorAll('.nav a').forEach(function (a) {
-        var active = a.getAttribute('data-route') === (r.name === 'my-work' && r.id === 'pm' ? 'my-work-pm' : r.name);
+        var active = a.getAttribute('data-route') === (r.name === 'my-work' && r.id === 'pm' ? 'my-work-pm' : r.name === 'items' ? 'taiga' : r.name);
         if (active) a.setAttribute('aria-current', 'page');
         else a.removeAttribute('aria-current');
       });
@@ -449,8 +451,8 @@
       var html;
       if (r.name === 'items' && r.id) {
         var row = state.byId[r.id];
-        html = row ? Views.form(state, 'edit', row) : UI.emptyState('ไม่พบรายการนี้', 'รายการอาจถูกเปลี่ยนเลขลำดับในชีต ลองโหลดข้อมูลใหม่', '<a class="btn" href="#/items">กลับไปที่รายการทั้งหมด</a>');
-      } else if (r.name === 'items') html = Views.items(state);
+        html = row ? Views.form(state, 'edit', row) : UI.emptyState('ไม่พบรายการนี้', 'รายการอาจถูกเปลี่ยนเลขลำดับในชีต ลองโหลดข้อมูลใหม่', '<a class="btn" href="#/taiga">กลับไปที่ทะเบียน Taiga</a>');
+      }
       else if (r.name === 'new') html = Views.form(state, 'new', null);
       else if (r.name === 'my-work') {
         state.myTab = r.id === 'pm' ? 'pm' : 'developer';
@@ -518,8 +520,7 @@
 
     /** Where "กลับ" goes when the page was opened directly (no history in this session). */
     function parentOf(r) {
-      if (r.name === 'items' && r.id) return '#/items';
-      if (r.name === 'items' && state.drill) return '#/monitor';
+      if (r.name === 'items') return '#/taiga';
       return '#/monitor';
     }
 
@@ -791,31 +792,26 @@
 
     // ------------------------------------------------------------------ Taiga register (2026-11-20)
 
-    var TG_KEY = 'ehp.taiga.v1'; // remembers scope, platform and PM; the search box starts empty
+    var TG_KEY = 'ehp.taiga.v1'; // remembers งาน Taiga / ทุกรายการ
     function taigaState() {
       if (!state.tg) {
         var saved = store(TG_KEY) || {};
-        state.tg = { scope: saved.scope || 'open', platform: saved.platform || '', pm: saved.pm || '', q: '', sync: '', review: false };
+        state.tg = { kind: saved.kind === 'all' || isOldItemsLink() ? 'all' : 'taiga', sync: '', review: false };
       }
       return state;
     }
-    function readTaigaForm(form) {
-      var tg = state.tg;
-      var el = form.elements;
-      tg.scope = el['tg-scope'].value;
-      tg.platform = el['tg-platform'].value;
-      tg.pm = el['tg-pm'].value;
-      tg.q = el['tg-q'].value;
-      tg.sync = el['tg-sync'] ? el['tg-sync'].value : ''; // not remembered: a hidden filter would look like missing items
-      store(TG_KEY, { scope: tg.scope, platform: tg.platform, pm: tg.pm });
+    function setTgKind(kind) {
+      state.tg.kind = kind;
+      state.itemsPage = 0;
+      store(TG_KEY, { kind: kind });
       renderTaiga();
     }
     /** Re-render the register without losing the focused field or text typed but not applied yet. */
     function renderTaiga() {
       var active = document.activeElement;
       var focusId = active && active.id;
-      var typed = document.getElementById('f-tg-q');
-      if (typed && state.tg) state.tg.q = typed.value;
+      var typed = document.getElementById('q');
+      if (typed) state.itemsQuery = typed.value;
       var pos = active && active.tagName === 'INPUT' ? active.selectionStart : null;
       render();
       var again = focusId && document.getElementById(focusId);
@@ -1049,9 +1045,10 @@
         state.drill = state.drills[el.getAttribute('data-drill')];
         state.itemsPage = 0;
         state.itemsQuery = '';
-        go('#/items');
+        if (state.tg) Object.assign(state.tg, { review: false }); // the list must match the number that was clicked
+        go('#/taiga');
       },
-      'clear-drill': function () { state.drill = null; render(); },
+      'clear-drill': function () { state.drill = null; state.itemsPage = 0; render(); },
       'clear-filters': function () {
         state.filters = Object.assign({}, EMPTY_FILTERS);
         store(KEYS.filters, state.filters);
@@ -1248,7 +1245,8 @@
       },
       'dr-export': exportDoneReport,
       'tg-export': exportTaiga,
-      'tg-review': function () { state.tg.review = !state.tg.review; renderTaiga(); },
+      'tg-review': function () { state.tg.review = !state.tg.review; state.itemsPage = 0; renderTaiga(); },
+      'tg-kind': function (el) { setTgKind(el.getAttribute('data-value')); },
       'tg-apply': function (el) { applyTaiga(el.getAttribute('data-id')); },
       'tg-push': function (el) { pushTaiga(el.getAttribute('data-id')); },
       'tg-logout': function () { TaigaApi.logout(); renderTaiga(); },
@@ -1329,8 +1327,11 @@
       }
       if (form && form.id === 'export-form') return refreshExport();
       if (form && form.id === 'dr-form') return readDoneReportForm(form);
-      // the search box re-renders on input (debounced); its change event on blur must not re-render under a click
-      if (form && form.id === 'tg-form') return ev.target.id === 'f-tg-q' ? undefined : readTaigaForm(form);
+      if (ev.target.id === 'f-tg-sync') {
+        state.tg.sync = ev.target.value; // not remembered: a hidden filter would look like missing items
+        state.itemsPage = 0;
+        return renderTaiga();
+      }
       if (form && form.id === 'filters') {
         ['platform', 'pm', 'developer', 'urgency', 'from', 'to'].forEach(function (k) { state.filters[k] = form.elements[k].value; });
         store(KEYS.filters, state.filters);
@@ -1362,14 +1363,10 @@
         }, 150);
         return;
       }
-      if (ev.target.id === 'f-tg-q') {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(function () { readTaigaForm(ev.target.form); }, 200);
-        return;
-      }
       if (ev.target.id !== 'q') return;
       clearTimeout(searchTimer);
       searchTimer = setTimeout(function () {
+        if (!ev.target.isConnected) return; // left the page, or re-rendered with the typed text kept
         state.itemsQuery = ev.target.value;
         state.itemsPage = 0;
         var pos = ev.target.selectionStart;

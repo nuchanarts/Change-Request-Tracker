@@ -101,7 +101,7 @@ The function returns `Index.html` evaluated as a template, with the title `ต�
 |---|---|---|
 | Monitor (default) | `#/monitor` | everyone |
 | My Work | `#/my-work` | everyone (editing requires `canEdit`) |
-| All items | `#/items` | everyone |
+| ทะเบียน Taiga (with every item since 2026-11-25; `#/items` still opens it) | `#/taiga` | everyone |
 | Item detail / edit | `#/items/:seq` | everyone (the form is read-only without `canEdit`) |
 | New item | `#/new` | `canEdit` only |
 | User guide | `#/help` | everyone |

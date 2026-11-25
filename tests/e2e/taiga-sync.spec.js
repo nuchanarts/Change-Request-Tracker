@@ -9,7 +9,10 @@ const setup = async (page, { map = {}, query = '' } = {}) => {
     window.__taigaMap = m;
     window.__beforeMock = (rows) => {
       const D = window.Domain;
-      const linked = rows.filter((r) => D.isOpen(r.status) && r.detail && /^\d+$/.test(r.seq));
+      // the newest rows: they are on the first page of the register
+      const linked = rows
+        .filter((r) => D.isOpen(r.status) && r.detail && /^\d+$/.test(r.seq))
+        .sort((x, y) => y.seq - x.seq);
       [0, 1, 2].forEach((i) => {
         linked[i].ticketLinks = [`https://taiga.example/project/sync/us/${i + 1}`];
         linked[i].status = 'รอทีมพัฒนา';
@@ -179,7 +182,7 @@ test('flags items developed before the PM reviewed them and can show only those'
   await expect(only).toHaveAttribute('aria-pressed', 'false');
   await only.click();
   await expect(only).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#tg-table tbody tr')).toHaveCount(n);
+  await expect(page.locator('#tg-table tbody tr')).toHaveCount(Math.min(50, n));
   await expect(rowOf(page, a)).toBeVisible();
   await only.click();
   await expect(rowOf(page, b)).toBeVisible();
