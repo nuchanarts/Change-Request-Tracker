@@ -901,7 +901,7 @@
         state.tgCounts = D.taigaKeyCounts(state.rows);
         state.tgCountsOf = state.rows;
       }
-      return D.taigaCompare(r, state.taiga.latest, state.taiga.map, state.tgCounts);
+      return D.taigaCompare(r, state.taiga.latest, state.taiga.map, state.tgCounts, state.taiga.appMap);
     }
 
     var TG_SYNC = [['diff', 'ไม่ตรงกับ Taiga'], ['match', 'ตรงกับ Taiga'], ['unmapped', 'ยังไม่จับคู่สถานะ'], ['deleted', 'ถูกลบใน Taiga'], ['none', 'ยังไม่มีข้อมูลจาก Taiga']];
@@ -934,24 +934,31 @@
       return html + '</td>';
     }
 
-    /** Admins pair Taiga statuses with app statuses. Saving a pair changes no item. */
+    /** Admins pair Taiga statuses with app statuses, then the sheet statuses left over. Saving a pair changes no item. */
     function tgMapPanel(state) {
       var t = state.taiga;
-      var names = t.statuses.slice();
-      var seen = names.map(D.taigaName);
-      Object.keys(t.map).concat(Object.keys(D.TAIGA_DEFAULT_MAP)).forEach(function (n) {
-        if (seen.indexOf(D.taigaName(n)) === -1) { seen.push(D.taigaName(n)); names.push(n); }
-      });
-      names.sort();
-      var left = names.filter(function (n) { return !Object.prototype.hasOwnProperty.call(t.map, n); }).length;
+      var appMap = t.appMap || {};
+      var names = D.taigaNames(t.statuses, t.map, appMap).sort();
+      var gaps = D.statusTaigaGaps(t.map, appMap);
+      var left = names.filter(function (n) { return !Object.prototype.hasOwnProperty.call(t.map, n); }).length +
+        gaps.filter(function (g) { return !appMap[g.app]; }).length;
       var html = '<details class="tg-map" id="tg-map"' + (state.tg.mapOpen ? ' open' : '') + '><summary>จับคู่สถานะ Taiga กับสถานะในแอป' + (left ? ' (ยังไม่จับคู่ ' + left + ')' : '') + '</summary>';
       if (!names.length) return html + '<p class="muted">ยังไม่มีสถานะจาก Taiga ให้จับคู่</p></details>';
       html += '<p class="muted">การจับคู่ใช้บอกว่างานตรงกับ Taiga หรือไม่ ไม่เปลี่ยนสถานะงานเอง</p><div class="tg-map-grid">' + names.map(function (n, i) {
         var cur = Object.prototype.hasOwnProperty.call(t.map, n) ? t.map[n] : '';
         return '<label for="tg-map-' + i + '">' + esc(n) + '</label><select id="tg-map-' + i + '" class="tg-map-select" data-taiga="' + esc(n) + '"><option value="">— ไม่จับคู่ —</option>' +
           D.WORKFLOW.map(function (s) { return '<option value="' + esc(s) + '"' + (s === cur ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join('') + '</select>';
-      }).join('') + '</div></details>';
-      return html;
+      }).join('') + '</div>';
+      if (gaps.length) html += '<p class="tg-map-sub"><strong>สถานะในแอปที่ต้องเลือกสถานะ Taiga เอง</strong></p>' +
+        '<p class="muted">สถานะที่ยังไม่มีคู่ หรือตรงกับ Taiga มากกว่า 1 สถานะ ไม่เลือกก็ได้ ถ้าเลือกแล้ว รายการที่อยู่ทั้งสองสถานะนี้จะถือว่าตรงกัน</p>' +
+        '<div class="tg-map-grid" id="tg-app-map">' + gaps.map(function (g) {
+          var id = 'tg-app-' + D.WORKFLOW.indexOf(g.app);
+          var cur = D.taigaName(appMap[g.app]);
+          return '<label for="' + id + '">' + esc(g.app) + (g.several.length ? '<span class="muted tg-map-several">ตรงกับ ' + esc(g.several.join(', ')) + '</span>' : '') + '</label>' +
+            '<select id="' + id + '" class="tg-app-select" data-app="' + esc(g.app) + '"><option value="">— ไม่จับคู่ —</option>' +
+            names.map(function (n) { return '<option value="' + esc(n) + '"' + (cur && D.taigaName(n) === cur ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select>';
+        }).join('') + '</div>';
+      return html + '</details>';
     }
 
     function tgProgress(r) {

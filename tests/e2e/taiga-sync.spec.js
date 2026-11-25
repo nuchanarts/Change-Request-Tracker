@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { open } from './helpers.js';
 
 // Taiga status in the register, mismatch filter, "ปรับตาม Taiga" and the status map (user request 2026-11-24).
@@ -201,4 +202,47 @@ test('works from the sheet dates when there is no Taiga log', async ({ page }) =
   }, a);
   await reload(page);
   await expect(rowOf(page, a).locator('.tg-review')).toContainText('เริ่มพัฒนา 1/1/2026');
+});
+
+// Sheet statuses without exactly one Taiga status are paired in the same panel (user request 2026-11-25)
+test('admins see the sheet statuses without a Taiga status and can pair them', async ({ page }) => {
+  const APP = '0.รอแจ้งทีมพัฒนา';
+  const [a] = await setup(page);
+  await page.evaluate(
+    ([s, st]) => {
+      window.__mockSheet.rows.find((r) => r.seq === s).status = st;
+    },
+    [a, APP],
+  );
+  await page.locator('#tg-map summary').click();
+  await reload(page);
+  await expect(rowOf(page, a)).toContainText('รอแจ้ง');
+  await expect(page.locator('#tg-map')).toHaveAttribute('open', ''); // a reload does not close it
+  await expect(page.locator('#tg-map summary')).toContainText('ยังไม่จับคู่ 9'); // Ready, Strange + 7
+  await expect(page.locator('#tg-app-map select')).toHaveCount(7);
+  await expect(page.locator('#tg-app-map')).toContainText('ตรงกับ Waiting Compile, compile from dev');
+  const select = page.getByLabel(APP, { exact: true });
+  await select.selectOption('In progress');
+  await expect(page.locator('.toast')).toContainText('In progress');
+  await expect(rowOf(page, a).locator('.tg-sync-match')).toBeVisible();
+  await expect(page.locator('#tg-map')).toHaveAttribute('open', '');
+  await expect(page.locator('#tg-map summary')).toContainText('ยังไม่จับคู่ 8');
+  await expect(select).toHaveValue('In progress');
+  await reload(page);
+  await expect(page.getByLabel(APP, { exact: true })).toHaveValue('In progress');
+  await page.getByLabel(APP, { exact: true }).selectOption('');
+  await expect(rowOf(page, a).locator('.tg-sync-diff')).toBeVisible();
+  expect(await page.evaluate(() => window.__mockLog.length)).toBe(0); // no item changed
+});
+
+test('the open status map has no accessibility problems and no sideways scroll', async ({ page }) => {
+  await setup(page);
+  await page.locator('#tg-map summary').click();
+  await expect(page.locator('#tg-app-map select').first()).toBeVisible();
+  const results = await new AxeBuilder({ page }).include('#tg-map').analyze();
+  expect(results.violations).toEqual([]);
+  const over = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(over).toBeLessThanOrEqual(0);
 });

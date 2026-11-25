@@ -816,8 +816,6 @@
       var focusId = active && active.id;
       var typed = document.getElementById('f-tg-q');
       if (typed && state.tg) state.tg.q = typed.value;
-      var map = document.getElementById('tg-map');
-      if (map && state.tg) state.tg.mapOpen = map.open;
       var pos = active && active.tagName === 'INPUT' ? active.selectionStart : null;
       render();
       var again = focusId && document.getElementById(focusId);
@@ -826,6 +824,11 @@
         if (pos !== null && again.setSelectionRange) again.setSelectionRange(pos, pos);
       }
     }
+
+    // the status map stays open or closed through every re-render, also a data reload ("toggle" does not bubble)
+    document.addEventListener('toggle', function (ev) {
+      if (ev.target.id === 'tg-map' && ev.target.isConnected && state.tg) state.tg.mapOpen = ev.target.open;
+    }, true);
 
     // Taiga statuses (2026-11-24): read from the bot's log when the register opens; the app never writes that log.
     function loadTaiga() {
@@ -843,6 +846,17 @@
           if (app) state.taiga.map[name] = app;
           else delete state.taiga.map[name];
           UI.toast(app ? 'จับคู่ "' + name + '" กับ "' + D.statusLabel(app) + '" แล้ว' : 'ยกเลิกการจับคู่ "' + name + '" แล้ว');
+        } else UI.toast(res.message, 'error');
+        if (route().name === 'taiga') renderTaiga();
+      });
+    }
+    function saveStatusTaiga(app, name) {
+      api('Api_saveStatusTaiga', { app: app, taiga: name }).then(function (res) {
+        if (res.ok) {
+          state.taiga.appMap = state.taiga.appMap || {};
+          if (name) state.taiga.appMap[app] = name;
+          else delete state.taiga.appMap[app];
+          UI.toast(name ? 'จับคู่ "' + D.statusLabel(app) + '" กับ Taiga "' + name + '" แล้ว' : 'ยกเลิกการจับคู่ "' + D.statusLabel(app) + '" แล้ว');
         } else UI.toast(res.message, 'error');
         if (route().name === 'taiga') renderTaiga();
       });
@@ -1201,6 +1215,7 @@
         return saveAccess({ email: ev.target.getAttribute('data-email'), name: ev.target.value });
       }
       if (ev.target.classList && ev.target.classList.contains('tg-map-select')) return saveTaigaMap(ev.target.getAttribute('data-taiga'), ev.target.value);
+      if (ev.target.classList && ev.target.classList.contains('tg-app-select')) return saveStatusTaiga(ev.target.getAttribute('data-app'), ev.target.value);
       if (ev.target.classList && ev.target.classList.contains('access-select')) {
         var input = { email: ev.target.getAttribute('data-email') };
         input[ev.target.getAttribute('data-field')] = ev.target.value;

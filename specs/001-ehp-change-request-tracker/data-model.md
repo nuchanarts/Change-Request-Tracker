@@ -168,4 +168,5 @@ Values are trimmed for comparison only. Writes always use the exact option strin
 
 - `_แมวส้ม_Taiga` (owned by the bot): **read only**. Columns found by header: เวลา, ชนิด, จาก, เป็น, โดย, ลิงก์. Missing sheet or columns → the feature is hidden. At most the newest 5000 events are read.
 - `_app_taiga_map` (owned by the app): สถานะใน Taiga | สถานะในแอป | แก้โดย | แก้เมื่อ. One row per Taiga status name; a target outside `WORKFLOW` is ignored. Changes are logged as `TAIGA_MAP`. A saved row overrides the built-in team table `Domain.TAIGA_DEFAULT_MAP` (empty = not paired); names match ignoring letter case and extra spaces.
+- `_app_status_taiga` (owned by the app, 2026-11-25): สถานะในแอป | สถานะใน Taiga | แก้โดย | แก้เมื่อ. One row per sheet status that has no Taiga status, or several. A row outside `WORKFLOW` or with an empty Taiga status is ignored. An item at a paired status counts as a match. Changes are logged as `STATUS_TAIGA`. Nothing is sent to Taiga.
 - Items are matched by full Taiga link (site/project/type/ref), never by number alone.

@@ -119,6 +119,8 @@
         };
       });
 
+  var statusTaiga = Object.assign({}, window.__statusTaiga);
+
   var handlers = {
     Api_taiga: function () {
       if (params.get('notaiga')) return ok({ available: false, latest: {}, statuses: [], map: {} });
@@ -134,7 +136,16 @@
         latest: D.taigaLatest(taigaEvents),
         statuses: statuses,
         map: D.taigaEffectiveMap(statuses, taigaPairs),
+        appMap: Object.assign({}, statusTaiga),
       });
+    },
+    Api_saveStatusTaiga: function (input) {
+      if (!user.isAdmin)
+        return { ok: false, code: 'NOT_ADMIN', message: 'เฉพาะผู้ดูแลเท่านั้นที่จัดการสิทธิ์ได้' };
+      if (D.WORKFLOW.indexOf(input.app) === -1) return fail('VALIDATION');
+      if (input.taiga) statusTaiga[input.app] = input.taiga;
+      else delete statusTaiga[input.app];
+      return ok({ app: input.app, taiga: input.taiga });
     },
     Api_saveTaigaMap: function (input) {
       if (!user.isAdmin)
