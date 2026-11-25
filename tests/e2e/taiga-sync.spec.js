@@ -549,3 +549,27 @@ test('form tick: a new item is saved first, then sent to its Taiga link', async 
   expect(await taigaOf(page, 99)).toBe('Ready for test');
   expect(await page.evaluate(() => window.__taigaLog.length)).toBe(1);
 });
+
+test('Escape never counts as yes, also after an earlier question was answered yes', async ({ page }) => {
+  const [a, , c] = await setup(page);
+  await pushButton(page, a).click();
+  await login(page);
+  await dialog(page).getByRole('button', { name: 'ส่งไป Taiga' }).click();
+  await expect(rowOf(page, a).locator('.tg-sync-match')).toBeVisible();
+  expect(await patches(page)).toBe(1);
+  await pushButton(page, c).click();
+  await expect(dialog(page)).toContainText('ตามสถานะในชีต');
+  await page.keyboard.press('Escape');
+  await expect(dialog(page)).toBeHidden();
+  await page.waitForTimeout(500);
+  expect(await patches(page)).toBe(1);
+});
+
+test('form tick: the box has the size of a checkbox and sits next to its text', async ({ page }) => {
+  const [a] = await setup(page, { map: FORM_MAP });
+  await openItem(page, a);
+  const box = await tick(page).boundingBox();
+  expect(box.width).toBeLessThanOrEqual(24);
+  const status = await page.locator('#f-status').boundingBox();
+  expect(Math.abs(box.x - status.x)).toBeLessThan(8);
+});

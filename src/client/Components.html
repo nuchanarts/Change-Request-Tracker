@@ -330,6 +330,7 @@
           dlg.removeEventListener('close', onClose);
           resolve(dlg.returnValue === 'yes');
         });
+        dlg.returnValue = ''; // a browser may keep an earlier "yes" when Escape closes the dialog
         dlg.showModal();
       });
     }
