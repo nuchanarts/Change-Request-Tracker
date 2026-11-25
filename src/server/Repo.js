@@ -459,6 +459,47 @@ function makeRepo(deps) {
   }
 
   /**
+   * Right before a person sends a status to Taiga: is this row still that item with that status? Reads only.
+   * @param {{rowNumber:number, seq:number, status:string}} req
+   */
+  function checkTaigaPush(req) {
+    var display = mainSheet().getDataRange().getDisplayValues();
+    var map = mapHeaders(display[0]);
+    if (map.missing.length) return C.fail('SCHEMA', { missing: map.missing }, map.missing.join(', '));
+    var rowNumber = Number(req && req.rowNumber);
+    var line = rowNumber >= 2 ? display[rowNumber - 1] : null;
+    if (!line) return C.fail('NOT_FOUND');
+    var seq = toInt(line[map.index.seq]);
+    if (seq === null) return C.fail('SEQ_INVALID');
+    if (seq !== Number(req.seq)) return C.fail('SEQ_MISMATCH', { expected: req.seq, actual: seq });
+    var same = display.slice(1).filter(function (/** @type {any[]} */ r) {
+      return toInt(r[map.index.seq]) === seq;
+    });
+    if (same.length > 1) return C.fail('SEQ_INVALID');
+    var actual = clean(line[map.index.status]);
+    if (actual !== clean(req.status))
+      return C.fail('CONFLICT', { status: { expected: clean(req.status), actual: actual } });
+    return C.ok({});
+  }
+
+  /**
+   * Log a status a person sent to Taiga from the browser (the app's server never calls Taiga).
+   * @param {{rowNumber:number, seq:number, from:string, to:string}} req @param {string} email
+   */
+  function logTaigaPush(req, email) {
+    var seq = Number(req && req.seq);
+    var row = Number(req && req.rowNumber);
+    var from = clean(req && req.from);
+    var to = clean(req && req.to);
+    if (!(seq > 0) || !(row >= 2) || !to || to.length > 100 || from.length > 100)
+      return C.fail('VALIDATION', { fields: { _: 'taiga' } });
+    return withLock(function () {
+      writeLog([[deps.nowText(), email, 'TAIGA_PUSH', row, seq, 'สถานะใน Taiga', from, to]]);
+      return C.ok({});
+    });
+  }
+
+  /**
    * Delete one item row for real (user decision 2026-11-11, constitution v4). Same guards as update:
    * lock, ลำดับ at that row, unique ลำดับ, and every column must still match what the user saw.
    * The whole row is logged as JSON {header: value} in _app_log so it can be restored by hand.
@@ -983,6 +1024,7 @@ function makeRepo(deps) {
         statuses: [],
         map: D.taigaEffectiveMap([], pairs),
         appMap: appMap,
+        host: C.TAIGA_HOST,
       };
     var statuses = taigaStatuses(events);
     return {
@@ -991,6 +1033,7 @@ function makeRepo(deps) {
       statuses: statuses,
       map: D.taigaEffectiveMap(statuses, pairs),
       appMap: appMap,
+      host: C.TAIGA_HOST,
     };
   }
 
@@ -1414,6 +1457,8 @@ function makeRepo(deps) {
     taiga: taiga,
     saveTaigaMap: saveTaigaMap,
     saveStatusTaiga: saveStatusTaiga,
+    checkTaigaPush: checkTaigaPush,
+    logTaigaPush: logTaigaPush,
     repairQuotedOptions: repairQuotedOptions,
   };
 }

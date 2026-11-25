@@ -228,3 +228,54 @@ describe('saveStatusTaiga(): sheet status → Taiga status, admins only (2026-11
     expect(build(null).taiga()).toMatchObject({ available: false, appMap: {} });
   });
 });
+
+describe('sending a status to Taiga: check before, log after (2026-11-25)', () => {
+  const C = Domain.COLUMNS;
+  let repo, main;
+  const add = (o) => main.appendRow(C.map((c) => o[c.key] || ''));
+  beforeEach(() => {
+    repo = build([HEAD, event()]);
+    main = ss.getSheetByName(Config.SHEETS.main);
+    add({ seq: '7', detail: 'งาน', status: 'กำลังทดสอบ' });
+    add({ seq: '8', detail: 'งาน', status: 'กำลังพัฒนา' });
+    add({ seq: '8', detail: 'ซ้ำ', status: 'กำลังพัฒนา' });
+    main.writes.length = 0;
+  });
+
+  it('the check passes only while the row is still the item with that status', () => {
+    expect(repo.checkTaigaPush({ rowNumber: 2, seq: 7, status: 'กำลังทดสอบ' }).ok).toBe(true);
+    expect(repo.checkTaigaPush({ rowNumber: 2, seq: 7, status: 'กำลังพัฒนา' }).code).toBe('CONFLICT');
+    expect(repo.checkTaigaPush({ rowNumber: 2, seq: 9, status: 'กำลังทดสอบ' }).code).toBe('SEQ_MISMATCH');
+    expect(repo.checkTaigaPush({ rowNumber: 3, seq: 8, status: 'กำลังพัฒนา' }).code).toBe('SEQ_INVALID');
+    expect(repo.checkTaigaPush({ rowNumber: 99, seq: 7, status: 'กำลังทดสอบ' }).code).toBe('NOT_FOUND');
+    expect(repo.checkTaigaPush(undefined).code).toBe('NOT_FOUND');
+    expect(main.writes).toEqual([]);
+  });
+
+  it('logs who sent what and shows it in the item history', () => {
+    const req = { rowNumber: 2, seq: 7, from: 'In progress', to: '=Ready for test' };
+    expect(repo.logTaigaPush(req, 'editor@x.com').ok).toBe(true);
+    expect(repo.history(7)).toEqual([
+      {
+        time: '24/11/2026 10:00:00',
+        who: 'editor@x.com',
+        action: 'TAIGA_PUSH',
+        column: 'สถานะใน Taiga',
+        from: 'In progress',
+        to: '=Ready for test',
+      },
+    ]);
+    expect(main.writes).toEqual([]);
+    expect(log.writes).toEqual([]);
+  });
+
+  it('refuses a log line without a ลำดับ or a status, or with an overlong name', () => {
+    expect(repo.logTaigaPush({ rowNumber: 2, seq: 'x', from: 'a', to: 'b' }, 'e').code).toBe('VALIDATION');
+    expect(repo.logTaigaPush({ rowNumber: 2, seq: 7, from: 'a', to: ' ' }, 'e').code).toBe('VALIDATION');
+    expect(repo.logTaigaPush({ rowNumber: 2, seq: 7, from: 'a', to: 'b'.repeat(101) }, 'e').code).toBe(
+      'VALIDATION',
+    );
+    expect(repo.logTaigaPush(undefined, 'e').code).toBe('VALIDATION');
+    expect(ss.getSheetByName(Config.SHEETS.log)).toBeFalsy();
+  });
+});

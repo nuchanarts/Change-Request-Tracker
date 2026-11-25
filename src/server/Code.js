@@ -203,6 +203,20 @@ function Api_saveTaigaMap(input) {
   });
 }
 
+/** Editors only: the row is still the item with that status (asked right before sending to Taiga). @param {any} req */
+function Api_taigaPushCheck(req) {
+  return guard_(function (ctx) {
+    return denied_(ctx) || ctx.repo.checkTaigaPush(req || {});
+  });
+}
+
+/** Editors only: log a status sent to Taiga from the browser. @param {any} req */
+function Api_logTaigaPush(req) {
+  return guard_(function (ctx) {
+    return denied_(ctx) || ctx.repo.logTaigaPush(req || {}, ctx.email);
+  });
+}
+
 /** Pair a sheet status with a Taiga status (admins only; enforced in Repo). @param {any} input */
 function Api_saveStatusTaiga(input) {
   return guard_(function (ctx) {

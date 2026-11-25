@@ -63,6 +63,8 @@ var Config = (function () {
     ACCESS: { allowed: 'อนุญาต', pending: 'รออนุมัติ', suspended: 'ระงับ' },
     TAIGA_MAP_HEADERS: ['สถานะใน Taiga', 'สถานะในแอป', 'แก้โดย', 'แก้เมื่อ'],
     STATUS_TAIGA_HEADERS: ['สถานะในแอป', 'สถานะใน Taiga', 'แก้โดย', 'แก้เมื่อ'],
+    /** The only site the browser may send a status to (constitution v7, 2026-11-25). */
+    TAIGA_HOST: 'taiga.hosxp.net',
     /** Columns the app needs from the bot's Taiga log, found by header. */
     TAIGA_LOG_COLUMNS: { at: 'เวลา', kind: 'ชนิด', from: 'จาก', to: 'เป็น', by: 'โดย', link: 'ลิงก์' },
     TAIGA_LOG_MAX: 5000, // newest events read per load

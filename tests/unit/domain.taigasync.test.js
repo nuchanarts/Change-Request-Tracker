@@ -262,3 +262,44 @@ describe('sheet statuses without exactly one Taiga status (user, 2026-11-25)', (
     });
   });
 });
+
+describe('sending the sheet status to Taiga: which Taiga status (user, 2026-11-25)', () => {
+  const base = D.taigaEffectiveMap([], []);
+  const APP = '0.รอแจ้งทีมพัฒนา';
+
+  it('is the pair made by hand, else the only Taiga status of that sheet status, else nothing', () => {
+    expect(D.statusTaigaTarget('กำลังพัฒนา', base, {})).toBe('In progress');
+    expect(D.statusTaigaTarget('กำลังพัฒนา', base, { กำลังพัฒนา: 'Rework' })).toBe('Rework');
+    expect(D.statusTaigaTarget(APP, base, {})).toBe('');
+    expect(D.statusTaigaTarget(APP, base, { [APP]: 'Ready for DEV' })).toBe('Ready for DEV');
+    expect(D.statusTaigaTarget('รอ compile', base, {})).toBe(''); // two Taiga statuses: never guess
+    expect(D.statusTaigaTarget('', base, {})).toBe('');
+    expect(D.statusTaigaTarget('constructor', base, {})).toBe('');
+  });
+
+  const cmp = (o, to, appMap = {}, rows) => {
+    const r = row(1, o);
+    return D.taigaCompare(r, D.taigaLatest([ev({ to })]), base, D.taigaKeyCounts(rows || [r]), appMap);
+  };
+
+  it('is offered when the two differ, also when the Taiga status is not paired', () => {
+    expect(cmp({ status: 'กำลังทดสอบ' }, 'In progress')).toMatchObject({
+      state: 'diff',
+      pushTo: 'Ready for test',
+    });
+    expect(cmp({ status: 'กำลังทดสอบ' }, 'Strange')).toMatchObject({
+      state: 'unmapped',
+      pushTo: 'Ready for test',
+    });
+  });
+
+  it('is never offered when they match, without a pair, for a shared link, a deleted item or no ลำดับ', () => {
+    expect(cmp({ status: 'กำลังพัฒนา' }, 'In progress').pushTo).toBe('');
+    expect(cmp({ status: APP }, 'In progress').pushTo).toBe('');
+    expect(cmp({ status: 'กำลังทดสอบ' }, 'In progress', {}, [row(1), row(2)]).pushTo).toBe('');
+    expect(cmp({ status: 'กำลังทดสอบ', seq: '' }, 'In progress').pushTo).toBe('');
+    const gone = D.taigaLatest([ev(), ev({ kind: 'ลบ' })]);
+    const r = row(1, { status: 'กำลังทดสอบ' });
+    expect(D.taigaCompare(r, gone, base, {}, {}).pushTo).toBe('');
+  });
+});

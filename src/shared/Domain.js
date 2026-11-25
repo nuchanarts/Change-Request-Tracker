@@ -1540,6 +1540,19 @@ var Domain = (function () {
     return out;
   }
 
+  /**
+   * The Taiga status to send for a sheet status: the pair made by hand, else its only Taiga status, else ''.
+   * @param {any} status @param {Object<string,string>} map taigaEffectiveMap() @param {Object<string,string>} appMap
+   */
+  function statusTaigaTarget(status, map, appMap) {
+    if (WORKFLOW.indexOf(status) === -1) return '';
+    if (Object.prototype.hasOwnProperty.call(appMap, status)) return appMap[status];
+    var names = Object.keys(map).filter(function (n) {
+      return map[n] === status;
+    });
+    return names.length === 1 ? names[0] : '';
+  }
+
   /** 'site/project/type/ref' of a full Taiga item link, or null. @param {any} url */
   function taigaKey(url) {
     var m = /^https?:\/\/([^/\s?#]+)\/project\/([^/\s?#]+)\/(us|task|issue|epic)\/(\d+)/i.exec(clean(url));
@@ -1584,13 +1597,14 @@ var Domain = (function () {
    * Never guesses a status: only an exact map entry that is a workflow status counts. canApply = a person may
    * press "ปรับตาม Taiga" (one row per Taiga item, and the row has a ลำดับ).
    * A status an admin paired by hand with this Taiga status (appMap) counts as a match.
+   * pushTo = the Taiga status a person may send with "ปรับ Taiga ตามชีต" ('' = not offered), same rules as canApply.
    * @param {any} r @param {any} latest taigaLatest() @param {Object<string,string>} map @param {Object<string,number>} counts
    * @param {Object<string,string>} [appMap] statusTaigaMap()
    */
   function taigaCompare(r, latest, map, counts, appMap) {
     var key = taigaKey(taigaLink(r));
     var t = key && Object.prototype.hasOwnProperty.call(latest, key) ? latest[key] : null;
-    var out = { state: 'none', taiga: t, expected: '', duplicate: false, canApply: false };
+    var out = { state: 'none', taiga: t, expected: '', duplicate: false, canApply: false, pushTo: '' };
     if (!key || !t || (!t.status && !t.deleted)) return out;
     out.duplicate = counts[key] > 1;
     if (t.deleted) {
@@ -1604,6 +1618,8 @@ var Domain = (function () {
       return out;
     }
     var want = Object.prototype.hasOwnProperty.call(map, t.status) ? map[t.status] : '';
+    if (r.status !== want && !out.duplicate && r.seq !== null)
+      out.pushTo = statusTaigaTarget(r.status, map, appMap || {});
     if (WORKFLOW.indexOf(want) === -1) {
       out.state = 'unmapped';
       return out;
@@ -1967,6 +1983,7 @@ var Domain = (function () {
     taigaEffectiveMap: taigaEffectiveMap,
     statusTaigaMap: statusTaigaMap,
     statusTaigaGaps: statusTaigaGaps,
+    statusTaigaTarget: statusTaigaTarget,
     taigaNames: taigaNames,
     taigaKey: taigaKey,
     taigaLatest: taigaLatest,
