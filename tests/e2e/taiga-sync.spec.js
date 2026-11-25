@@ -268,17 +268,22 @@ test('both warnings are small chips on the summary line, not full-width banners 
       const box = await page.locator(sel).boundingBox();
       return box.y + box.height / 2;
     };
-    const line = await mid('#tg-count');
-    expect(Math.abs((await mid('#tg-review-btn')) - line)).toBeLessThan(8);
-    expect(Math.abs((await mid('#tg-nolink')) - line)).toBeLessThan(8);
+    await expect(async () => {
+      const line = await mid('#tg-count'); // measured again when the page is drawn in between
+      expect(Math.abs((await mid('#tg-review-btn')) - line)).toBeLessThan(8);
+      expect(Math.abs((await mid('#tg-nolink')) - line)).toBeLessThan(8);
+    }).toPass();
   }
   await expect(async () => {
     await page.locator('#tg-nolink .tip').focus(); // a late re-render may take the focus away
     await expect(page.locator('#tg-nolink .tip-body')).toBeVisible({ timeout: 300 });
   }).toPass();
-  const tip = await page.locator('#tg-nolink .tip-body').boundingBox();
-  expect(tip.x).toBeGreaterThanOrEqual(0);
-  expect(tip.x + tip.width).toBeLessThanOrEqual(page.viewportSize().width);
+  await expect(async () => {
+    await page.locator('#tg-nolink .tip').focus();
+    const tip = await page.locator('#tg-nolink .tip-body').boundingBox();
+    expect(tip.x).toBeGreaterThanOrEqual(0);
+    expect(tip.x + tip.width).toBeLessThanOrEqual(page.viewportSize().width);
+  }).toPass();
 });
 
 // "ปรับ Taiga ตามชีต" (user request 2026-11-25). The mock answers for Taiga; nothing leaves the browser.
@@ -404,4 +409,38 @@ test('an expired Taiga login asks to log in again', async ({ page }) => {
 test('view-only people get no button to change Taiga', async ({ page }) => {
   await setup(page, { query: '?viewer=1' });
   await expect(page.getByRole('button', { name: /ปรับ Taiga ตามชีต/ })).toHaveCount(0);
+});
+
+test('the login remembers the username only, and only while the box is ticked (2026-11-25)', async ({
+  page,
+}) => {
+  const [a, , c] = await setup(page);
+  const user = page.getByLabel('ชื่อผู้ใช้ Taiga', { exact: true });
+  const keep = page.getByLabel('จำชื่อผู้ใช้ในเครื่องนี้');
+  await pushButton(page, a).click();
+  await expect(keep).toBeChecked();
+  await expect(page.getByLabel('รหัสผ่าน Taiga')).toHaveAttribute('autocomplete', 'current-password');
+  await login(page, 'wrong');
+  await expect(dialog(page).getByRole('alert')).toContainText('ไม่ถูกต้อง');
+  expect(await page.evaluate(() => localStorage.getItem('ehp.taigaUser.v1'))).toBeNull(); // a failed login is not kept
+  await login(page);
+  await expect(dialog(page)).toContainText('ตามสถานะในชีต');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: /ออกจาก Taiga/ }).click();
+
+  await pushButton(page, c).click();
+  await expect(user).toHaveValue('someone');
+  await expect(page.getByLabel('รหัสผ่าน Taiga')).toHaveValue('');
+  await expect(page.getByLabel('รหัสผ่าน Taiga')).toBeFocused();
+  const kept = await page.evaluate(() => JSON.stringify({ ...localStorage }));
+  expect(kept).not.toContain('mock-token');
+  expect(kept).not.toContain('"mock"');
+  await keep.uncheck();
+  await login(page);
+  await expect(dialog(page)).toContainText('ตามสถานะในชีต');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: /ออกจาก Taiga/ }).click();
+  await pushButton(page, a).click();
+  await expect(user).toHaveValue('');
+  await expect(keep).not.toBeChecked();
 });

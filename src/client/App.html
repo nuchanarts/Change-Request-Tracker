@@ -868,16 +868,19 @@
         'Taiga: "' + c.taiga.status + '" · สถานะจะเปลี่ยนจาก "' + (row.status ? D.statusLabel(row.status) : 'ว่าง') + '" เป็น "' + D.statusLabel(c.expected) + '"' + close + skips,
         'ปรับสถานะ').then(function (yes) { if (yes) moveStatus(id, c.expected); });
     }
+    var TG_USER_KEY = 'ehp.taigaUser.v1';
     /** Log in to Taiga with the person's own account; resolves true once logged in, false when cancelled. */
     function taigaLogin(host) {
       return new Promise(function (resolve) {
         var dlg = document.getElementById('dialog');
         var done = false;
+        var kept = store(TG_USER_KEY); // username only; false = the person asked not to keep it
         dlg.className = '';
-        dlg.innerHTML = '<form id="tg-login"><h2>เข้าสู่ระบบ Taiga</h2>' +
+        dlg.innerHTML = '<form id="tg-login" method="post"><h2>เข้าสู่ระบบ Taiga</h2>' +
           '<p class="muted">ใช้บัญชี Taiga ของคุณเอง รหัสผ่านส่งตรงไปที่ ' + UI.esc(host) + ' แอปไม่เก็บรหัสผ่าน และจำการเข้าสู่ระบบเฉพาะแท็บนี้</p>' +
-          '<div class="field"><label for="tg-user">ชื่อผู้ใช้ Taiga</label><input id="tg-user" name="username" type="text" autocomplete="username" required /></div>' +
+          '<div class="field"><label for="tg-user">ชื่อผู้ใช้ Taiga</label><input id="tg-user" name="username" type="text" autocomplete="username" value="' + UI.esc(kept || '') + '" required /></div>' +
           '<div class="field"><label for="tg-pass">รหัสผ่าน Taiga</label><input id="tg-pass" name="password" type="password" autocomplete="current-password" required /></div>' +
+          '<label class="tg-keep"><input type="checkbox" name="keep"' + (kept === false ? '' : ' checked') + ' /> จำชื่อผู้ใช้ในเครื่องนี้</label>' +
           '<p class="err" role="alert" id="tg-login-err"></p>' +
           '<div class="dialog-actions"><button type="button" class="btn" id="tg-login-no">ยกเลิก</button><button type="submit" class="btn primary">เข้าสู่ระบบ</button></div></form>';
         var form = document.getElementById('tg-login');
@@ -887,9 +890,10 @@
           ev.stopPropagation();
           var btn = form.querySelector('[type="submit"]');
           btn.disabled = true;
-          TaigaApi.login(host, form.elements.username.value.trim(), form.elements.password.value).then(function () {
+          var user = form.elements.username.value.trim();
+          TaigaApi.login(host, user, form.elements.password.value).then(function () {
+            store(TG_USER_KEY, form.elements.keep.checked ? user : false);
             done = true;
-            form.reset();
             dlg.close();
           }, function (e) {
             btn.disabled = false;
@@ -906,6 +910,7 @@
           resolve(done);
         });
         dlg.showModal();
+        if (kept) form.elements.password.focus();
       });
     }
 
