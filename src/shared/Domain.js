@@ -1398,15 +1398,18 @@ var Domain = (function () {
   }
 
   /**
-   * Items with a Taiga link or in a Taiga step, newest first. scope: 'open' (default) | 'closed' | 'all'.
-   * @param {any[]} rows @param {{scope?: string}} q
+   * Items with a Taiga link or in a Taiga step, newest first; kind 'all' = every item (the register replaced
+   * "รายการทั้งหมด", user 2026-11-25). scope: 'open' (default) | 'overdue' | 'closed' | 'all'.
+   * @param {any[]} rows @param {{scope?: string, kind?: string}} q
    */
   function taigaRegister(rows, q) {
     var scope = (q && q.scope) || 'open';
+    var every = !!q && q.kind === 'all';
     var out = rows.filter(function (r) {
       if (scope === 'open' && !r.isOpen) return false;
       if (scope === 'closed' && r.isOpen) return false;
-      return !!taigaLink(r) || TAIGA_STEPS.indexOf(r.status) !== -1;
+      if (scope === 'overdue' && !r.isOverdue) return false;
+      return every || !!taigaLink(r) || TAIGA_STEPS.indexOf(r.status) !== -1;
     });
     out.sort(function (a, b) {
       return (b.seq === null ? -1 : b.seq) - (a.seq === null ? -1 : a.seq);
@@ -1427,7 +1430,7 @@ var Domain = (function () {
       rows: out,
       total: out.length,
       noLink: out.filter(function (r) {
-        return !taigaLink(r);
+        return TAIGA_STEPS.indexOf(r.status) !== -1 && !taigaLink(r);
       }).length,
       byStatus: byStatus,
     };
