@@ -738,7 +738,7 @@
       return html;
     }
 
-    var ACTION_TEXT = { CREATE: 'เพิ่มรายการ', UPDATE: 'แก้ไข', DELETE: 'ลบรายการ', RESTORE: 'กู้คืนรายการ' };
+    var ACTION_TEXT = { CREATE: 'เพิ่มรายการ', UPDATE: 'แก้ไข', DELETE: 'ลบรายการ', RESTORE: 'กู้คืนรายการ', TAIGA_PUSH: 'ส่งไป Taiga' };
 
     /** Who changed what on this item (loaded on demand from _app_log). */
     function historyPanel(state, row) {
@@ -749,8 +749,8 @@
       else if (!h.list.length) body = '<p class="muted">ยังไม่มีประวัติในแอป (รายการที่แก้ในชีตโดยตรงจะไม่มีประวัติ)</p>';
       else {
         body = '<ol class="hist">' + h.list.map(function (e) {
-          var what = e.action === 'UPDATE' || e.action === 'CREATE'
-            ? '<strong>' + esc(e.column) + '</strong>' + (e.action === 'UPDATE' ? ': <span class="hist-from">' + esc(e.from || '(ว่าง)') + '</span> → ' : ': ') + '<span class="hist-to">' + esc(e.to || '(ว่าง)') + '</span>'
+          var what = e.action === 'UPDATE' || e.action === 'CREATE' || e.action === 'TAIGA_PUSH'
+            ? '<strong>' + esc(e.column) + '</strong>' + (e.action !== 'CREATE' ? ': <span class="hist-from">' + esc(e.from || '(ว่าง)') + '</span> → ' : ': ') + '<span class="hist-to">' + esc(e.to || '(ว่าง)') + '</span>'
             : '<strong>' + esc(ACTION_TEXT[e.action] || e.action) + '</strong>';
           return '<li><span class="hist-time num">' + esc(e.time) + '</span><span class="hist-who">' + esc(e.who) + '</span><span class="hist-what">' + (e.action === 'UPDATE' ? '' : esc(ACTION_TEXT[e.action] || '') + ' ') + what + '</span></li>';
         }).join('') + '</ol>';
@@ -923,15 +923,23 @@
       var html = '<td class="tg-taiga"><span class="tg-cap">ใน Taiga: </span><strong>' + esc(t.status || '–') + '</strong>' + (who ? '<div class="muted tg-who">' + esc(who) + '</div>' : '');
       if (c.state === 'match') html += '<div class="tg-sync tg-sync-match">✓ ตรงกัน</div>';
       else if (c.state === 'deleted') html += '<div class="tg-sync tg-sync-deleted">ถูกลบใน Taiga</div>';
-      else if (c.state === 'unmapped') html += '<div class="tg-sync tg-sync-unmapped">ยังไม่จับคู่สถานะ</div>';
+      else if (c.state === 'unmapped') html += '<div class="tg-sync tg-sync-unmapped">ยังไม่จับคู่สถานะ</div>' + tgPushButton(state, r, c);
       else {
         html += '<div class="tg-sync tg-sync-diff">⚠ ควรเป็น ' + esc(D.statusLabel(c.expected)) + '</div>';
         if (c.duplicate) html += '<div class="muted tg-who">ลิงก์ Taiga นี้อยู่หลายรายการ ปรับเองทีละรายการ</div>';
         else if (c.canApply && state.user.canEdit && state.schema.ok) {
           html += '<button type="button" class="btn small" data-action="tg-apply" data-id="' + esc(r.id) + '" aria-label="ปรับตาม Taiga รายการ #' + esc(r.seq) + '">ปรับตาม Taiga</button>';
         }
+        html += tgPushButton(state, r, c);
       }
       return html + '</td>';
+    }
+
+    /** The other direction: send the sheet status to Taiga (user request 2026-11-25). */
+    function tgPushButton(state, r, c) {
+      var host = state.taiga.host;
+      if (!c.pushTo || !state.user.canEdit || !state.schema.ok || !host || D.taigaKey(D.taigaLink(r)).split('/')[0] !== host) return '';
+      return '<button type="button" class="btn small" data-action="tg-push" data-id="' + esc(r.id) + '" aria-label="ปรับ Taiga ตามชีต รายการ #' + esc(r.seq) + '">ปรับ Taiga ตามชีต</button>';
     }
 
     /** Admins pair Taiga statuses with app statuses, then the sheet statuses left over. Saving a pair changes no item. */
@@ -983,7 +991,9 @@
         groups: [{ label: 'เทียบกับ Taiga', options: TG_SYNC.map(function (x) { return { value: x[0], label: x[1] }; }) }] }) : '';
 
       var html = '<div class="page-head"><h1>ทะเบียน Taiga</h1><span class="muted">ความคืบหน้าของงานที่มีลิงก์ Taiga หรืออยู่ในขั้นตอน Taiga</span>' +
-        '<span class="spacer"></span><button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button>' +
+        '<span class="spacer"></span>' +
+        (hasTaiga && state.taiga.host && TaigaApi.loggedIn(state.taiga.host) ? '<button class="btn small" data-action="tg-logout">ออกจาก Taiga (' + esc(TaigaApi.name()) + ')</button>' : '') +
+        '<button class="btn small" data-action="reload">โหลดข้อมูลใหม่</button>' +
         '<button class="btn small primary" data-action="tg-export"' + (rep.total ? '' : ' disabled') + '>' + UI.withIcon('download', 'Export CSV (Excel)') + '</button></div>';
       html += '<form class="filters dr-filters" id="tg-form" aria-label="ตัวเลือกทะเบียน Taiga">' + scopeSel + platformSel + pmSel + syncSel + search + '</form>';
       // the warnings share the summary line: full-width banners took too many lines (user request 2026-11-25)

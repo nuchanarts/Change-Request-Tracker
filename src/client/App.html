@@ -872,6 +872,110 @@
         'Taiga: "' + c.taiga.status + '" · สถานะจะเปลี่ยนจาก "' + (row.status ? D.statusLabel(row.status) : 'ว่าง') + '" เป็น "' + D.statusLabel(c.expected) + '"' + close + skips,
         'ปรับสถานะ').then(function (yes) { if (yes) moveStatus(id, c.expected); });
     }
+    /** Log in to Taiga with the person's own account; resolves true once logged in, false when cancelled. */
+    function taigaLogin(host) {
+      return new Promise(function (resolve) {
+        var dlg = document.getElementById('dialog');
+        var done = false;
+        dlg.className = '';
+        dlg.innerHTML = '<form id="tg-login"><h2>เข้าสู่ระบบ Taiga</h2>' +
+          '<p class="muted">ใช้บัญชี Taiga ของคุณเอง รหัสผ่านส่งตรงไปที่ ' + UI.esc(host) + ' แอปไม่เก็บรหัสผ่าน และจำการเข้าสู่ระบบเฉพาะแท็บนี้</p>' +
+          '<div class="field"><label for="tg-user">ชื่อผู้ใช้ Taiga</label><input id="tg-user" name="username" type="text" autocomplete="username" required /></div>' +
+          '<div class="field"><label for="tg-pass">รหัสผ่าน Taiga</label><input id="tg-pass" name="password" type="password" autocomplete="current-password" required /></div>' +
+          '<p class="err" role="alert" id="tg-login-err"></p>' +
+          '<div class="dialog-actions"><button type="button" class="btn" id="tg-login-no">ยกเลิก</button><button type="submit" class="btn primary">เข้าสู่ระบบ</button></div></form>';
+        var form = document.getElementById('tg-login');
+        document.getElementById('tg-login-no').addEventListener('click', function () { dlg.close(); });
+        form.addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          var btn = form.querySelector('[type="submit"]');
+          btn.disabled = true;
+          TaigaApi.login(host, form.elements.username.value.trim(), form.elements.password.value).then(function () {
+            done = true;
+            form.reset();
+            dlg.close();
+          }, function (e) {
+            btn.disabled = false;
+            document.getElementById('tg-login-err').textContent = e.message;
+            form.elements.password.value = '';
+            form.elements.password.focus();
+          });
+        });
+        dlg.addEventListener('close', function onClose() {
+          dlg.removeEventListener('close', onClose);
+          dlg.innerHTML = '';
+          // closed while Taiga was still answering: the person cancelled
+          if (!done) TaigaApi.logout();
+          resolve(done);
+        });
+        dlg.showModal();
+      });
+    }
+
+    var tgPushing = false;
+    /** "ปรับ Taiga ตามชีต": a person confirms every item; Taiga's version check stops overwriting newer changes. */
+    function pushTaiga(id) {
+      var row = state.byId[id];
+      var c = row && Views.tgCompare(state, row);
+      if (!c || !c.pushTo || tgPushing) return;
+      var host = state.taiga.host;
+      var key = D.taigaKey(D.taigaLink(row));
+      if (!key || key.split('/')[0] !== host) return;
+      var seen = c.taiga.status;
+      var cancelled = { code: 'CANCELLED' };
+      tgPushing = true;
+      function needLogin() {
+        if (TaigaApi.loggedIn(host)) return Promise.resolve();
+        return taigaLogin(host).then(function (yes) { if (!yes) throw cancelled; });
+      }
+      function settle(status) {
+        // the register shows it at once; the bot's log catches up later
+        state.taiga.latest[key] = { status: status, from: item.status, by: TaigaApi.name(), at: Date.now(), deleted: false };
+      }
+      var item, target;
+      needLogin().then(function () {
+        return TaigaApi.load(key).catch(function (e) {
+          if (e.code !== 'AUTH') throw e;
+          TaigaApi.logout(); // expired: log in once more
+          return needLogin().then(function () { return TaigaApi.load(key); });
+        });
+      }).then(function (res) {
+        item = res;
+        if (D.taigaName(item.status) === D.taigaName(c.pushTo)) {
+          state.taiga.latest[key] = Object.assign({}, c.taiga, { status: item.status });
+          throw { code: 'SAME', message: 'Taiga อยู่ที่ "' + item.status + '" อยู่แล้ว' };
+        }
+        target = item.statuses.filter(function (s) { return D.taigaName(s.name) === D.taigaName(c.pushTo); })[0];
+        if (!target) throw { code: 'NO_STATUS', message: 'โปรเจกต์นี้ใน Taiga ไม่มีสถานะ "' + c.pushTo + '" ตรวจการจับคู่สถานะอีกครั้ง' };
+        return UI.confirm('ปรับ Taiga รายการ #' + row.seq + ' ตามสถานะในชีต?',
+          'ชีต: "' + D.statusLabel(row.status) + '" · Taiga จะเปลี่ยนจาก "' + item.status + '" เป็น "' + target.name + '" ในชื่อ ' + TaigaApi.name() +
+          (D.taigaName(item.status) !== D.taigaName(seen) ? ' ⚠ Taiga เปลี่ยนจากที่แสดงในทะเบียน ("' + seen + '") แล้ว' : '') +
+          (target.is_closed ? ' สถานะนี้ปิดงานใน Taiga' : ''), 'ส่งไป Taiga');
+      }).then(function (yes) {
+        if (!yes) throw cancelled;
+        return api('Api_taigaPushCheck', { rowNumber: row.rowNumber, seq: row.seq, status: row.raw.status });
+      }).then(function (res) {
+        if (!res.ok) throw res;
+        return TaigaApi.saveStatus(item, target.id).catch(function (e) {
+          if (e.code === 'AUTH') TaigaApi.logout();
+          if (e.code === 'NETWORK') throw { code: e.code, message: 'ไม่แน่ใจว่า Taiga ได้รับหรือไม่ กรุณาเปิดดูใน Taiga' };
+          throw e;
+        });
+      }).then(function () {
+        settle(target.name);
+        return api('Api_logTaigaPush', { rowNumber: row.rowNumber, seq: row.seq, from: item.status, to: target.name });
+      }).then(function (res) {
+        if (res.ok) UI.toast('ปรับ Taiga รายการ #' + row.seq + ' เป็น "' + target.name + '" แล้ว');
+        else UI.toast('ปรับ Taiga แล้ว แต่บันทึกประวัติในแอปไม่สำเร็จ', 'error');
+      }).catch(function (e) {
+        if (e.code === 'CANCELLED') return;
+        UI.toast(e.message || 'ส่งไป Taiga ไม่สำเร็จ', e.code === 'SAME' ? undefined : 'error');
+      }).then(function () {
+        tgPushing = false;
+        if (route().name === 'taiga') renderTaiga();
+      });
+    }
     function exportTaiga() {
       var rep = Views.tgReport(state);
       var blob = new Blob(['\ufeff' + D.taigaRegisterCsv(rep.rows)], { type: 'text/csv;charset=utf-8' });
@@ -1146,6 +1250,8 @@
       'tg-export': exportTaiga,
       'tg-review': function () { state.tg.review = !state.tg.review; renderTaiga(); },
       'tg-apply': function (el) { applyTaiga(el.getAttribute('data-id')); },
+      'tg-push': function (el) { pushTaiga(el.getAttribute('data-id')); },
+      'tg-logout': function () { TaigaApi.logout(); renderTaiga(); },
       'pick-skin': function (el) {
         var id = applySkin(el.getAttribute('data-skin'));
         store(SKIN_KEY, id);

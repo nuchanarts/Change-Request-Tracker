@@ -269,8 +269,136 @@ test('both warnings are small chips on the summary line, not full-width banners 
     expect(Math.abs((await mid('#tg-review-btn')) - line)).toBeLessThan(8);
     expect(Math.abs((await mid('#tg-nolink')) - line)).toBeLessThan(8);
   }
-  await page.locator('#tg-nolink .tip').focus(); // the explanation stays on the screen
+  await expect(async () => {
+    await page.locator('#tg-nolink .tip').focus(); // a late re-render may take the focus away
+    await expect(page.locator('#tg-nolink .tip-body')).toBeVisible({ timeout: 300 });
+  }).toPass();
   const tip = await page.locator('#tg-nolink .tip-body').boundingBox();
   expect(tip.x).toBeGreaterThanOrEqual(0);
   expect(tip.x + tip.width).toBeLessThanOrEqual(page.viewportSize().width);
+});
+
+// "ปรับ Taiga ตามชีต" (user request 2026-11-25). The mock answers for Taiga; nothing leaves the browser.
+const pushButton = (page, seq) => rowOf(page, seq).getByRole('button', { name: /ปรับ Taiga ตามชีต/ });
+const dialog = (page) => page.locator('#dialog');
+const login = async (page, word = 'mock') => {
+  await page.getByLabel('ชื่อผู้ใช้ Taiga').fill('someone');
+  await page.getByLabel('รหัสผ่าน Taiga').fill(word);
+  await dialog(page).getByRole('button', { name: 'เข้าสู่ระบบ' }).click();
+};
+const taigaOf = (page, n) => page.evaluate((k) => window.__taiga.items['sync/us/' + k].status, n);
+const patches = (page) =>
+  page.evaluate(() => window.__taiga.calls.filter((c) => c.method === 'PATCH').length);
+
+test('"ปรับ Taiga ตามชีต" logs in, asks, then changes Taiga only and logs it', async ({ page }) => {
+  const [a] = await setup(page);
+  await expect(pushButton(page, a)).toBeVisible();
+  await pushButton(page, a).click();
+  await login(page);
+  await expect(dialog(page)).toContainText('ตามสถานะในชีต');
+  await expect(dialog(page)).toContainText('"In progress"');
+  await expect(dialog(page)).toContainText('"Ready for DEV"');
+  expect(await patches(page)).toBe(0);
+  await dialog(page).getByRole('button', { name: 'ส่งไป Taiga' }).click();
+  await expect(page.locator('.toast')).toContainText('Ready for DEV');
+  await expect(rowOf(page, a).locator('.tg-sync-match')).toBeVisible();
+  expect(await taigaOf(page, 1)).toBe('Ready for DEV');
+  expect(await page.evaluate(() => window.__mockLog.length)).toBe(0); // the sheet did not change
+  expect(await page.evaluate(() => window.__taigaLog.map((e) => [e.from, e.to]))).toEqual([
+    ['In progress', 'Ready for DEV'],
+  ]);
+  const stored = await page.evaluate(() => JSON.stringify([{ ...localStorage }, { ...sessionStorage }]));
+  expect(stored).not.toContain('"mock"'); // the password is never stored
+});
+
+test('cancelling the login or the question sends nothing', async ({ page }) => {
+  const [a] = await setup(page);
+  await pushButton(page, a).click();
+  await expect(page.getByLabel('รหัสผ่าน Taiga')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog(page)).toBeHidden();
+  await pushButton(page, a).click();
+  await login(page);
+  await expect(dialog(page)).toContainText('ตามสถานะในชีต');
+  await page.keyboard.press('Escape');
+  await expect(dialog(page)).toBeHidden();
+  await page.waitForTimeout(400);
+  expect(await patches(page)).toBe(0);
+});
+
+test('a wrong password stays in the login; a second item needs no new login; logout forgets it', async ({
+  page,
+}) => {
+  const [a, , c] = await setup(page);
+  await pushButton(page, a).click();
+  await login(page, 'wrong');
+  await expect(dialog(page).getByRole('alert')).toContainText('ไม่ถูกต้อง');
+  await login(page);
+  await dialog(page).getByRole('button', { name: 'ส่งไป Taiga' }).click();
+  await expect(rowOf(page, a).locator('.tg-sync-match')).toBeVisible();
+  await pushButton(page, c).click(); // "Strange" is not paired, but the sheet status is
+  await dialog(page).getByRole('button', { name: 'ส่งไป Taiga' }).click();
+  await expect(rowOf(page, c).locator('.tg-sync-match')).toBeVisible();
+  await page.getByRole('button', { name: /ออกจาก Taiga/ }).click();
+  await expect(page.getByRole('button', { name: /ออกจาก Taiga/ })).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage }))).not.toContain('mock-token');
+});
+
+test('never overwrites: someone changed Taiga after the question, or the sheet before sending', async ({
+  page,
+}) => {
+  const [a] = await setup(page);
+  await pushButton(page, a).click();
+  await login(page);
+  await expect(dialog(page)).toContainText('ตามสถานะในชีต');
+  await page.evaluate(() => {
+    Object.assign(window.__taiga.items['sync/us/1'], { status: 'Done', version: 9 });
+  });
+  await dialog(page).getByRole('button', { name: 'ส่งไป Taiga' }).click();
+  await expect(page.locator('.toast')).toContainText('มีคนแก้รายการนี้ใน Taiga');
+  expect(await taigaOf(page, 1)).toBe('Done');
+
+  await page.evaluate((s) => window.__mockSheet.edit(s, 'status', 'กำลังทดสอบ'), a);
+  await pushButton(page, a).click();
+  await dialog(page).getByRole('button', { name: 'ส่งไป Taiga' }).click();
+  await expect(page.locator('.toast').last()).toContainText('มีคนแก้ไขรายการนี้ไปก่อน');
+  expect(await taigaOf(page, 1)).toBe('Done');
+  expect(await page.evaluate(() => window.__taigaLog.length)).toBe(0);
+});
+
+test('says so when Taiga is already there, lacks the status, or refuses', async ({ page }) => {
+  const [a] = await setup(page);
+  await page.evaluate(() => (window.__taiga.items['sync/us/1'].status = 'Ready for DEV'));
+  await pushButton(page, a).click();
+  await login(page);
+  await expect(page.locator('.toast').last()).toContainText('อยู่ที่ "Ready for DEV" อยู่แล้ว');
+  await expect(rowOf(page, a).locator('.tg-sync-match')).toBeVisible();
+  await page.evaluate(() => {
+    window.__taiga.statuses = window.__taiga.statuses.filter((s) => s !== 'Ready for DEV');
+  });
+  await reload(page);
+  await expect(pushButton(page, a)).toBeVisible();
+  await page.evaluate(() => (window.__taiga.items['sync/us/1'].status = 'In progress'));
+  await pushButton(page, a).click();
+  await expect(page.locator('.toast').last()).toContainText('ไม่มีสถานะ "Ready for DEV"');
+  await page.evaluate(() => (window.__taiga.denied = true));
+  await pushButton(page, a).click();
+  await expect(page.locator('.toast').last()).toContainText('ไม่มีสิทธิ์');
+  expect(await patches(page)).toBe(0);
+});
+
+test('an expired Taiga login asks to log in again', async ({ page }) => {
+  const [a] = await setup(page);
+  await pushButton(page, a).click();
+  await login(page);
+  await expect(dialog(page)).toContainText('ตามสถานะในชีต');
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => (window.__taiga.token = 'another'));
+  await pushButton(page, a).click();
+  await expect(page.getByLabel('รหัสผ่าน Taiga')).toBeVisible();
+});
+
+test('view-only people get no button to change Taiga', async ({ page }) => {
+  await setup(page, { query: '?viewer=1' });
+  await expect(page.getByRole('button', { name: /ปรับ Taiga ตามชีต/ })).toHaveCount(0);
 });

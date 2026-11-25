@@ -114,4 +114,5 @@ The function returns `Index.html` evaluated as a template, with the title `à¸•à¸
 - `Api_taiga`: `{ available, latest: { [key]: { status, from, by, at, deleted } }, statuses, map, appMap }`. Reads only.
 - `Api_saveTaigaMap`: admins only (`NOT_ADMIN`). `app` = a workflow status or '' to clear. Runs in the lock and is logged. Changes no item.
 - `Api_saveStatusTaiga({ app, taiga })` (2026-11-25): admins only (`NOT_ADMIN`). `app` = a workflow status; `taiga` = a Taiga status the app knows, or '' to clear. Runs in the lock and is logged. Changes no item and sends nothing to Taiga.
+- `Api_taigaPushCheck({ rowNumber, seq, status })` / `Api_logTaigaPush({ rowNumber, seq, from, to })` (2026-11-25): editors only. The browser, not the server, sends the status to Taiga with the person's own login; the server checks the row right before and writes `TAIGA_PUSH` to `_app_log` after. `Api_taiga` also returns `host`, the only Taiga site allowed.
 - A status is changed from Taiga only when a person confirms it, through `Api_updateRequest`.
