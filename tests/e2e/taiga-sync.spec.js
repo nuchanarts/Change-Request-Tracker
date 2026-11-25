@@ -444,3 +444,84 @@ test('the login remembers the username only, and only while the box is ticked (2
   await expect(user).toHaveValue('');
   await expect(keep).not.toBeChecked();
 });
+
+// The tick next to "สถานะ" on the item form (user request 2026-11-25).
+const FORM_MAP = { ...MAP, 'Ready for test': 'กำลังทดสอบ' };
+const openItem = async (page, seq) => {
+  await page.goto('/#/items/' + seq);
+  await expect(page.locator('#item-form')).toBeVisible();
+};
+const tick = (page) => page.getByLabel('ปรับ Taiga ตามสถานะนี้เมื่อบันทึก');
+const sheetStatus = (page, seq) =>
+  page.evaluate((s) => window.__mockSheet.rows.find((r) => r.seq === s).status, seq);
+
+test('form tick: saving the status also sends it to Taiga after a person confirms', async ({ page }) => {
+  const [a] = await setup(page, { map: FORM_MAP });
+  await openItem(page, a);
+  await expect(tick(page)).not.toBeChecked(); // nothing is sent unless the person ticks it
+  await page.locator('#f-status').selectOption('กำลังทดสอบ');
+  await expect(page.locator('#tg-form-sync')).toContainText('Ready for test');
+  await tick(page).check();
+  await page.locator('#save-btn').click();
+  await login(page);
+  await expect(dialog(page)).toContainText('ตามสถานะในชีต');
+  expect(await sheetStatus(page, a)).toBe('กำลังทดสอบ'); // the sheet is saved first
+  expect(await patches(page)).toBe(0);
+  await dialog(page).getByRole('button', { name: 'ส่งไป Taiga' }).click();
+  await expect(page).toHaveURL(/#\/taiga$/);
+  expect(await taigaOf(page, 1)).toBe('Ready for test');
+  await expect(rowOf(page, a).locator('.tg-taiga')).toContainText('Ready for test'); // not the older log
+  await openItem(page, a);
+  await expect(tick(page)).toBeChecked(); // remembered
+  await page.locator('#save-btn').click(); // no change in the sheet: only checks Taiga
+  await expect(page.locator('.toast').last()).toContainText('อยู่แล้ว');
+  expect(await patches(page)).toBe(1);
+});
+
+test('form tick: without the tick Taiga is not called; cancelling keeps the sheet save', async ({ page }) => {
+  const [a] = await setup(page, { map: FORM_MAP });
+  await openItem(page, a);
+  await page.locator('#f-status').selectOption('กำลังทดสอบ');
+  await expect(tick(page)).toBeVisible();
+  await page.locator('#save-btn').click();
+  await expect(page).toHaveURL(/#\/taiga$/);
+  expect(await page.evaluate(() => window.__taiga.calls.length)).toBe(0);
+  await openItem(page, a);
+  await page.locator('#f-status').selectOption('ส่งกลับนักพัฒนาแก้ไข');
+  await tick(page).check();
+  await page.locator('#save-btn').click();
+  await expect(page.getByLabel('รหัสผ่าน Taiga')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.toast').last()).toContainText('ยังไม่ได้ปรับ Taiga');
+  expect(await sheetStatus(page, a)).toBe('ส่งกลับนักพัฒนาแก้ไข');
+  expect(await patches(page)).toBe(0);
+});
+
+test('form tick: says why it cannot send, keeps typed text, and passes axe', async ({ page }) => {
+  const [a] = await setup(page, { map: FORM_MAP });
+  await openItem(page, a);
+  await page.locator('#f-detail').fill('ข้อความที่กำลังพิมพ์');
+  await page.locator('#f-status').selectOption('dev ขอ Sourecode อจ.');
+  await expect(tick(page)).toBeDisabled();
+  await expect(page.locator('#tg-form-sync')).toContainText('ยังไม่จับคู่');
+  await page.locator('#f-ticket').fill('12345');
+  await expect(tick(page)).toHaveCount(0);
+  await page.locator('#f-ticket').fill('https://taiga.example/project/sync/us/2');
+  await expect(page.locator('#tg-form-sync')).toContainText('ลิงก์ Taiga นี้'); // used by another item
+  await expect(page.locator('#f-detail')).toHaveValue('ข้อความที่กำลังพิมพ์');
+  const axe = await new AxeBuilder({ page }).include('#tg-form-sync').analyze();
+  expect(axe.violations).toEqual([]);
+});
+
+test('form tick: hidden for an item without a Taiga link', async ({ page }) => {
+  await setup(page, { map: FORM_MAP });
+  const seq = await page.evaluate(
+    () =>
+      window.__mockSheet.rows.find(
+        (r) => /^\d+$/.test(r.seq) && r.detail && !/taiga/i.test(r.ticket) && !(r.ticketLinks || []).length,
+      ).seq,
+  );
+  await openItem(page, seq);
+  await page.waitForTimeout(500);
+  await expect(tick(page)).toHaveCount(0);
+});

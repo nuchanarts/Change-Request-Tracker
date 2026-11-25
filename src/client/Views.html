@@ -415,7 +415,8 @@
       var opts = state.options;
       if (col.type === 'option') return UI.select(Object.assign(o, { options: opts[key] }));
       if (col.type === 'status') {
-        return UI.select(Object.assign(o, { options: D.WORKFLOW, groups: UI.statusGroups(), allowEmpty: false, hint: 'เรียงตามขั้นตอนงานจริง เลือกขั้นถัดไปเมื่องานคืบหน้า' }));
+        return UI.select(Object.assign(o, { options: D.WORKFLOW, groups: UI.statusGroups(), allowEmpty: false, hint: 'เรียงตามขั้นตอนงานจริง เลือกขั้นถัดไปเมื่องานคืบหน้า' }))
+          .replace(/<\/div>$/, readOnly ? '</div>' : '<div id="tg-form-sync"></div></div>'); // filled by App refreshFormSync()
       }
       if (key === 'pm') return UI.multiPick(Object.assign(o, { options: opts.pm }));
       if (col.type === 'person') return UI.select(Object.assign(o, { options: key === 'pm' ? opts.pm : opts.developer, emptyLabel: key === 'developer' ? '— ยังไม่มอบหมาย —' : undefined }));
@@ -473,6 +474,22 @@
       if (row) html += '<p class="muted" style="margin-top:12px;font-size:13px">แถวที่ ' + row.rowNumber + ' ในชีต ระบบจะบันทึกเฉพาะช่องที่คุณแก้ และเก็บประวัติไว้ในชีต _app_log</p>';
       if (row && row.seq !== null) html += historyPanel(state, row);
       return html;
+    }
+
+    var SYNC_WHY = {
+      unmapped: 'สถานะนี้ยังไม่จับคู่กับ Taiga จึงส่งไม่ได้ (ผู้ดูแลจับคู่ได้ที่หน้าทะเบียน Taiga)',
+      duplicate: 'ลิงก์ Taiga นี้ใช้กับหลายรายการ จึงไม่ปรับให้อัตโนมัติ',
+      deleted: 'รายการนี้ถูกลบใน Taiga แล้ว',
+    };
+    /** "ปรับ Taiga ตามสถานะนี้เมื่อบันทึก" next to the status. @param {any} s Domain.taigaFormSync() */
+    function tgFormSync(s, checked) {
+      if (!s.show) return '';
+      var can = !s.reason;
+      var text = !can ? SYNC_WHY[s.reason]
+        : s.match ? 'Taiga อยู่ที่ "' + s.now + '" ตรงกันแล้ว'
+        : 'Taiga จะเปลี่ยน' + (s.now ? 'จาก "' + s.now + '" ' : '') + 'เป็น "' + s.target + '" ระบบจะถามยืนยันก่อนส่ง';
+      return '<label class="tg-keep"><input type="checkbox" id="f-taiga-sync" aria-describedby="tg-form-why"' + (can && checked ? ' checked' : '') + (can ? '' : ' disabled') + ' /> ปรับ Taiga ตามสถานะนี้เมื่อบันทึก</label>' +
+        '<div class="hint" id="tg-form-why">' + esc(text) + '</div>';
     }
 
     function defaults(state) {
@@ -1210,6 +1227,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, taigaRegister: taigaRegister, tgReport: tgReport, tgReview: tgReview, tgCompare: tgCompare, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, taigaRegister: taigaRegister, tgReport: tgReport, tgReview: tgReview, tgCompare: tgCompare, tgFormSync: tgFormSync, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>

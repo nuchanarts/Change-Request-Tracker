@@ -303,3 +303,59 @@ describe('sending the sheet status to Taiga: which Taiga status (user, 2026-11-2
     expect(D.taigaCompare(r, gone, base, {}, {}).pushTo).toBe('');
   });
 });
+
+// The tick next to the status on the item form (user request 2026-11-25).
+describe('taigaFormSync', () => {
+  const HOST = 'taiga.hosxp.net';
+  const map = { 'In progress': 'กำลังพัฒนา', Ready: 'รอทีมพัฒนา', A: 'กำลังทดสอบ', B: 'กำลังทดสอบ' };
+  const ask = (o = {}) =>
+    D.taigaFormSync({
+      item: { id: '1', seq: 1, status: 'กำลังพัฒนา', ticketLinks: [URL], ticketUrl: null, ...o.item },
+      rows: o.rows || [row(1)],
+      host: 'host' in o ? o.host : HOST,
+      latest: o.latest || {},
+      map,
+      appMap: o.appMap || {},
+    });
+
+  it('says which Taiga status the sheet status sends, even before the bot logged the item', () => {
+    expect(ask()).toEqual({ show: true, target: 'In progress', now: '', match: false, reason: '' });
+    expect(ask({ latest: { [KEY]: { status: 'Ready', deleted: false } } }).now).toBe('Ready');
+  });
+  it('knows when Taiga already matches, also when several Taiga statuses mean the same', () => {
+    expect(ask({ latest: { [KEY]: { status: 'In progress' } } }).match).toBe(true);
+    const b = ask({ item: { status: 'กำลังทดสอบ' }, latest: { [KEY]: { status: 'B' } } });
+    expect(b).toMatchObject({ match: true, reason: '' });
+  });
+  it('explains why nothing can be sent', () => {
+    expect(ask({ item: { status: 'กำลังทดสอบ' } }).reason).toBe('unmapped');
+    expect(ask({ item: { status: 'กำลังทดสอบ' }, appMap: { กำลังทดสอบ: 'B' } })).toMatchObject({
+      target: 'B',
+      reason: '',
+    });
+    expect(ask({ rows: [row(1), row(2)] }).reason).toBe('duplicate');
+    expect(ask({ latest: { [KEY]: { status: 'Ready', deleted: true } } }).reason).toBe('deleted');
+  });
+  it('is hidden without a Taiga item link on the allowed site', () => {
+    expect(ask({ item: { ticketLinks: [], ticketUrl: null } }).show).toBe(false);
+    expect(ask({ host: 'other.example' }).show).toBe(false);
+    expect(ask({ host: undefined }).show).toBe(false);
+  });
+  it('a new item counts every row with the same link as another one', () => {
+    expect(ask({ item: { id: null }, rows: [row(5)] }).reason).toBe('duplicate');
+    expect(ask({ item: { id: null }, rows: [] }).reason).toBe('');
+  });
+});
+
+describe('taigaWithSent', () => {
+  const sent = { [KEY]: { status: 'Done', at: 2000 } };
+  it('shows what was just sent until the bot logs something newer', () => {
+    expect(D.taigaWithSent({ [KEY]: { status: 'New', at: 1000 } }, sent, 2500)[KEY].status).toBe('Done');
+    expect(D.taigaWithSent({}, sent, 2500)[KEY].status).toBe('Done');
+    expect(D.taigaWithSent({ [KEY]: { status: 'Ready', at: 2100 } }, sent, 2500)[KEY].status).toBe('Ready');
+  });
+  it('forgets it after ten minutes', () => {
+    const late = 2000 + 10 * 60000 + 1;
+    expect(D.taigaWithSent({ [KEY]: { status: 'New', at: 1000 } }, sent, late)[KEY].status).toBe('New');
+  });
+});

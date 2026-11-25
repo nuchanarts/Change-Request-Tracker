@@ -1634,6 +1634,46 @@ var Domain = (function () {
     return out;
   }
 
+  /**
+   * The tick next to the status on the item form: what saving would send to Taiga, or why it cannot.
+   * @param {{item:any, rows:any[], host:any, latest:any, map:any, appMap:any}} o item = what the form shows now
+   */
+  function taigaFormSync(o) {
+    var key = taigaKey(taigaLink(o.item));
+    var out = { show: false, target: '', now: '', match: false, reason: '' };
+    if (!key || !o.host || key.split('/')[0] !== o.host) return out;
+    out.show = true;
+    var others = o.rows.filter(function (r) {
+      return r.id !== o.item.id && taigaKey(taigaLink(r)) === key;
+    }).length;
+    /** @type {Object<string, number>} */
+    var counts = {};
+    counts[key] = others + 1;
+    var cmp = taigaCompare(o.item, o.latest, o.map, counts, o.appMap);
+    out.now = cmp.taiga ? cmp.taiga.status : '';
+    out.match = cmp.state === 'match';
+    out.target = statusTaigaTarget(o.item.status, o.map, o.appMap || {});
+    if (others) out.reason = 'duplicate';
+    else if (cmp.state === 'deleted') out.reason = 'deleted';
+    else if (!out.target && !out.match) out.reason = 'unmapped';
+    return out;
+  }
+
+  var SENT_KEEP_MS = 10 * 60000;
+  /**
+   * The bot's log runs a little behind: keep showing what was just sent until it logs something newer.
+   * @param {any} latest taigaLatest() @param {any} sent the same shape @param {number} now ms
+   */
+  function taigaWithSent(latest, sent, now) {
+    var out = Object.assign({}, latest);
+    Object.keys(sent).forEach(function (key) {
+      var logged = out[key];
+      if (now - sent[key].at > SENT_KEEP_MS || (logged && logged.at > sent[key].at)) return;
+      out[key] = sent[key];
+    });
+    return out;
+  }
+
   // The PM has not passed the Taiga item: exactly these two sheet statuses (user, 2026-11-24).
   var WAIT_PM = [PM_REVIEW, PM_RETURN];
   // Development has begun: from กำลังพัฒนา to the compile steps, and done.
@@ -1998,6 +2038,8 @@ var Domain = (function () {
     taigaLatest: taigaLatest,
     taigaKeyCounts: taigaKeyCounts,
     taigaCompare: taigaCompare,
+    taigaFormSync: taigaFormSync,
+    taigaWithSent: taigaWithSent,
     DEV_STEPS: DEV_STEPS,
     devBeforeReview: devBeforeReview,
     TAIGA_STEPS: TAIGA_STEPS,
