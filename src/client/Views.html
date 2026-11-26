@@ -1055,7 +1055,6 @@
         '<div class="export-opts"><div class="field"><label for="daily-date">วันที่ปฏิบัติงาน</label>' +
         '<input type="date" id="daily-date" value="' + esc(D.toIso(day)) + '" max="' + esc(D.toIso(state.today)) + '" /></div></div>' +
         '<label class="sr-only" for="daily-text">ข้อความรายงานประจำวัน</label><textarea id="daily-text" class="export-text"></textarea>' +
-        '<p class="hint" style="margin:6px 0 0">การแก้ที่พิมพ์ลงชีตโดยตรงจะไม่อยู่ในรายละเอียดรายวัน เพราะไม่มีประวัติใน _app_log แต่งานที่ปิดจะนับจากวันที่เสร็จ</p>' +
         // the app sends nothing to BMS Life: it copies the text and opens the page; the person pastes it (2026-11-26)
         '<div class="daily-blog"><a class="btn blog-btn" href="' + BLOG_URL + '" target="_blank" rel="noopener" data-action="daily-blog">' +
         UI.withIcon('copy', 'คัดลอกแล้วเปิด BMS Life Blog') + ' <span aria-hidden="true">↗</span></a>' +
