@@ -1047,6 +1047,7 @@
         '<button class="btn primary" data-action="export-copy">' + UI.withIcon('copy', 'คัดลอกข้อความ') + '</button></div>';
     }
 
+    var BLOG_URL = 'https://bmslife.bmscloud.in.th/#/blog';
     /** "สรุปรายงานประจำวัน": pick a day; App fills #daily-text from Api_activity (2026-11-26). */
     function dailyDialog(state, day) {
       return '<h2>สรุปรายงานประจำวัน</h2>' +
@@ -1055,6 +1056,10 @@
         '<input type="date" id="daily-date" value="' + esc(D.toIso(day)) + '" max="' + esc(D.toIso(state.today)) + '" /></div></div>' +
         '<label class="sr-only" for="daily-text">ข้อความรายงานประจำวัน</label><textarea id="daily-text" class="export-text"></textarea>' +
         '<p class="hint" style="margin:6px 0 0">การแก้ที่พิมพ์ลงชีตโดยตรงจะไม่อยู่ในรายละเอียดรายวัน เพราะไม่มีประวัติใน _app_log แต่งานที่ปิดจะนับจากวันที่เสร็จ</p>' +
+        // the app sends nothing to BMS Life: it copies the text and opens the page; the person pastes it (2026-11-26)
+        '<div class="daily-blog"><a class="btn blog-btn" href="' + BLOG_URL + '" target="_blank" rel="noopener" data-action="daily-blog">' +
+        UI.withIcon('copy', 'คัดลอกแล้วเปิด BMS Life Blog') + ' <span aria-hidden="true">↗</span></a>' +
+        '<span class="hint">แล้วกดปุ่ม "เขียน blog วันนี้" ที่มุมขวาล่างของหน้านั้น วางข้อความได้เลย (Ctrl+V)</span></div>' +
         '<div class="dialog-actions"><button class="btn" value="close" data-action="export-close">ปิด</button>' +
         '<button type="button" class="btn" data-action="daily-download">' + UI.withIcon('download', 'ดาวน์โหลด .txt') + '</button>' +
         '<button type="button" class="btn primary" data-action="daily-copy">' + UI.withIcon('copy', 'คัดลอกข้อความ') + '</button></div>';

@@ -37,6 +37,18 @@ test('a status change made today is in the daily report; copy and pick another d
   await page.getByRole('button', { name: 'คัดลอกข้อความ' }).click();
   await expect(page.locator('.toast').last()).toContainText(/คัดลอก|Ctrl\+C/);
 
+  // copy, then open the BMS Life blog in a new tab (user request 2026-11-26)
+  const blog = page.getByRole('link', { name: /คัดลอกแล้วเปิด BMS Life Blog/ });
+  await expect(blog).toHaveAttribute('href', 'https://bmslife.bmscloud.in.th/#/blog');
+  await expect(blog).toHaveAttribute('target', '_blank');
+  await expect(page.locator('#dialog')).toContainText('เขียน blog วันนี้');
+  const popup = page.waitForEvent('popup');
+  await page.route('https://bmslife.bmscloud.in.th/**', (r) => r.fulfill({ body: 'blog' })); // never leaves the test
+  await blog.click();
+  expect((await popup).url()).toContain('bmslife.bmscloud.in.th');
+  await expect(page.locator('.toast').last()).toContainText(/คัดลอก|Ctrl\+C/);
+  await expect(page.locator('#dialog')).toBeVisible(); // still open: copy again if needed
+
   // the day before: its own date, without today's sheet change
   const prev = await page.evaluate(() => {
     const D = window.Domain;

@@ -1392,6 +1392,11 @@
         rememberReportBaseline();
       },
       'daily-open': openDaily,
+      'daily-blog': function (el) {
+        // links are handled here (preventDefault), so open it in the same click that copies
+        copyText('daily-text', 'คัดลอกรายงานแล้ว กด "เขียน blog วันนี้" ที่มุมขวาล่าง แล้ววางข้อความ');
+        window.open(el.getAttribute('href'), '_blank', 'noopener');
+      },
       'daily-copy': function () {
         copyText('daily-text', 'คัดลอกรายงานแล้ว วางในบล็อก LINE หรืออีเมลได้เลย');
       },
