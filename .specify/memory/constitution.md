@@ -1,7 +1,10 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 7.0.0 → 7.1.0 (MINOR: the Taiga exception may also be used from the item form, by a tick next to
+Version change: 7.1.0 → 7.2.0 (MINOR: the Taiga exception may also be used from the นักพัฒนา page cards, by the same
+tick, now labelled "ปรับ Taiga ด้วย"; the daily report may open the BMS Life blog page in a new tab, sending nothing.
+Every other condition is unchanged. User request 2026-11-26.)
+Previous: 7.0.0 → 7.1.0 (MINOR: the Taiga exception may also be used from the item form, by a tick next to
 the status that is off until the person ticks it; every other condition is unchanged. User request 2026-11-25.)
 Previous: 6.0.0 → 7.0.0 (MAJOR: Additional Constraints: one exception to "no data to external services":
 an editor may send an item's status, and nothing else, to taiga.hosxp.net from the browser, with their own Taiga
@@ -276,7 +279,8 @@ Follow-up TODOs: none.
 - **สิทธิ์การใช้งาน**: Deploy แบบ "Execute as: User accessing the web app" เพื่อให้ log บันทึกตัวตนจริงของคนแก้ และให้สิทธิ์แก้ไขในแอปเป็นไปตามสิทธิ์ของชีต ผู้ที่มีแค่สิทธิ์ดูจะเปิดได้เฉพาะหน้า Monitor
 - **ใครเข้าถึงได้**: ชีตเป็นของบัญชี Gmail ส่วนตัว ไม่ใช่ Workspace domain จึงใช้ "Anyone with a Google account" ซึ่งต้องล็อกอินก่อน คนที่ไม่มีสิทธิ์ในชีตจะอ่านข้อมูลไม่ได้ เพราะแอปรันด้วยสิทธิ์ของผู้ใช้เอง
 - **ข้อมูลภายใน**: ห้ามส่งข้อมูลออกไปยังบริการภายนอก และห้ามเปิดเว็บแอปให้ "Anyone (anonymous)" เข้าถึง
-  - **ข้อยกเว้นเดียว (2026-11-25):** ผู้มีสิทธิ์แก้ไขกด "ปรับ Taiga ตามชีต" หรือติ๊ก "ปรับ Taiga ตามสถานะนี้เมื่อบันทึก" ในหน้ารายการ เพื่อส่ง**เฉพาะสถานะ**ไปที่ `taiga.hosxp.net` ได้ ต้องยืนยันทีละรายการ ใช้บัญชี Taiga ของตัวเอง เรียกจากเบราว์เซอร์เท่านั้น ห้ามเก็บรหัสผ่าน ต้องตรวจว่าชีตและ Taiga ยังไม่ถูกแก้ไปก่อน และบันทึกลง `_app_log` ทุกครั้ง
+  - **ข้อยกเว้นเดียว (2026-11-25):** ผู้มีสิทธิ์แก้ไขกด "ปรับ Taiga ตามชีต" หรือติ๊ก "ปรับ Taiga ด้วย" ในหน้ารายการหรือในการ์ดงานหน้านักพัฒนา (2026-11-26) เพื่อส่ง**เฉพาะสถานะ**ไปที่ `taiga.hosxp.net` ได้ ต้องยืนยันทีละรายการ ใช้บัญชี Taiga ของตัวเอง เรียกจากเบราว์เซอร์เท่านั้น ห้ามเก็บรหัสผ่าน ต้องตรวจว่าชีตและ Taiga ยังไม่ถูกแก้ไปก่อน และบันทึกลง `_app_log` ทุกครั้ง
+  - **ไม่นับเป็นการส่งข้อมูลออก (2026-11-26):** ปุ่มในสรุปรายงานประจำวันที่คัดลอกข้อความแล้วเปิดหน้า BMS Life Blog (`https://bmslife.bmscloud.in.th/#/blog`) ในแท็บใหม่ แอปไม่ส่งข้อมูลใดไปที่นั่น คนวางข้อความเอง
 - **ข้อมูลไม่ครบ**: แถวที่ไม่มี `รายละเอียด` ไม่นับเป็นรายการ ส่วนแถวที่มีค่าผิดประเภทให้แสดงป้าย "ข้อมูลไม่ครบ/ผิดช่อง" ในหน้า Monitor เพื่อให้ PM ตามแก้
 
 ## Quality Gates
@@ -316,4 +320,4 @@ Follow-up TODOs: none.
 - ทุก plan และทุก review ต้องตรวจว่าเป็นไปตาม constitution นี้ ความซับซ้อนที่ไม่มีเหตุผลรองรับจะทำให้รวมงานไม่ได้
 - คำแนะนำสำหรับ agent อยู่ใน `CLAUDE.md` และต้องสอดคล้องกับเอกสารนี้เสมอ
 
-**Version**: 7.1.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-25
+**Version**: 7.2.0 | **Ratified**: 2026-11-11 | **Last Amended**: 2026-11-26
