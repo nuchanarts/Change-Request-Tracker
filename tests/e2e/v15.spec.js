@@ -9,12 +9,12 @@ test.describe('Navigation order, Taiga link, access admin (2026-11-11)', () => {
     );
     expect(names).toEqual([
       'หน้าหลัก',
+      'ทะเบียน Taiga', // user request 2026-11-20; right after หน้าหลัก since 2026-11-26
       'มอบหมายงาน',
       'บอร์ดงาน',
       'นักพัฒนา', // was งานของฉัน (user request 2026-11-20)
       'งาน PM',
       'รายงานปิดงาน',
-      'ทะเบียน Taiga', // user request 2026-11-20
       'จัดการสิทธิ์',
       'วิธีใช้งาน', // icon only; the name is for screen readers
     ]);
