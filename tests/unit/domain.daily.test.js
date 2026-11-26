@@ -98,7 +98,7 @@ describe('logTime / bangkokTime', () => {
 describe('dailyReport', () => {
   it('lists the day’s items with sheet and Taiga changes, oldest first', () => {
     const r = rep();
-    expect(r.day.items.map((x) => x.seq)).toEqual([688, 690, null]);
+    expect(r.day.items.map((x) => x.seq)).toEqual([688, 690]);
     const a = r.day.items[0];
     expect(a.lines.map((l) => l.source + ' ' + l.hm)).toEqual([
       'sheet 09:15',
@@ -112,14 +112,14 @@ describe('dailyReport', () => {
     expect(a.lines[3].text).toBe('Taiga: มีคอมเมนต์ใหม่');
     // CREATE is one line, not one per cell
     expect(r.day.items[1].lines.map((l) => l.text)).toEqual(['เพิ่มรายการใหม่']);
-    expect(r.day.items[2].link).toBe(T(9999)); // a Taiga item the sheet does not know
+    // a Taiga item the sheet does not know is left out (user request 2026-11-26)
   });
 
   it('counts the day', () => {
     expect(rep().day.counts).toEqual({
-      items: 3,
+      items: 2,
       sheet: 2,
-      taiga: 2,
+      taiga: 1,
       created: 1,
       moved: 1,
       closed: 0,
@@ -130,7 +130,7 @@ describe('dailyReport', () => {
   it('this week so far: every item with a change, and what was closed', () => {
     const w = rep().week;
     expect(w.range).toEqual({ from: d(2026, 11, 23), to: today });
-    expect(w.items.map((x) => x.seq)).toEqual([688, 689, 690, null]);
+    expect(w.items.map((x) => x.seq)).toEqual([688, 689, 690]);
     expect(w.closed.map((r) => r.seq)).toEqual([689]); // 691 closed last week
     expect(w.created).toBe(1);
   });
@@ -153,7 +153,8 @@ describe('dailyReportText', () => {
     expect(text).toContain('   - 09:15 สถานะ: รอทีมพัฒนา → กำลังพัฒนา (ชีต · แก้ส)');
     expect(text).toContain('   - 10:05 Taiga: In progress → Ready for test (Taiga · ริว)');
     expect(text).toContain('   🔗 ' + T(2312));
-    expect(text).toContain('Taiga #9999 (ไม่พบในชีต)');
+    expect(text).not.toContain('ไม่พบในชีต');
+    expect(text).not.toContain('9999');
     expect(text).toContain('สรุปสิ่งที่แก้ไขในสัปดาห์นี้ (สะสม 23–26 พ.ย. 2569) :');
     expect(text).toContain('#689');
     expect(text.indexOf('วันที่ปฏิบัติงาน')).toBeLessThan(text.indexOf('สรุปการดำเนินการ'));

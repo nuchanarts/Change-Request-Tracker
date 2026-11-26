@@ -1683,6 +1683,7 @@ var Domain = (function () {
       var key = taigaKey(e.link);
       if (!t || !text || !key) return;
       var row = byKey[key];
+      if (!row) return; // Taiga items without a row in the sheet are not reported (user request 2026-11-26)
       events.push({
         source: 'taiga',
         action: e.kind,
