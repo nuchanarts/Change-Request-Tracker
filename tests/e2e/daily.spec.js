@@ -41,7 +41,13 @@ test('a status change made today is in the daily report; copy and pick another d
   const blog = page.getByRole('link', { name: /คัดลอกแล้วเปิด BMS Life Blog/ });
   await expect(blog).toHaveAttribute('href', 'https://bmslife.bmscloud.in.th/#/blog');
   await expect(blog).toHaveAttribute('target', '_blank');
-  await expect(page.locator('#dialog')).toContainText('เขียน blog วันนี้');
+  await expect(page.locator('#dialog')).not.toContainText('มุมขวาล่างของหน้านั้น'); // no hint line (2026-11-26)
+  const right = await page.evaluate(() => {
+    const b = document.querySelector('.blog-btn').getBoundingClientRect();
+    const box = document.querySelector('.daily-blog').getBoundingClientRect();
+    return box.right - b.right;
+  });
+  expect(right).toBeLessThan(40); // the button sits on the right
   const popup = page.waitForEvent('popup');
   await page.route('https://bmslife.bmscloud.in.th/**', (r) => r.fulfill({ body: 'blog' })); // never leaves the test
   await blog.click();
