@@ -1899,14 +1899,7 @@ var Domain = (function () {
       L.push('กำลังดำเนินการ:');
       others.forEach(function (/** @type {any} */ g, /** @type {number} */ i) {
         L.push(
-          i +
-            1 +
-            '. ' +
-            reportTitle(g.row, g.key) +
-            (g.row ? ' — ' + statusLabel(g.row.status) : '') +
-            ' (' +
-            g.lines.length +
-            ' ครั้ง)',
+          i + 1 + '. ' + reportTitle(g.row, g.key) + (g.row ? ' — ' + statusLabel(g.row.status) : ''), // no "(n ครั้ง)" (user request 2026-11-26)
         );
       });
     }

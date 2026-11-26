@@ -155,6 +155,9 @@ describe('dailyReportText', () => {
     expect(text).toContain('   🔗 ' + T(2312));
     expect(text).not.toContain('ไม่พบในชีต');
     expect(text).not.toContain('9999');
+    // the week list has no "(n ครั้ง)" (user request 2026-11-26)
+    expect(text).not.toMatch(/\(\d+ ครั้ง\)/);
+    expect(text).toContain('1. #688 [INV] 2312 NHIP_EHP-ขอแก้ไข การแสดงผล Stock Card — กำลังพัฒนา\n');
     expect(text).toContain('สรุปสิ่งที่แก้ไขในสัปดาห์นี้ (สะสม 23–26 พ.ย. 2569) :');
     expect(text).toContain('#689');
     expect(text.indexOf('วันที่ปฏิบัติงาน')).toBeLessThan(text.indexOf('สรุปการดำเนินการ'));
