@@ -456,7 +456,7 @@ const openItem = async (page, seq) => {
   await page.goto('/#/items/' + seq);
   await expect(page.locator('#item-form')).toBeVisible();
 };
-const tick = (page) => page.getByLabel('ปรับ Taiga ตามสถานะนี้เมื่อบันทึก');
+const tick = (page) => page.getByLabel('ปรับ Taiga ด้วย');
 const sheetStatus = (page, seq) =>
   page.evaluate((s) => window.__mockSheet.rows.find((r) => r.seq === s).status, seq);
 
@@ -466,12 +466,10 @@ test('form tick: saving the status also sends it to Taiga after a person confirm
   await expect(tick(page)).not.toBeChecked(); // nothing is sent unless the person ticks it
   await page.locator('#f-status').selectOption('กำลังทดสอบ');
   await expect(page.locator('#tg-form-sync')).toContainText('Ready for test');
-  // the narrow column breaks between phrases, never inside a Thai word
-  await expect(page.locator('#tg-form-sync label .nw')).toHaveText([
-    'ปรับ Taiga',
-    'ตามสถานะนี้',
-    'เมื่อบันทึก',
-  ]);
+  // the label fits on one line; the hint breaks between phrases, never inside a Thai word
+  const label = page.locator('#tg-form-sync label');
+  const lineHeight = parseFloat(await label.evaluate((el) => getComputedStyle(el).lineHeight));
+  expect((await label.locator('.nw').boundingBox()).height).toBeLessThan(lineHeight * 1.5);
   await expect(page.locator('#tg-form-why .nw').first()).toHaveCSS('white-space', 'nowrap');
   await tick(page).check();
   await page.locator('#save-btn').click();

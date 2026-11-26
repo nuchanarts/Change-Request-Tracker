@@ -191,6 +191,7 @@
           : '') +
         myWorkChip(state) +
         '<button class="btn small export-btn" data-action="export-open">' + UI.withIcon('report', 'สรุปรายงาน (Export)') + '</button>' +
+        '<button class="btn small daily-btn" data-action="daily-open">' + UI.withIcon('daily', 'สรุปรายงานประจำวัน') + '</button>' +
         '<button class="btn small" data-action="reload">' + UI.withIcon('reload', 'โหลดข้อมูลใหม่') + '</button>' +
         '<span class="hero-meta">' + esc(filterSummary(state)) + ', ข้อมูล ณ ' + esc(state.loadedAt) + '</span></div></div>' +
         '<div class="hero-art">' + UI.mascots() + '</div>' +
@@ -482,14 +483,14 @@
       duplicate: ['ลิงก์ Taiga นี้', 'ใช้กับหลายรายการ ', 'จึงไม่ปรับให้อัตโนมัติ'],
       deleted: ['รายการนี้ถูกลบ', 'ใน Taiga แล้ว'],
     };
-    /** "ปรับ Taiga ตามสถานะนี้เมื่อบันทึก" next to the status. @param {any} s Domain.taigaFormSync() */
+    /** "ปรับ Taiga ด้วย" next to the status: short enough for one line in the narrow column (2026-11-26). @param {any} s Domain.taigaFormSync() */
     function tgFormSync(s, checked) {
       if (!s.show) return '';
       var can = !s.reason;
       var parts = !can ? SYNC_WHY[s.reason]
         : s.match ? ['Taiga อยู่ที่ ', '"' + s.now + '" ', 'ตรงกันแล้ว']
         : ['Taiga จะเปลี่ยน'].concat(s.now ? ['จาก "' + s.now + '" '] : [], ['เป็น "' + s.target + '" ', 'ระบบจะถามยืนยัน', 'ก่อนส่ง']);
-      return '<label class="tg-keep"><input type="checkbox" id="f-taiga-sync" aria-describedby="tg-form-why"' + (can && checked ? ' checked' : '') + (can ? '' : ' disabled') + ' /> <span>' + UI.phrases(['ปรับ Taiga ', 'ตามสถานะนี้', 'เมื่อบันทึก']) + '</span></label>' +
+      return '<label class="tg-keep"><input type="checkbox" id="f-taiga-sync" aria-describedby="tg-form-why"' + (can && checked ? ' checked' : '') + (can ? '' : ' disabled') + ' /> <span class="nw">ปรับ Taiga ด้วย</span></label>' +
         '<div class="hint" id="tg-form-why">' + UI.phrases(parts) + '</div>';
     }
 
@@ -1046,6 +1047,19 @@
         '<button class="btn primary" data-action="export-copy">' + UI.withIcon('copy', 'คัดลอกข้อความ') + '</button></div>';
     }
 
+    /** "สรุปรายงานประจำวัน": pick a day; App fills #daily-text from Api_activity (2026-11-26). */
+    function dailyDialog(state, day) {
+      return '<h2>สรุปรายงานประจำวัน</h2>' +
+        '<p class="muted" style="margin:4px 0 12px">รวมสิ่งที่เปลี่ยนในชีต (ผ่านแอปนี้) และใน Taiga ของวันที่เลือก พร้อมสรุปสะสมของสัปดาห์ คัดลอกไปวางในบล็อก LINE หรืออีเมลได้เลย แก้ข้อความเพิ่มได้ก่อนคัดลอก</p>' +
+        '<div class="export-opts"><div class="field"><label for="daily-date">วันที่ปฏิบัติงาน</label>' +
+        '<input type="date" id="daily-date" value="' + esc(D.toIso(day)) + '" max="' + esc(D.toIso(state.today)) + '" /></div></div>' +
+        '<label class="sr-only" for="daily-text">ข้อความรายงานประจำวัน</label><textarea id="daily-text" class="export-text"></textarea>' +
+        '<p class="hint" style="margin:6px 0 0">การแก้ที่พิมพ์ลงชีตโดยตรงจะไม่อยู่ในรายละเอียดรายวัน เพราะไม่มีประวัติใน _app_log แต่งานที่ปิดจะนับจากวันที่เสร็จ</p>' +
+        '<div class="dialog-actions"><button class="btn" value="close" data-action="export-close">ปิด</button>' +
+        '<button type="button" class="btn" data-action="daily-download">' + UI.withIcon('download', 'ดาวน์โหลด .txt') + '</button>' +
+        '<button type="button" class="btn primary" data-action="daily-copy">' + UI.withIcon('copy', 'คัดลอกข้อความ') + '</button></div>';
+    }
+
     // ------------------------------------------------------------------ Kanban (US8)
 
     var KANBAN_LIMIT = 40;
@@ -1231,6 +1245,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, taigaRegister: taigaRegister, tgReport: tgReport, tgReview: tgReview, tgCompare: tgCompare, tgFormSync: tgFormSync, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, form: form, myWork: myWork, access: access, exportDialog: exportDialog, dailyDialog: dailyDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, taigaRegister: taigaRegister, tgReport: tgReport, tgReview: tgReview, tgCompare: tgCompare, tgFormSync: tgFormSync, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>

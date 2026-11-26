@@ -1585,6 +1585,333 @@ var Domain = (function () {
     return out;
   }
 
+  // ---------------------------------------------------------------- daily report (user request 2026-11-26)
+
+  /** '26/11/2026 09:05:00' (_app_log, Bangkok) -> {date, hm}; null when unreadable. @param {any} text */
+  function logTime(text) {
+    var m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/.exec(clean(text));
+    if (!m) return null;
+    var p = parseDate(m[1] + '/' + m[2] + '/' + m[3]);
+    if (!p.date) return null;
+    return { date: p.date, hm: (m[4].length < 2 ? '0' : '') + m[4] + ':' + m[5] };
+  }
+
+  /** A Taiga event time (ms) as a Bangkok day and HH:mm. @param {number|null} ms */
+  function bangkokTime(ms) {
+    if (typeof ms !== 'number' || !isFinite(ms)) return null;
+    var t = new Date(ms + 7 * 3600000);
+    var p = function (/** @type {number} */ n) {
+      return n < 10 ? '0' + n : String(n);
+    };
+    return {
+      date: { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() },
+      hm: p(t.getUTCHours()) + ':' + p(t.getUTCMinutes()),
+    };
+  }
+
+  /** @param {any} v */
+  function orEmpty(v) {
+    return clean(v) === '' ? '(ว่าง)' : clean(v);
+  }
+
+  /** One _app_log entry as a report line ('' = leave out). @param {any} e */
+  function logLine(e) {
+    if (e.action === 'CREATE') return 'เพิ่มรายการใหม่';
+    if (e.action === 'DELETE') return 'ลบรายการ';
+    if (e.action === 'RESTORE') return 'กู้คืนรายการ';
+    if (e.action === 'TAIGA_PUSH') return 'ส่งสถานะไป Taiga: ' + orEmpty(e.from) + ' → ' + orEmpty(e.to);
+    if (e.action === 'UPDATE') return clean(e.column) + ': ' + orEmpty(e.from) + ' → ' + orEmpty(e.to);
+    return '';
+  }
+
+  /** One Taiga event as a report line ('' = leave out). @param {any} e */
+  function taigaLine(e) {
+    if (e.kind === 'ทดสอบ') return '';
+    if (e.kind === 'สถานะ' || e.kind === 'เสร็จ') return 'Taiga: ' + orEmpty(e.from) + ' → ' + orEmpty(e.to);
+    if (e.kind === 'คอมเมนต์') return 'Taiga: มีคอมเมนต์ใหม่';
+    if (e.kind === 'ลบ') return 'Taiga: ถูกลบ';
+    return 'Taiga: ' + clean(e.kind) + (clean(e.to) ? ' (' + clean(e.to) + ')' : '');
+  }
+
+  /**
+   * What changed on one day (sheet via _app_log, Taiga via the bot's log) and so far this week (Monday..date).
+   * Changes typed straight into the sheet are not in _app_log; they show only through วันที่เสร็จ.
+   * @param {{date:SheetDate, rows:any[], log:any[], taiga:any[]}} o
+   */
+  function dailyReport(o) {
+    var day = o.date;
+    var week = { from: weekRange(day).from, to: day };
+    var STATUS = COLUMN_BY_KEY.status.header;
+    /** @type {Object<string, any>} */
+    var bySeq = {};
+    /** @type {Object<string, any>} */
+    var byKey = {};
+    o.rows.forEach(function (r) {
+      if (r.seq !== null) bySeq[r.seq] = r;
+      var k = taigaKey(taigaLink(r));
+      if (k && !byKey[k]) byKey[k] = r;
+    });
+    /** @type {any[]} */
+    var events = [];
+    (o.log || []).forEach(function (e, i) {
+      var t = logTime(e.time);
+      var seq = Number(e.seq);
+      var text = logLine(e);
+      if (!t || !text || !clean(e.seq) || !isFinite(seq)) return;
+      // a new item writes one log row per cell: keep the first
+      var dup = events.some(function (x) {
+        return e.action === 'CREATE' && x.action === 'CREATE' && x.seq === seq;
+      });
+      if (dup) return;
+      var isStatus = e.action === 'UPDATE' && clean(e.column) === STATUS;
+      events.push({
+        source: 'sheet',
+        action: e.action,
+        date: t.date,
+        hm: t.hm,
+        order: i,
+        seq: seq,
+        who: clean(e.who),
+        text: text,
+        moved: isStatus,
+        closed: isStatus && CLOSED.indexOf(clean(e.to)) !== -1,
+      });
+    });
+    (o.taiga || []).forEach(function (e, i) {
+      var t = bangkokTime(e.at);
+      var text = taigaLine(e);
+      var key = taigaKey(e.link);
+      if (!t || !text || !key) return;
+      var row = byKey[key];
+      events.push({
+        source: 'taiga',
+        action: e.kind,
+        date: t.date,
+        hm: t.hm,
+        order: 1e6 + i,
+        seq: row ? row.seq : null,
+        key: row ? null : key,
+        link: clean(e.link),
+        who: clean(e.by),
+        text: text,
+        moved: false,
+        closed: false,
+      });
+    });
+    events.sort(function (a, b) {
+      return compareDate(a.date, b.date) || (a.hm < b.hm ? -1 : a.hm > b.hm ? 1 : a.order - b.order);
+    });
+    /** @param {any[]} list */
+    function group(list) {
+      /** @type {Object<string, any>} */
+      var at = {};
+      /** @type {any[]} */
+      var out = [];
+      list.forEach(function (e) {
+        var id = e.seq !== null ? 's' + e.seq : 'k' + e.key;
+        var g = at[id];
+        if (!g) {
+          var row = e.seq !== null ? bySeq[e.seq] || null : null;
+          g = at[id] = {
+            seq: e.seq,
+            row: row,
+            key: e.key || null,
+            link: row ? taigaLink(row) : e.link,
+            lines: [],
+          };
+          out.push(g);
+        }
+        g.lines.push({ source: e.source, hm: e.hm, who: e.who, text: e.text, action: e.action });
+      });
+      return out;
+    }
+    /** @param {any[]} list @param {(e:any)=>boolean} f */
+    var count = function (list, f) {
+      return list.filter(f).length;
+    };
+    /** @param {any} g @param {string} src */
+    var has = function (g, src) {
+      return g.lines.some(function (/** @type {any} */ l) {
+        return l.source === src;
+      });
+    };
+    var today = events.filter(function (e) {
+      return compareDate(e.date, day) === 0;
+    });
+    var inWeek = events.filter(function (e) {
+      return inRange(e.date, week);
+    });
+    var items = group(today);
+    var weekItems = group(inWeek).sort(function (a, b) {
+      if (a.seq === null || b.seq === null) return (a.seq === null ? 1 : 0) - (b.seq === null ? 1 : 0);
+      return a.seq - b.seq;
+    });
+    /** @type {Object<string, boolean>} */
+    var closedSeen = {};
+    /** @type {any[]} */
+    var closed = [];
+    /** @param {any} r */
+    var addClosed = function (r) {
+      if (!r || closedSeen[r.seq] || r.isOpen) return;
+      closedSeen[r.seq] = true;
+      closed.push(r);
+    };
+    inWeek.forEach(function (e) {
+      if (e.closed) addClosed(bySeq[e.seq]);
+    });
+    o.rows.forEach(function (r) {
+      if (r.seq !== null && r.doneDate && inRange(r.doneDate.date, week)) addClosed(r);
+    });
+    closed.sort(function (a, b) {
+      return a.seq - b.seq;
+    });
+    var isCreate = function (/** @type {any} */ e) {
+      return e.action === 'CREATE';
+    };
+    return {
+      date: day,
+      day: {
+        items: items,
+        counts: {
+          items: items.length,
+          sheet: count(items, function (g) {
+            return has(g, 'sheet');
+          }),
+          taiga: count(items, function (g) {
+            return has(g, 'taiga');
+          }),
+          created: count(today, isCreate),
+          moved: count(today, function (e) {
+            return e.moved;
+          }),
+          closed: count(today, function (e) {
+            return e.closed;
+          }),
+          pushed: count(today, function (e) {
+            return e.action === 'TAIGA_PUSH';
+          }),
+        },
+      },
+      week: { range: week, items: weekItems, closed: closed, created: count(inWeek, isCreate) },
+    };
+  }
+
+  /** "#688 [INV] detail" on one line; a Taiga item the sheet does not know by its number. @param {any} r @param {string|null} [key] */
+  function reportTitle(r, key) {
+    if (!r) return 'Taiga #' + clean(key).split('/').pop() + ' (ไม่พบในชีต)';
+    var detail = clean(r.detail).replace(/\s+/g, ' ');
+    if (detail.length > 140) detail = detail.slice(0, 139) + '…';
+    return '#' + r.seq + (clean(r.platform) ? ' [' + clean(r.platform) + ']' : '') + ' ' + detail;
+  }
+
+  /**
+   * The daily report as plain text in the team's format, ready to paste into a blog, LINE or e-mail.
+   * @param {any} rep dailyReport() @param {{reporter?:string, today?:SheetDate, rows?:any[]}} [opts]
+   */
+  function dailyReportText(rep, opts) {
+    opts = opts || {};
+    var c = rep.day.counts;
+    /** @type {string[]} */
+    var L = [];
+    L.push('📋 สรุปรายงานประจำวัน');
+    L.push('วันที่ปฏิบัติงาน : ' + formatThaiLong(rep.date));
+    if (opts.reporter) L.push('ผู้รายงาน : ' + opts.reporter);
+    L.push('');
+    L.push('สรุปการดำเนินการ :');
+    if (!c.items) L.push('- ไม่มีการเปลี่ยนแปลงในชีตหรือ Taiga ในวันนี้');
+    else {
+      L.push(
+        '- ติดตามและปรับปรุงรายการขอแก้ไขโปรแกรม ' +
+          c.items +
+          ' รายการ (แก้ในชีต ' +
+          c.sheet +
+          ' · เปลี่ยนใน Taiga ' +
+          c.taiga +
+          ')',
+      );
+      var parts = [];
+      if (c.created) parts.push('เพิ่มรายการใหม่ ' + c.created);
+      if (c.moved) parts.push('เปลี่ยนสถานะ ' + c.moved);
+      if (c.closed) parts.push('ปิดงาน ' + c.closed);
+      if (c.pushed) parts.push('ส่งสถานะไป Taiga ' + c.pushed);
+      if (parts.length) L.push('- ' + parts.join(' · ') + ' รายการ');
+    }
+    if (opts.rows && opts.today) {
+      var m = computeMetrics(opts.rows, opts.today);
+      L.push(
+        '- งานค้างทั้งหมด ' + m.openCount + ' รายการ · เกินกำหนด ' + m.overdueCount + ' รายการ (ณ วันนี้)',
+      );
+    }
+    L.push('');
+    L.push('รายละเอียดการดำเนินการ :');
+    if (!rep.day.items.length) L.push('- ไม่มี');
+    rep.day.items.forEach(function (/** @type {any} */ g, /** @type {number} */ i) {
+      L.push(i + 1 + '. ' + reportTitle(g.row, g.key));
+      g.lines.forEach(function (/** @type {any} */ l) {
+        L.push(
+          '   - ' +
+            l.hm +
+            ' ' +
+            l.text +
+            ' (' +
+            (l.source === 'taiga' ? 'Taiga' : 'ชีต') +
+            (l.who ? ' · ' + l.who : '') +
+            ')',
+        );
+      });
+      if (g.row) L.push('   สถานะตอนนี้: ' + statusLabel(g.row.status));
+      if (g.link) L.push('   🔗 ' + g.link);
+    });
+    L.push('');
+    var w = rep.week;
+    L.push('สรุปสิ่งที่แก้ไขในสัปดาห์นี้ (สะสม ' + thaiRange(w.range) + ') :');
+    L.push(
+      '- มีความเคลื่อนไหว ' +
+        w.items.length +
+        ' รายการ · ปิดงาน ' +
+        w.closed.length +
+        ' รายการ · เพิ่มรายการใหม่ ' +
+        w.created +
+        ' รายการ',
+    );
+    if (w.closed.length) {
+      L.push('ปิดงานแล้ว:');
+      w.closed.forEach(function (/** @type {any} */ r, /** @type {number} */ i) {
+        L.push(
+          i +
+            1 +
+            '. ' +
+            reportTitle(r) +
+            ' — ' +
+            statusLabel(r.status) +
+            (r.doneDate && r.doneDate.date ? ' ' + formatThai(r.doneDate.date) : ''),
+        );
+      });
+    }
+    var closedSeq = w.closed.map(function (/** @type {any} */ r) {
+      return r.seq;
+    });
+    var others = w.items.filter(function (/** @type {any} */ g) {
+      return g.seq === null || closedSeq.indexOf(g.seq) === -1;
+    });
+    if (others.length) {
+      L.push('กำลังดำเนินการ:');
+      others.forEach(function (/** @type {any} */ g, /** @type {number} */ i) {
+        L.push(
+          i +
+            1 +
+            '. ' +
+            reportTitle(g.row, g.key) +
+            (g.row ? ' — ' + statusLabel(g.row.status) : '') +
+            ' (' +
+            g.lines.length +
+            ' ครั้ง)',
+        );
+      });
+    }
+    return L.join('\n');
+  }
+
   /** How many rows point at each Taiga item. @param {any[]} rows */
   function taigaKeyCounts(rows) {
     /** @type {Object<string, number>} */
@@ -2040,6 +2367,10 @@ var Domain = (function () {
     taigaCompare: taigaCompare,
     taigaFormSync: taigaFormSync,
     taigaWithSent: taigaWithSent,
+    logTime: logTime,
+    bangkokTime: bangkokTime,
+    dailyReport: dailyReport,
+    dailyReportText: dailyReportText,
     DEV_STEPS: DEV_STEPS,
     devBeforeReview: devBeforeReview,
     TAIGA_STEPS: TAIGA_STEPS,

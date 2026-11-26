@@ -601,6 +601,36 @@ function makeRepo(deps) {
     }
   }
 
+  /**
+   * Item changes between two days (Bangkok), oldest first, for the daily report: _app_log rows that carry a
+   * ลำดับ (a DELETE's JSON snapshot is left out) and the bot's Taiga events. Reads only.
+   * @param {{y:number, m:number, d:number}} from @param {{y:number, m:number, d:number}} to
+   */
+  function activity(from, to) {
+    var range = { from: from, to: to };
+    var log = [];
+    logRows().forEach(function (r) {
+      var t = D.logTime(r[0]);
+      var seq = toInt(r[4]);
+      if (!t || seq === null || !D.inRange(t.date, range)) return;
+      var whole = r[2] === 'DELETE' || r[2] === 'RESTORE';
+      log.push({
+        time: r[0],
+        who: r[1],
+        action: r[2],
+        seq: seq,
+        column: r[5],
+        from: whole ? '' : r[6],
+        to: whole ? '' : r[7],
+      });
+    });
+    var taiga = (taigaEvents() || []).filter(function (/** @type {any} */ e) {
+      var t = D.bangkokTime(e.at);
+      return t && D.inRange(t.date, range);
+    });
+    return { log: log, taiga: taiga };
+  }
+
   /** Deleted items whose ลำดับ is not back in the sheet, newest first (admins restore from here). */
   function listDeleted() {
     var present = seqSet();
@@ -1441,6 +1471,7 @@ function makeRepo(deps) {
     update: update,
     remove: remove,
     history: history,
+    activity: activity,
     listDeleted: listDeleted,
     restore: restore,
     enqueueNotify: enqueueNotify,
