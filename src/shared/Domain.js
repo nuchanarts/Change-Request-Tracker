@@ -1896,11 +1896,32 @@ var Domain = (function () {
       return g.seq === null || closedSeq.indexOf(g.seq) === -1;
     });
     if (others.length) {
-      L.push('กำลังดำเนินการ:');
-      others.forEach(function (/** @type {any} */ g, /** @type {number} */ i) {
-        L.push(
-          i + 1 + '. ' + reportTitle(g.row, g.key) + (g.row ? ' — ' + statusLabel(g.row.status) : ''), // no "(n ครั้ง)" (user request 2026-11-26)
-        );
+      // grouped by the status each item has now, in workflow order; unknown statuses last (user request 2026-11-26)
+      /** @type {Object<string, any[]>} */
+      var byStatus = {};
+      /** @type {string[]} */
+      var order = [];
+      others.forEach(function (/** @type {any} */ g) {
+        var s = g.row ? clean(g.row.status) : '';
+        if (!byStatus[s]) {
+          byStatus[s] = [];
+          order.push(s);
+        }
+        byStatus[s].push(g);
+      });
+      var rank = function (/** @type {string} */ s) {
+        var i = WORKFLOW.indexOf(s);
+        return i === -1 ? WORKFLOW.length : i;
+      };
+      order.sort(function (a, b) {
+        return rank(a) - rank(b);
+      });
+      L.push('กำลังดำเนินการ (แยกตามสถานะ):');
+      order.forEach(function (s) {
+        L.push('▸ ' + (s ? statusLabel(s) : 'สถานะว่าง') + ' (' + byStatus[s].length + ')');
+        byStatus[s].forEach(function (/** @type {any} */ g, /** @type {number} */ i) {
+          L.push('  ' + (i + 1) + '. ' + reportTitle(g.row, g.key));
+        });
       });
     }
     return L.join('\n');
