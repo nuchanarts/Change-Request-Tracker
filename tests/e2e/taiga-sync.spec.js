@@ -4,31 +4,36 @@ import { open } from './helpers.js';
 
 // Taiga status in the register, mismatch filter, "ปรับตาม Taiga" and the status map (user request 2026-11-24).
 // The mock log is built from the fixture: the first three open rows with a Taiga link have Taiga events.
-const setup = async (page, { map = {}, query = '' } = {}) => {
-  await page.addInitScript((m) => {
-    window.__taigaMap = m;
-    window.__beforeMock = (rows) => {
-      const D = window.Domain;
-      // the newest rows: they are on the first page of the register
-      const linked = rows
-        .filter((r) => D.isOpen(r.status) && r.detail && /^\d+$/.test(r.seq))
-        .sort((x, y) => y.seq - x.seq);
-      [0, 1, 2].forEach((i) => {
-        linked[i].ticketLinks = [`https://taiga.example/project/sync/us/${i + 1}`];
-        linked[i].status = 'รอทีมพัฒนา';
-      });
-      window.__taigaSeqs = linked.slice(0, 3).map((r) => r.seq);
-      const ev = (n, to) => ({
-        kind: 'สถานะ',
-        link: `https://taiga.example/project/sync/us/${n}`,
-        from: 'New',
-        to,
-        by: 'ริว',
-        at: Date.UTC(2026, 10, 24, 3, 5),
-      });
-      window.__taigaEvents = [ev(1, 'In progress'), ev(2, 'Ready'), ev(3, 'Strange')];
-    };
-  }, map);
+const setup = async (page, { map = {}, query = '', dev = '' } = {}) => {
+  await page.addInitScript(
+    ([m, d]) => {
+      window.__taigaMap = m;
+      if (d) window.__mockUserName = d;
+      window.__beforeMock = (rows) => {
+        const D = window.Domain;
+        // the newest rows: they are on the first page of the register
+        const linked = rows
+          .filter((r) => D.isOpen(r.status) && r.detail && /^\d+$/.test(r.seq))
+          .sort((x, y) => y.seq - x.seq);
+        [0, 1, 2].forEach((i) => {
+          linked[i].ticketLinks = [`https://taiga.example/project/sync/us/${i + 1}`];
+          linked[i].status = 'รอทีมพัฒนา';
+        });
+        if (d) Object.assign(linked[0], { developer: d, dueDate: '1/1/2020', postponedDate: '' }); // overdue: on the นักพัฒนา page
+        window.__taigaSeqs = linked.slice(0, 3).map((r) => r.seq);
+        const ev = (n, to) => ({
+          kind: 'สถานะ',
+          link: `https://taiga.example/project/sync/us/${n}`,
+          from: 'New',
+          to,
+          by: 'ริว',
+          at: Date.UTC(2026, 10, 24, 3, 5),
+        });
+        window.__taigaEvents = [ev(1, 'In progress'), ev(2, 'Ready'), ev(3, 'Strange')];
+      };
+    },
+    [map, dev],
+  );
   await open(page, `/${query}#/taiga`);
   if (!query.includes('notaiga')) await expect(page.locator('#tg-table .tg-taiga').first()).toBeVisible();
   return page.evaluate(() => window.__taigaSeqs);
@@ -451,7 +456,7 @@ const openItem = async (page, seq) => {
   await page.goto('/#/items/' + seq);
   await expect(page.locator('#item-form')).toBeVisible();
 };
-const tick = (page) => page.getByLabel('ปรับ Taiga ตามสถานะนี้เมื่อบันทึก');
+const tick = (page) => page.getByLabel('ปรับ Taiga ด้วย');
 const sheetStatus = (page, seq) =>
   page.evaluate((s) => window.__mockSheet.rows.find((r) => r.seq === s).status, seq);
 
@@ -461,6 +466,11 @@ test('form tick: saving the status also sends it to Taiga after a person confirm
   await expect(tick(page)).not.toBeChecked(); // nothing is sent unless the person ticks it
   await page.locator('#f-status').selectOption('กำลังทดสอบ');
   await expect(page.locator('#tg-form-sync')).toContainText('Ready for test');
+  // the label fits on one line; the hint breaks between phrases, never inside a Thai word
+  const label = page.locator('#tg-form-sync label');
+  const lineHeight = parseFloat(await label.evaluate((el) => getComputedStyle(el).lineHeight));
+  expect((await label.locator('.nw').boundingBox()).height).toBeLessThan(lineHeight * 1.5);
+  await expect(page.locator('#tg-form-why .nw').first()).toHaveCSS('white-space', 'nowrap');
   await tick(page).check();
   await page.locator('#save-btn').click();
   await login(page);
@@ -572,4 +582,34 @@ test('form tick: the box has the size of a checkbox and sits next to its text', 
   expect(box.width).toBeLessThanOrEqual(24);
   const status = await page.locator('#f-status').boundingBox();
   expect(Math.abs(box.x - status.x)).toBeLessThan(8);
+});
+
+// The นักพัฒนา page: a tick next to "เปลี่ยนสถานะ" (user request 2026-11-26).
+test('นักพัฒนา card tick: the sheet is saved first, then Taiga after a person confirms', async ({ page }) => {
+  const dev = 'นักพัฒนา แดง';
+  const [a] = await setup(page, { map: FORM_MAP, dev });
+  await page.goto('/#/my-work');
+  const card = page.locator('.work', { hasText: '#' + a + ' ' }).first();
+  const box = card.getByLabel('ปรับ Taiga ด้วย');
+  await expect(box).not.toBeChecked(); // nothing is sent unless the person ticks it
+  await card.locator('select[name="to"]').selectOption('กำลังทดสอบ');
+  await box.check();
+  await card.getByRole('button', { name: 'เปลี่ยนสถานะ' }).click();
+  await login(page);
+  await expect(dialog(page)).toContainText('ตามสถานะในชีต');
+  expect(await sheetStatus(page, a)).toBe('กำลังทดสอบ');
+  expect(await patches(page)).toBe(0);
+  await dialog(page).getByRole('button', { name: 'ส่งไป Taiga' }).click();
+  await expect.poll(() => taigaOf(page, 1)).toBe('Ready for test');
+  await openItem(page, a);
+  await expect(tick(page)).toBeChecked(); // one remembered choice for both places
+});
+
+test('the back button has an arrow icon and the accent colour', async ({ page }) => {
+  const [a] = await setup(page);
+  await openItem(page, a);
+  const back = page.getByRole('button', { name: 'กลับ', exact: true }).first();
+  await expect(back.locator('svg')).toBeVisible();
+  const bg = await back.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(bg).not.toBe('rgb(255, 255, 255)');
 });

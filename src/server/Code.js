@@ -344,6 +344,23 @@ function Api_itemHistory(seq) {
   });
 }
 
+/**
+ * Item changes from Monday of that week up to the day, for "สรุปรายงานประจำวัน" (anyone signed in; reads only).
+ * @param {{date?: string}} input date as d/m/yyyy
+ */
+function Api_activity(input) {
+  return guard_(function (ctx) {
+    var day = Domain.parseDate(input && input.date).date;
+    if (!day) return Config.fail('VALIDATION', { fields: { date: 'กรุณาเลือกวันที่' } });
+    var a = ctx.repo.activity(Domain.weekRange(day).from, day);
+    var name = whoNamer_(ctx);
+    a.log.forEach(function (/** @type {any} */ e) {
+      e.who = name(e.who);
+    });
+    return Config.ok(a);
+  });
+}
+
 /** Deleted items that can be restored (admins only). */
 function Api_listDeleted() {
   return guard_(function (ctx) {

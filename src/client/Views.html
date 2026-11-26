@@ -191,6 +191,7 @@
           : '') +
         myWorkChip(state) +
         '<button class="btn small export-btn" data-action="export-open">' + UI.withIcon('report', 'สรุปรายงาน (Export)') + '</button>' +
+        '<button class="btn small daily-btn" data-action="daily-open">' + UI.withIcon('daily', 'สรุปรายงานประจำวัน') + '</button>' +
         '<button class="btn small" data-action="reload">' + UI.withIcon('reload', 'โหลดข้อมูลใหม่') + '</button>' +
         '<span class="hero-meta">' + esc(filterSummary(state)) + ', ข้อมูล ณ ' + esc(state.loadedAt) + '</span></div></div>' +
         '<div class="hero-art">' + UI.mascots() + '</div>' +
@@ -415,7 +416,7 @@
       var opts = state.options;
       if (col.type === 'option') return UI.select(Object.assign(o, { options: opts[key] }));
       if (col.type === 'status') {
-        return UI.select(Object.assign(o, { options: D.WORKFLOW, groups: UI.statusGroups(), allowEmpty: false, hint: 'เรียงตามขั้นตอนงานจริง เลือกขั้นถัดไปเมื่องานคืบหน้า' }))
+        return UI.select(Object.assign(o, { options: D.WORKFLOW, groups: UI.statusGroups(), allowEmpty: false, hint: ['เรียงตามขั้นตอนงานจริง ', 'เลือกขั้นถัดไป', 'เมื่องานคืบหน้า'] }))
           .replace(/<\/div>$/, readOnly ? '</div>' : '<div id="tg-form-sync"></div></div>'); // filled by App refreshFormSync()
       }
       if (key === 'pm') return UI.multiPick(Object.assign(o, { options: opts.pm }));
@@ -476,20 +477,21 @@
       return html;
     }
 
+    // Each part stays on one line (UI.phrases), so the narrow status column breaks between phrases.
     var SYNC_WHY = {
-      unmapped: 'สถานะนี้ยังไม่จับคู่กับ Taiga จึงส่งไม่ได้ (ผู้ดูแลจับคู่ได้ที่หน้าทะเบียน Taiga)',
-      duplicate: 'ลิงก์ Taiga นี้ใช้กับหลายรายการ จึงไม่ปรับให้อัตโนมัติ',
-      deleted: 'รายการนี้ถูกลบใน Taiga แล้ว',
+      unmapped: ['สถานะนี้ยังไม่จับคู่กับ Taiga ', 'จึงส่งไม่ได้ ', '(ผู้ดูแลจับคู่ได้', 'ที่หน้าทะเบียน Taiga)'],
+      duplicate: ['ลิงก์ Taiga นี้', 'ใช้กับหลายรายการ ', 'จึงไม่ปรับให้อัตโนมัติ'],
+      deleted: ['รายการนี้ถูกลบ', 'ใน Taiga แล้ว'],
     };
-    /** "ปรับ Taiga ตามสถานะนี้เมื่อบันทึก" next to the status. @param {any} s Domain.taigaFormSync() */
+    /** "ปรับ Taiga ด้วย" next to the status: short enough for one line in the narrow column (2026-11-26). @param {any} s Domain.taigaFormSync() */
     function tgFormSync(s, checked) {
       if (!s.show) return '';
       var can = !s.reason;
-      var text = !can ? SYNC_WHY[s.reason]
-        : s.match ? 'Taiga อยู่ที่ "' + s.now + '" ตรงกันแล้ว'
-        : 'Taiga จะเปลี่ยน' + (s.now ? 'จาก "' + s.now + '" ' : '') + 'เป็น "' + s.target + '" ระบบจะถามยืนยันก่อนส่ง';
-      return '<label class="tg-keep"><input type="checkbox" id="f-taiga-sync" aria-describedby="tg-form-why"' + (can && checked ? ' checked' : '') + (can ? '' : ' disabled') + ' /> ปรับ Taiga ตามสถานะนี้เมื่อบันทึก</label>' +
-        '<div class="hint" id="tg-form-why">' + esc(text) + '</div>';
+      var parts = !can ? SYNC_WHY[s.reason]
+        : s.match ? ['Taiga อยู่ที่ ', '"' + s.now + '" ', 'ตรงกันแล้ว']
+        : ['Taiga จะเปลี่ยน'].concat(s.now ? ['จาก "' + s.now + '" '] : [], ['เป็น "' + s.target + '" ', 'ระบบจะถามยืนยัน', 'ก่อนส่ง']);
+      return '<label class="tg-keep"><input type="checkbox" id="f-taiga-sync" aria-describedby="tg-form-why"' + (can && checked ? ' checked' : '') + (can ? '' : ' disabled') + ' /> <span class="nw">ปรับ Taiga ด้วย</span></label>' +
+        '<div class="hint" id="tg-form-why">' + UI.phrases(parts) + '</div>';
     }
 
     function defaults(state) {
@@ -676,7 +678,10 @@
         actions += '<form class="qs-form" data-id="' + esc(r.id) + '"><label class="sr-only" for="qs-' + esc(r.id) + '">เปลี่ยนสถานะ #' + esc(r.seq) + '</label>' +
           '<select id="qs-' + esc(r.id) + '" name="to">' + UI.statusGroups().map(function (g) {
             return '<optgroup label="' + esc(g.label) + '">' + g.options.map(function (o) { return opt(o.value, o.label); }).join('') + '</optgroup>';
-          }).join('') + '</select><button type="submit" class="btn small primary">เปลี่ยนสถานะ</button></form>';
+          }).join('') + '</select><button type="submit" class="btn small primary">เปลี่ยนสถานะ</button>' +
+          // items with a Taiga link: send the new status to Taiga too, after a person confirms (user request 2026-11-26)
+          (D.taigaKey(D.taigaLink(r)) ? '<label class="tg-keep qs-taiga"><input type="checkbox" name="taiga"' + (state.taigaSync ? ' checked' : '') + ' /> ปรับ Taiga ด้วย</label>' : '') +
+          '</form>';
       }
       return '<article class="work' + (r.isOverdue ? ' over' : '') + '"><div><a href="#/items/' + encodeURIComponent(r.id) + '" style="color:inherit">' + esc(r.detail) + '</a>' +
         '<div class="meta"><span>#' + esc(r.seq === null ? '–' : r.seq) + '</span><span>' + esc(r.platform) + ' / ' + esc(r.system) + '</span>' +
@@ -1042,6 +1047,23 @@
         '<button class="btn primary" data-action="export-copy">' + UI.withIcon('copy', 'คัดลอกข้อความ') + '</button></div>';
     }
 
+    var BLOG_URL = 'https://bmslife.bmscloud.in.th/#/blog';
+    /** "สรุปรายงานประจำวัน": pick a day; App fills #daily-text from Api_activity (2026-11-26). */
+    function dailyDialog(state, day) {
+      return '<h2>สรุปรายงานประจำวัน</h2>' +
+        '<p class="muted" style="margin:4px 0 12px">รวมสิ่งที่เปลี่ยนในชีต (ผ่านแอปนี้) และใน Taiga ของวันที่เลือก พร้อมสรุปสะสมของสัปดาห์ คัดลอกไปวางในบล็อก LINE หรืออีเมลได้เลย แก้ข้อความเพิ่มได้ก่อนคัดลอก</p>' +
+        '<div class="export-opts"><div class="field"><label for="daily-date">วันที่ปฏิบัติงาน</label>' +
+        '<input type="date" id="daily-date" value="' + esc(D.toIso(day)) + '" max="' + esc(D.toIso(state.today)) + '" /></div></div>' +
+        '<label class="sr-only" for="daily-text">ข้อความรายงานประจำวัน</label><textarea id="daily-text" class="export-text"></textarea>' +
+        // the app sends nothing to BMS Life: it copies the text and opens the page; the person pastes it (2026-11-26)
+        '<div class="daily-blog"><a class="btn blog-btn" href="' + BLOG_URL + '" target="_blank" rel="noopener" data-action="daily-blog">' +
+        UI.withIcon('copy', 'คัดลอกแล้วเปิด BMS Life Blog') + ' <span aria-hidden="true">↗</span></a>' +
+        '</div>' +
+        '<div class="dialog-actions"><button class="btn" value="close" data-action="export-close">ปิด</button>' +
+        '<button type="button" class="btn" data-action="daily-download">' + UI.withIcon('download', 'ดาวน์โหลด .txt') + '</button>' +
+        '<button type="button" class="btn primary" data-action="daily-copy">' + UI.withIcon('copy', 'คัดลอกข้อความ') + '</button></div>';
+    }
+
     // ------------------------------------------------------------------ Kanban (US8)
 
     var KANBAN_LIMIT = 40;
@@ -1227,6 +1249,6 @@
         '<button class="btn primary" data-action="tour-next" autofocus>' + (step === TOUR.length - 1 ? 'เริ่มใช้งาน' : 'ถัดไป') + '</button></div></div></div>';
     }
 
-    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, form: form, myWork: myWork, access: access, exportDialog: exportDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, taigaRegister: taigaRegister, tgReport: tgReport, tgReview: tgReview, tgCompare: tgCompare, tgFormSync: tgFormSync, help: help, tour: tour, TOUR_STEPS: TOUR.length };
+    return { presenceWarn: presenceWarn, presenceList: presenceList, ITEM_COLS_DEFAULT: ITEM_COLS_DEFAULT, assign: assign, monitor: monitor, kanban: kanban, form: form, myWork: myWork, access: access, exportDialog: exportDialog, dailyDialog: dailyDialog, doneReport: doneReport, drQuery: drQuery, drReport: drReport, taigaRegister: taigaRegister, tgReport: tgReport, tgReview: tgReview, tgCompare: tgCompare, tgFormSync: tgFormSync, help: help, tour: tour, TOUR_STEPS: TOUR.length };
   })();
 </script>

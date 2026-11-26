@@ -152,7 +152,7 @@
     // ------------------------------------------------------------------ API
 
     // Calls that only read; everything else changes data and must wait for fresh data (snapshot, 2026-11-20).
-    var READ_ONLY_API = ['Api_bootstrap', 'Api_heartbeat', 'Api_itemHistory', 'Api_listAccess', 'Api_listDeleted', 'Api_taiga'];
+    var READ_ONLY_API = ['Api_bootstrap', 'Api_heartbeat', 'Api_itemHistory', 'Api_listAccess', 'Api_listDeleted', 'Api_taiga', 'Api_activity'];
 
     function api(name, arg) {
       if (state.stale && READ_ONLY_API.indexOf(name) === -1) {
@@ -476,7 +476,7 @@
       if (document.getElementById('tg-form-sync')) {
         if (!state.taigaFresh && !state.taigaLoading) loadTaiga();
         refreshFormSync();
-      }
+      } else if (document.querySelector('.qs-taiga') && !state.taigaFresh && !state.taigaLoading) loadTaiga();
       if (r.name === 'monitor' && !state.introPlayed) playIntro(main);
     }
 
@@ -624,6 +624,7 @@
 
     var SYNC_KEY = 'ehp.taigaFormSync.v1';
     var formSync = store(SYNC_KEY) === true; // the person's last choice
+    state.taigaSync = formSync; // the นักพัฒนา cards' tick (Views.workCard)
     /** Draw the Taiga tick next to the status in place, so nothing typed in the form is lost. */
     function refreshFormSync() {
       var slot = document.getElementById('tg-form-sync');
@@ -1085,6 +1086,60 @@
       exportOpts.since = /^\d+$/.test(sinceRaw) ? Number(sinceRaw) : null;
       document.getElementById('rep-text').value = reportText();
     }
+    /** Copy a textarea's text; falls back to selecting it. @param {string} id @param {string} msg @param {Function} [after] */
+    function copyText(id, msg, after) {
+      var ta = document.getElementById(id);
+      ta.focus();
+      ta.select();
+      var done = function () { if (after) after(); UI.toast(msg); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(ta.value).then(done, function () {
+          UI.toast('คัดลอกอัตโนมัติไม่ได้ ข้อความถูกเลือกไว้แล้ว กด Ctrl+C (มือถือ: กดค้างแล้วเลือกคัดลอก)', 'error');
+        });
+      } else {
+        UI.toast('ข้อความถูกเลือกไว้แล้ว กด Ctrl+C เพื่อคัดลอก');
+      }
+    }
+    /** Save a textarea's text as a .txt file. @param {string} id @param {string} fileName */
+    function downloadText(id, fileName) {
+      var blob = new Blob([document.getElementById(id).value], { type: 'text/plain;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    }
+
+    // ------------------------------------------------------------------ daily report (2026-11-26)
+
+    var daily = { date: null, seq: 0 }; // seq: only the newest answer is drawn
+    function openDaily() {
+      daily.date = state.today;
+      var dlg = document.getElementById('dialog');
+      dlg.className = 'export-dialog';
+      dlg.innerHTML = '<form id="daily-form" method="dialog">' + Views.dailyDialog(state, daily.date) + '</form>';
+      dlg.showModal();
+      loadDaily();
+    }
+    function loadDaily() {
+      var ta = document.getElementById('daily-text');
+      var mine = ++daily.seq;
+      var day = daily.date;
+      ta.value = 'กำลังรวบรวมการเปลี่ยนแปลงในชีตและ Taiga…';
+      ta.setAttribute('aria-busy', 'true');
+      api('Api_activity', { date: D.formatDate(day) }).then(function (res) {
+        if (mine !== daily.seq || !document.getElementById('daily-text')) return;
+        ta.removeAttribute('aria-busy');
+        if (!res.ok) {
+          ta.value = res.message || 'โหลดข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง';
+          return;
+        }
+        var rep = D.dailyReport({ date: day, rows: state.rows, log: res.data.log, taiga: res.data.taiga });
+        ta.value = D.dailyReportText(rep, { reporter: state.myName(), today: state.today, rows: state.rows });
+      });
+    }
+
     /** Next report's "new items" start after the highest ลำดับ in this one. */
     function rememberReportBaseline() {
       store(REPORT_KEY, D.nextSeq(state.rows) - 1);
@@ -1330,28 +1385,23 @@
       'export-open': openExport,
       'export-close': function () { document.getElementById('dialog').close(); },
       'export-copy': function () {
-        var ta = document.getElementById('rep-text');
-        ta.focus();
-        ta.select();
-        var done = function () { rememberReportBaseline(); UI.toast('คัดลอกข้อความแล้ว วางใน LINE หรืออีเมลได้เลย'); };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(ta.value).then(done, function () {
-            UI.toast('คัดลอกอัตโนมัติไม่ได้ ข้อความถูกเลือกไว้แล้ว กด Ctrl+C (มือถือ: กดค้างแล้วเลือกคัดลอก)', 'error');
-          });
-        } else {
-          UI.toast('ข้อความถูกเลือกไว้แล้ว กด Ctrl+C เพื่อคัดลอก');
-        }
+        copyText('rep-text', 'คัดลอกข้อความแล้ว วางใน LINE หรืออีเมลได้เลย', rememberReportBaseline);
       },
       'export-download': function () {
-        var text = document.getElementById('rep-text').value;
-        var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-        var a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'สรุปรายการขอแก้ไข-' + D.formatDate(state.today).split('/').join('-') + '.txt';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        downloadText('rep-text', 'สรุปรายการขอแก้ไข-' + D.formatDate(state.today).split('/').join('-') + '.txt');
         rememberReportBaseline();
+      },
+      'daily-open': openDaily,
+      'daily-blog': function (el) {
+        // links are handled here (preventDefault), so open it in the same click that copies
+        copyText('daily-text', 'คัดลอกรายงานแล้ว กด "เขียน blog วันนี้" ที่มุมขวาล่าง แล้ววางข้อความ');
+        window.open(el.getAttribute('href'), '_blank', 'noopener');
+      },
+      'daily-copy': function () {
+        copyText('daily-text', 'คัดลอกรายงานแล้ว วางในบล็อก LINE หรืออีเมลได้เลย');
+      },
+      'daily-download': function () {
+        downloadText('daily-text', 'รายงานประจำวัน-' + D.formatDate(daily.date).split('/').join('-') + '.txt');
       },
       'mw-week': function (el, ev) {
         if (ev) ev.preventDefault();
@@ -1386,7 +1436,18 @@
     document.addEventListener('change', function (ev) {
       var form = ev.target.form;
       if (ev.target.id === 'mw-who') return setMyName(ev.target.value);
-      if (ev.target.id === 'f-taiga-sync') return store(SYNC_KEY, (formSync = ev.target.checked));
+      if (ev.target.id === 'daily-date') {
+        var picked = D.fromIso(ev.target.value);
+        if (!picked) return;
+        daily.date = picked;
+        return loadDaily();
+      }
+      if (ev.target.id === 'f-taiga-sync' || ev.target.closest('.qs-taiga')) {
+        // one remembered choice for the item form and the นักพัฒนา cards
+        state.taigaSync = formSync = ev.target.checked;
+        document.querySelectorAll('.qs-taiga input').forEach(function (b) { b.checked = formSync; });
+        return store(SYNC_KEY, formSync);
+      }
       if (ev.target.id === 'f-status' && form && form.id === 'item-form') refreshFormSync();
       if (ev.target.classList && ev.target.classList.contains('access-name')) {
         return saveAccess({ email: ev.target.getAttribute('data-email'), name: ev.target.value });
@@ -1467,7 +1528,9 @@
         var qsBtn = form.querySelector('button[type="submit"]');
         qsBtn.disabled = true;
         qsBtn.textContent = 'กำลังบันทึก…';
-        moveStatus(qsRow.id, to); // same safe path: lock, ลำดับ + conflict check, done date for แก้ไขเรียบร้อย
+        var qsTaiga = !!(form.elements.taiga && form.elements.taiga.checked);
+        // same safe path: lock, ลำดับ + conflict check, done date for แก้ไขเรียบร้อย; the sheet first, then Taiga
+        Promise.resolve(moveStatus(qsRow.id, to)).then(function (ok) { return thenSync(ok && qsTaiga, qsRow.id, function () {}); });
         return;
       }
       if (form.classList && form.classList.contains('as-row')) {

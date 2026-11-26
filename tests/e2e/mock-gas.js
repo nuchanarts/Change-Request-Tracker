@@ -42,7 +42,7 @@
   window.__mockLog = log;
   window.__mockNotify = notify;
   var stamp = function () {
-    return '11/11/2026 10:' + String(10 + log.length).slice(-2) + ':00';
+    return D.formatDate(fx.today) + ' 10:' + String(10 + log.length).slice(-2) + ':00'; // the fixture's today
   };
   var latency = Number(params.get('latency') || 250);
   // the remembered-copy start (App.html showSnapshot) is off unless a test asks for it
@@ -367,6 +367,21 @@
             return { time: e.time, who: e.who, action: e.action, column: e.column, from: e.from, to: e.to };
           }),
       );
+    },
+    Api_activity: function (input) {
+      var day = D.parseDate(input && input.date).date;
+      if (!day) return fail('VALIDATION');
+      var range = { from: D.weekRange(day).from, to: day };
+      return ok({
+        log: log.filter(function (e) {
+          var t = D.logTime(e.time);
+          return t && D.inRange(t.date, range);
+        }),
+        taiga: taigaEvents.filter(function (e) {
+          var t = D.bangkokTime(e.at);
+          return t && D.inRange(t.date, range);
+        }),
+      });
     },
     Api_listDeleted: function () {
       if (!user.isAdmin) return { ok: false, code: 'NOT_ADMIN', message: 'เฉพาะผู้ดูแลเท่านั้น' };
