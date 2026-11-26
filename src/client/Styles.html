@@ -47,6 +47,7 @@
       --accent: #3fb8aa;
       --accent-ink: #082522;
       --accent-soft: #163a37;
+      --accent-deep: #9be3da;
       --danger: #ff8a7a;
       --danger-soft: #3a1d1a;
       --warn: #f2b45a;
@@ -77,6 +78,7 @@
   h3 { font-size: 15px; }
   p { margin: 0; }
   :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+  .nw { white-space: nowrap; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .muted { color: var(--muted); }
   .num { font-variant-numeric: tabular-nums; }
@@ -96,6 +98,11 @@
   .brand span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ver { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: 11px; line-height: 18px; }
   .page-head .back, .drill .back { margin-right: var(--s-1); }
+  /* back: easy to spot (user request 2026-11-26) */
+  .btn.back, .btn.small.back { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-deep); font-weight: 600; font-size: 14px; min-height: 36px; padding: 4px 14px 4px 10px; gap: 4px; }
+  .btn.back:hover, .btn.small.back:hover { background: var(--accent); color: var(--accent-ink); }
+  .btn.back .bi { width: 18px; height: 18px; }
+  .btn.back .bi svg { stroke-width: 2.4; }
   .nav { display: flex; gap: var(--s-1); overflow-x: auto; max-width: 100%; }
   .nav a {
     text-decoration: none; color: var(--muted); padding: var(--s-2) var(--s-3);
@@ -981,6 +988,7 @@
   .plan-free { color: var(--muted); font-size: 13px; margin: auto 0; text-align: center; }
   /* My Work: pick a status */
   .qs-form { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .qs-form .qs-taiga { min-height: 34px; font-size: 13.5px; white-space: nowrap; gap: 6px; }
   .qs-form select { font: inherit; font-size: 14px; min-height: 34px; max-width: 220px; border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; background: var(--surface); }
   /* item history */
   .hist-panel { margin-top: 14px; }

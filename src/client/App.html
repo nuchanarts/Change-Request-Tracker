@@ -476,7 +476,7 @@
       if (document.getElementById('tg-form-sync')) {
         if (!state.taigaFresh && !state.taigaLoading) loadTaiga();
         refreshFormSync();
-      }
+      } else if (document.querySelector('.qs-taiga') && !state.taigaFresh && !state.taigaLoading) loadTaiga();
       if (r.name === 'monitor' && !state.introPlayed) playIntro(main);
     }
 
@@ -624,6 +624,7 @@
 
     var SYNC_KEY = 'ehp.taigaFormSync.v1';
     var formSync = store(SYNC_KEY) === true; // the person's last choice
+    state.taigaSync = formSync; // the นักพัฒนา cards' tick (Views.workCard)
     /** Draw the Taiga tick next to the status in place, so nothing typed in the form is lost. */
     function refreshFormSync() {
       var slot = document.getElementById('tg-form-sync');
@@ -1386,7 +1387,12 @@
     document.addEventListener('change', function (ev) {
       var form = ev.target.form;
       if (ev.target.id === 'mw-who') return setMyName(ev.target.value);
-      if (ev.target.id === 'f-taiga-sync') return store(SYNC_KEY, (formSync = ev.target.checked));
+      if (ev.target.id === 'f-taiga-sync' || ev.target.closest('.qs-taiga')) {
+        // one remembered choice for the item form and the นักพัฒนา cards
+        state.taigaSync = formSync = ev.target.checked;
+        document.querySelectorAll('.qs-taiga input').forEach(function (b) { b.checked = formSync; });
+        return store(SYNC_KEY, formSync);
+      }
       if (ev.target.id === 'f-status' && form && form.id === 'item-form') refreshFormSync();
       if (ev.target.classList && ev.target.classList.contains('access-name')) {
         return saveAccess({ email: ev.target.getAttribute('data-email'), name: ev.target.value });
@@ -1467,7 +1473,9 @@
         var qsBtn = form.querySelector('button[type="submit"]');
         qsBtn.disabled = true;
         qsBtn.textContent = 'กำลังบันทึก…';
-        moveStatus(qsRow.id, to); // same safe path: lock, ลำดับ + conflict check, done date for แก้ไขเรียบร้อย
+        var qsTaiga = !!(form.elements.taiga && form.elements.taiga.checked);
+        // same safe path: lock, ลำดับ + conflict check, done date for แก้ไขเรียบร้อย; the sheet first, then Taiga
+        Promise.resolve(moveStatus(qsRow.id, to)).then(function (ok) { return thenSync(ok && qsTaiga, qsRow.id, function () {}); });
         return;
       }
       if (form.classList && form.classList.contains('as-row')) {

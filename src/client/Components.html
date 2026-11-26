@@ -140,6 +140,7 @@
       trash: '<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/>',
       copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
       download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+      back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
     };
     /** Icon + text for buttons (icon is decorative; the text carries the meaning). */
     function withIcon(name, text) {
@@ -151,7 +152,7 @@
 
     /** In-app back button: returns to the page the user came from (see App back()). */
     function backButton() {
-      return '<button type="button" class="btn small back" data-action="back" aria-label="กลับ"><span aria-hidden="true">←</span> กลับ</button>';
+      return '<button type="button" class="btn small back" data-action="back" aria-label="กลับ">' + withIcon('back', 'กลับ') + '</button>';
     }
 
     function emptyState(title, text, actionHtml) {
@@ -220,13 +221,19 @@
       ];
     }
 
+    /** Thai has no spaces between words, so the browser may break inside one. Each part stays on one line;
+     *  lines break only between parts (<wbr>), and the text reads exactly as the parts joined. */
+    function phrases(parts) {
+      return parts.map(function (p) { return '<span class="nw">' + esc(p) + '</span>'; }).join('<wbr>');
+    }
+
     function fieldWrap(o, control, autoWarn) {
       return (
         '<div class="field' + (o.wide ? ' wide' : '') + (o.feature ? ' field-feature' : '') + (o.required ? ' field-required' : '') + (o.pmFills ? ' field-pm' : '') + '"><label for="f-' + esc(o.name) + '">' + (o.icon ? '<span class="li">' + icon(o.icon) + '</span>' : '') + esc(o.label) +
         (o.required ? ' <span class="req" aria-hidden="true">* จำเป็น</span>' : '') + (o.tip ? ' ' + helpTip(o.tip) : '') + '</label>' +
         control +
         '<div id="h-' + esc(o.name) + '">' +
-        (o.hint ? '<div class="hint">' + esc(o.hint) + '</div>' : '') +
+        (o.hint ? '<div class="hint">' + (Array.isArray(o.hint) ? phrases(o.hint) : esc(o.hint)) + '</div>' : '') +
         (o.error ? '<div class="err">' + esc(o.error) + '</div>' : '') +
         (o.warn || autoWarn ? '<div class="warn">' + esc(o.warn || autoWarn) + '</div>' : '') +
         '</div></div>'
@@ -337,7 +344,7 @@
 
     return {
       esc: esc, statusLines: statusLines, statusBadge: statusBadge, statusClass: statusClass, urgency: urgency, due: due, ticket: ticket,
-      helpTip: helpTip, withIcon: withIcon, backButton: backButton, calendar: calendar, ticketLink: ticketLink, taigaButton: taigaButton, TAIGA_URL: TAIGA_URL, illustration: illustration, mascots: mascots, icon: icon, emptyState: emptyState, loading: loading, errorState: errorState,
+      phrases: phrases, helpTip: helpTip, withIcon: withIcon, backButton: backButton, calendar: calendar, ticketLink: ticketLink, taigaButton: taigaButton, TAIGA_URL: TAIGA_URL, illustration: illustration, mascots: mascots, icon: icon, emptyState: emptyState, loading: loading, errorState: errorState,
       select: select, multiPick: multiPick, statusGroups: statusGroups, input: input, textarea: textarea, combobox: combobox, dateField: dateField,
       toast: toast, confirm: confirm,
     };
